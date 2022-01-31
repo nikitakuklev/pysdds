@@ -1,11 +1,10 @@
-[![MIT License][license-shield]][license-url]
-
 <br />
 <div align="center">
   <h3 align="center">pySDDS</h3>
   <p align="center">
     Pure Python SDDS reader and writer
   </p>
+  ![GitHub](https://img.shields.io/github/license/nikitakuklev/pysdds)
 </div>
 
 <!-- TABLE OF CONTENTS -->
@@ -42,22 +41,22 @@ Self Describing Data Set (SDDS) [file format](https://ops.aps.anl.gov/manuals/sd
 
 ### Installation
 Clone this repository:
-```
+```bash
 git clone https://github.com/nkuklev/pysdds
 ```
 and add to path during runtime:
-```
+```python
 sys.path.append(<location where repo was cloned>/pysdds)
 ```
 If you have access to ANL APS network, you can install package in development mode, and it will be updated automatically with new versions:
-```
+```bash
 pip install -e /home/oxygen/NKUKLEV/software/pysdds
 ```
 Public PyPI/conda packages will be added once the codebase matures
 
 ## Usage
 Reading a file:
-```
+```python
 import pysdds
 
 # All parameters are automatically inferred
@@ -74,7 +73,7 @@ sdds = pysdds.read('file.sdds', pages=[0,2], columns=['x','y'], arrays=['matrix1
 ```
 
 Working with data:
-```
+```python
 sdds = pysdds.read('file.sdds')
 
 # Get column 'x' and parameter 'betax'
