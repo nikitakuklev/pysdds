@@ -6,10 +6,9 @@
   </p>
   <img alt="GitHub" src="https://img.shields.io/github/license/nikitakuklev/pysdds">
   <img alt="GitHub release (latest by date)" src="https://img.shields.io/github/v/release/nikitakuklev/pysdds">
+  <img alt="GitHub release (latest by date including pre-releases)" src="https://img.shields.io/github/v/release/nikitakuklev/pysdds?include_prereleases&label=dev%20release">
 </div>
 
-
-<!-- TABLE OF CONTENTS -->
 <details>
   <summary>Table of Contents</summary>
   <ol>
@@ -44,13 +43,13 @@ Self Describing Data Set (SDDS) [file format](https://ops.aps.anl.gov/manuals/sd
 ### Installation
 Clone this repository:
 ```bash
-git clone https://github.com/nkuklev/pysdds
+git clone https://github.com/nikitakuklev/pysdds.git
 ```
 and add to path during runtime:
 ```python
 sys.path.append(<location where repo was cloned>/pysdds)
 ```
-If you have access to ANL APS network, you can install package in development mode, and it will be updated automatically with new versions:
+or install in pip development mode. If you have access to ANL APS network, you can install latest development version with:
 ```bash
 pip install -e /home/oxygen/NKUKLEV/software/pysdds
 ```
@@ -129,9 +128,9 @@ Package architecture is straightforward - file header is first parsed to determi
 
 ## Version history
 
-* 0.11
+* 0.1.1
   * Implemented fast zero-copy path for numeric-only data
-* 0.1
+* 0.1.0
   * Initial release, read support for most ASCII/binary cases
 
 ## Contributing
