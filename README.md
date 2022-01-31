@@ -1,11 +1,13 @@
-<br />
+<br/>
 <div align="center">
   <h3 align="center">pySDDS</h3>
   <p align="center">
-    Pure Python SDDS reader and writer
+    Efficient Python SDDS reader and writer
   </p>
-  ![GitHub](https://img.shields.io/github/license/nikitakuklev/pysdds)
+  <img alt="GitHub" src="https://img.shields.io/github/license/nikitakuklev/pysdds">
+  <img alt="GitHub release (latest by date)" src="https://img.shields.io/github/v/release/nikitakuklev/pysdds">
 </div>
+
 
 <!-- TABLE OF CONTENTS -->
 <details>
