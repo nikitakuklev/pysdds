@@ -882,7 +882,7 @@ def _read_pages_binary(file: IO[bytes],
         # Array reading loop
         for i in range(n_arrays):
             a = sdds.arrays[i]
-            data_array = None
+            mask = arrays_mask[i] and not page_skip
             type_len = arrays_size[i]
             mapped_t = arrays_type[i]
             if TRACE:
@@ -902,33 +902,31 @@ def _read_pages_binary(file: IO[bytes],
 
             if type_len is None:
                 # Strings need special treatment
-                data_array = np.empty(dimensions, dtype=object) if arrays_mask[i] else None
+                data_array = np.empty(dimensions, dtype=object) if mask else None
                 for j in range(n_elements):
                     byte_array = file.read(4)
                     assert len(byte_array) == 4
                     string_len_actual = int.from_bytes(byte_array, endianness)
                     assert 0 <= string_len_actual <= 10000
-                    if arrays_mask[i]:
-                        if string_len_actual == 0:
+                    if string_len_actual == 0:
+                        if mask:
                             data_array[j] = ''
-                        else:
-                            data_array[j] = file.read(string_len_actual).decode('ascii')
                     else:
-                        file.read(string_len_actual)
+                        if mask:
+                            data_array[j] = file.read(string_len_actual).decode('ascii')
+                if mask:
+                    arrays[i].data.append(data_array)
             else:
                 # Should read the right number of bytes or EOF
                 data_bytes = file.read(type_len * n_elements)
                 if len(data_bytes) < type_len * n_elements:
                     raise ValueError(f'>>Array {a.name} read failed because of EOF')
-
-                if arrays_mask[i] and not page_skip:
+                if mask:
                     # Arrays are initialized in C order by default, matching SDDS
                     values = np.frombuffer(data_bytes, dtype=mapped_t)
                     data_array = np.empty(dimensions, dtype=mapped_t)
                     data_array[:] = values[:]
-
-            if arrays_mask[i] and not page_skip:
-                arrays[i].data.append(data_array)
+                    arrays[i].data.append(data_array)
 
         # Column reading loop
         fixed_rowcount_eof = False
@@ -1174,7 +1172,6 @@ def _read_pages_binary(file: IO[bytes],
                         idx_active += 1
                 page_stored_idx += 1
 
-            columns_data = []
             if TRACE:
                 logger.debug(f'Page {page_idx} data copy finished')
 
@@ -1197,13 +1194,13 @@ def _read_pages_binary(file: IO[bytes],
         # parameters should already be in native format
         for i, el in enumerate(sdds.arrays):
             if arrays_mask[i]:
-                for i in range(len(el.data)):
-                    el.data[i] = el.data[i].byteswap().newbyteorder()
+                for j in range(len(el.data)):
+                    el.data[j] = el.data[j].byteswap().newbyteorder()
 
         for i, c in enumerate(sdds.columns):
             if columns_mask[i]:
-                for i in range(len(c.data)):
-                    c.data[i] = c.data[i].byteswap().newbyteorder()
+                for j in range(len(c.data)):
+                    c.data[j] = c.data[j].byteswap().newbyteorder()
 
     sdds.n_pages = page_stored_idx
 
