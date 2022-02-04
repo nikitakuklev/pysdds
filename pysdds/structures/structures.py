@@ -301,7 +301,7 @@ class Array:
         #     err('page_numbers')
         #     return False
         if len(self.data) != len(other.data):
-            err('page count')
+            err('array length')
             return False
         if self._enabled != other._enabled:
             err('enabled')
@@ -368,12 +368,14 @@ class Column:
     __slots__ = ('__dict__', 'nm', 'data', 'sdds')
 
     def __init__(self, namelist, sdds: "SDDSFile" = None):
-        self.nm = namelist
+        self.nm: dict = namelist
         self.data: List[np.ndarray] = []
         # Internal object - stores original page indices with possible discontinuities
-        self._page_numbers = []
-        self._enabled = True
-        self.sdds = sdds
+        self._page_numbers: List[int] = []
+        # Stores if column is enabled (i.e. was parsed)
+        self._enabled: bool = True
+        # Parent SDDSFile
+        self.sdds: SDDSFile = sdds
 
     def __eq__(self, other: "Column"):
         return self.compare(other, eps=None)
@@ -519,7 +521,8 @@ class SDDSFile:
     Holds all objects in sorted lists and provides convenience access and setting methods
     """
 
-    __slots__ = ('__dict__', 'description', 'parameters', 'arrays', 'columns', 'data', 'mode', 'endianness', 'n_pages')
+    __slots__ = ('__dict__', 'description', 'parameters', 'arrays', 'columns', 'data', 'mode',
+                 'endianness', 'n_pages')
 
     def __init__(self):
         self.description: Optional[Description] = None
@@ -535,8 +538,10 @@ class SDDSFile:
         self._source_file_size: Optional[int] = None
         # self.columns_dict = None
 
-        self.n_pages: Optional[int] = None
-        self.n_parameters: Optional[int] = None
+        self.n_pages: int = 0
+        self.n_parameters: int = 0
+        self.n_arrays: int = 0
+        self.n_columns: int = 0
 
         # This indicates parsing mode with more rows specified than actually exist, used in loggers
         self._meta_fixed_rowcount = False
@@ -623,6 +628,12 @@ class SDDSFile:
         if self.n_parameters != other.n_parameters:
             err('n_parameters', self.n_parameters, other.n_parameters)
             return False
+        if self.n_arrays != other.n_arrays != len(self.arrays) != len(other.arrays):
+            err('n_arrays', self.n_arrays, other.n_arrays)
+            return False
+        if self.n_columns != other.n_columns != len(self.columns) != len(other.columns):
+            err('n_columns', self.n_columns, other.n_columns)
+            return False
 
         if self.description is None:
             if other.description is not None:
@@ -639,7 +650,8 @@ class SDDSFile:
             #     if not self.parameters[i].compare(other.parameters[i], eps, raise_error, fixed_equivalent=True):
             #         return False
             # else:
-            if not self.parameters[i].compare(other.parameters[i], eps, raise_error, fixed_equivalent=True):
+            if not self.parameters[i].compare(other.parameters[i], eps, raise_error,
+                                              fixed_equivalent=fixed_value_equivalent):
                 return False
 
         for i in range(len(self.arrays)):

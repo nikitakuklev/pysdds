@@ -92,4 +92,4 @@ def test_page_mask(file_root):
 def test_read_data_compare(file1, file2):
     sdds1 = pysdds.read(file1)
     sdds2 = pysdds.read(file2)
-    assert sdds1.compare(sdds2, eps=1e-5, raise_error=True)
+    assert sdds1.compare(sdds2, eps=1e-5, raise_error=True, fixed_value_equivalent=True)

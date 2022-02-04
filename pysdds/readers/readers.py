@@ -27,7 +27,7 @@ _NUMPY_DTYPE_STRINGS_LE = {'short': '<i2', 'ushort': '<u2', 'long': '<i4',
 _NUMPY_DTYPE_STRINGS_BE = {'short': '>i2', 'ushort': '>u2', 'long': '>i4',
                            'float': '>f4', 'double': '>f8', 'character': '>i1', 'string': object}
 _NUMPY_DTYPE_FINAL = {'short': 'i2', 'ushort': 'u2', 'long': 'i4',
-                      'float': 'f4', 'double': 'f8', 'character': object, 'string': object} #np.dtype('U1')
+                      'float': 'f4', 'double': 'f8', 'character': object, 'string': object}  # np.dtype('U1')
 _STRUCT_DTYPE_STRINGS_LE = {'short': '<h', 'ushort': '<H', 'long': '<l',
                             'float': '<f', 'double': '<d', 'character': '<c', 'string': object}
 _STRUCT_DTYPE_STRINGS_BE = {'short': '>h', 'ushort': '>H', 'long': '>l',
@@ -45,7 +45,7 @@ _KEYS_DATA = {'mode', 'lines_per_row', 'no_row_counts', 'additional_header_lines
 
 _ASCII_TEXT_PARSE_METHOD = 'read_table'
 # _ASCII_TEXT_PARSE_METHOD = 'shlex'
-_ASCII_NUMERIC_PARSE_METHOD = 'read_table'#'fromtxt'
+_ASCII_NUMERIC_PARSE_METHOD = 'read_table'  # 'fromtxt'
 
 
 def _open_file(filepath: Path, compression: str, use_magic_values: bool = False) -> IO[bytes]:
@@ -336,7 +336,7 @@ def read(filepath: Union[Path, str],
         file.close()
 
     cols_enabled = [c for c in sdds.columns if c._enabled]
-    n_colenabled = len(cols_enabled)
+    n_cols_enabled = len(cols_enabled)
     arrays_enabled = sum(1 for c in sdds.arrays if c._enabled)
     if len(cols_enabled) > 0:
         n_rows = sum(len(v) for v in cols_enabled[0].data)
@@ -344,7 +344,7 @@ def read(filepath: Union[Path, str],
         n_rows = 0
     logger.info(f'Finished in {(time.perf_counter() - t_start) * 1e3:.3f} ms')
     logger.info(f'Totals: {sdds.n_pages} pages, {n_rows} rows, {len(sdds.parameters)} parameters,'
-                f' {arrays_enabled}/{len(sdds.arrays)} arrays, {n_colenabled}/{len(sdds.columns)} columns\n')
+                f' {arrays_enabled}/{len(sdds.arrays)} arrays, {n_cols_enabled}/{len(sdds.columns)} columns\n')
     logger.debug(f'File description:')
     logger.debug(f'{sdds.describe()}')
     return sdds
@@ -701,6 +701,10 @@ def _read_header_fullstream(file: IO[bytes], sdds: SDDSFile, mode: str, endianne
         if sdds.data is None:
             raise AttributeError('SDDS file contains columns, arrays, or parameters - &data namelist is required')
 
+    sdds.n_parameters = len(sdds.parameters)
+    sdds.n_arrays = len(sdds.arrays)
+    sdds.n_columns = len(sdds.columns)
+
 
 def _read_pages_binary(file: IO[bytes],
                        sdds: SDDSFile,
@@ -767,9 +771,10 @@ def _read_pages_binary(file: IO[bytes],
     n_parameters = len(parameters)
 
     # Arrays go here
+    arrays = sdds.arrays
     arrays_type = []
     arrays_size: List[Optional[int]] = []
-    for i, a in enumerate(sdds.arrays):
+    for i, a in enumerate(arrays):
         t = a.type
         if t == 'string':
             mapped_t = object
@@ -788,7 +793,6 @@ def _read_pages_binary(file: IO[bytes],
     columns_structs = []
     columns_store_type = []
     columns_len: List[Optional[int]] = []
-    columns_data = []
     combined_struct = combined_size = None
     columns = sdds.columns
     for i, c in enumerate(columns):
@@ -876,9 +880,9 @@ def _read_pages_binary(file: IO[bytes],
                 el.data.append(parameter_data[i])
 
         # Array reading loop
-        array_idx = 0
         for i in range(n_arrays):
             a = sdds.arrays[i]
+            data_array = None
             type_len = arrays_size[i]
             mapped_t = arrays_type[i]
             if TRACE:
@@ -911,9 +915,6 @@ def _read_pages_binary(file: IO[bytes],
                             data_array[j] = file.read(string_len_actual).decode('ascii')
                     else:
                         file.read(string_len_actual)
-
-                if arrays_mask[i] and not page_skip:
-                    arrays_data.append(data_array)
             else:
                 # Should read the right number of bytes or EOF
                 data_bytes = file.read(type_len * n_elements)
@@ -925,12 +926,12 @@ def _read_pages_binary(file: IO[bytes],
                     values = np.frombuffer(data_bytes, dtype=mapped_t)
                     data_array = np.empty(dimensions, dtype=mapped_t)
                     data_array[:] = values[:]
-                    arrays_data.append(data_array)
-            array_idx += 1
+
+            if arrays_mask[i] and not page_skip:
+                arrays[i].data.append(data_array)
 
         # Column reading loop
         fixed_rowcount_eof = False
-
         if sdds.data.column_major_order != 0:
             # Column major order
             for i in range(n_columns):
@@ -1082,7 +1083,7 @@ def _read_pages_binary(file: IO[bytes],
                     if columns_mask[i]:
                         arr = array[f'f{i}'].copy()
                         if columns_len[i] == 1:
-                            #c.data.append(np.char.decode(arr.view('S1'), 'ascii'))
+                            # c.data.append(np.char.decode(arr.view('S1'), 'ascii'))
                             c.data.append(np.char.decode(arr.view('S1'), 'ascii').astype(object))
                         else:
                             c.data.append(arr)
@@ -1207,380 +1208,6 @@ def _read_pages_binary(file: IO[bytes],
     sdds.n_pages = page_stored_idx
 
 
-def _read_pages_ascii_lines(file: IO[bytes],
-                            sdds: SDDSFile,
-                            arrays_mask: List[bool],
-                            columns_mask: List[bool],
-                            pages_mask: List[bool]) -> None:
-    """
-    A basic ASCII SDDS parser. Compatible with ASCII data type in NON-STREAMING mode (lines_per_row >= 1).
-
-    Parameters
-    ----------
-    file
-    sdds
-    arrays_mask
-    columns_mask
-    pages_mask
-
-    Returns
-    -------
-    None
-    """
-
-    # Assemble data types
-    # Parameters are first on every page - for ASCII, parameters precede page size
-    # Those with fixed_value are skipped from reading
-    parameters = []
-    parameter_types = []
-    for p in sdds.parameters:
-        if not p.fixed_value:
-            t = p.type
-            parameters.append(p)
-            parameter_types.append(_NUMPY_DTYPES[t])
-
-    logger.debug(f'Parameter types: {parameter_types}')
-
-    # Arrays
-    arrays_type = []
-    for i, a in enumerate(sdds.arrays):
-        t = a.type
-        arrays_type.append(_NUMPY_DTYPES[t])
-
-    # Columns
-    columns_type = []
-    columns_store_type = []
-    for i, c in enumerate(sdds.columns):
-        t = c.type
-        columns_type.append(_NUMPY_DTYPES[t])
-        columns_store_type.append(_NUMPY_DTYPE_FINAL[t])
-    columns_all_numeric = object not in columns_type
-    struct_type = None
-    if columns_all_numeric:
-        struct_type = np.dtype(', '.join(columns_type))
-    logger.debug(f'Column types: {columns_type}')
-    logger.debug(f'All numeric: {columns_all_numeric}')
-    logger.debug(f'struct_type: {struct_type}')
-
-    page_idx = 0
-    page_stored_idx = 0
-    # Flag for eof since can't break out of two loops
-    reached_eof = False
-    # To avoid seeking backwards, buffer a line
-    # buffered_line = None
-    while True:
-        # This is main loop for reading pages
-        # Try find first valid line or EOF
-        if reached_eof:
-            break
-
-        buffered_line = __get_next_line(file)
-        if buffered_line is None:
-            logger.debug(f'>>PARS | pos {file.tell()} | reached EOF while reading page {page_idx}')
-            break
-
-        if pages_mask is not None:
-            if page_idx >= len(pages_mask):
-                raise Exception(f'Found more pages (>{page_idx}+1) than given in mask ({len(pages_mask)})')
-            else:
-                page_skip = pages_mask[page_idx]
-        else:
-            page_skip = False
-
-        if page_skip:
-            logger.debug(f'>>PG | pos {file.tell()} | skipping page {page_idx}')
-        else:
-            logger.debug(f'>>PG | pos %d | reading page %d', file.tell(), page_idx)
-
-        # Read parameters
-        parameter_data = []
-        par_idx = 0
-        par_line_num = 0
-        while par_idx < len(parameter_types):
-            b_array = buffered_line or __get_next_line(file)
-            buffered_line = None
-            if b_array is None:
-                raise Exception(f'>>PARS | pos {file.tell()} | unexpected EOF at page {page_idx}')
-            par_line_num += 1
-
-            if par_line_num > 10000:
-                raise Exception('Did not finish parsing parameters after 10000 lines - something is wrong')
-
-            if parameter_types[par_idx] == object:
-                value = b_array.strip()
-                # Indicates a variable length string
-                if value.startswith('"') and value.endswith('"'):
-                    value = value[1:-1]
-                if TRACE:
-                    logger.debug(
-                        f'>>PARS | pos {file.tell()} | {par_idx=} | {parameter_types[par_idx]} | {repr(b_array)} | {value}')
-            else:
-                # Primitive types
-                value = np.fromstring(b_array, dtype=parameter_types[par_idx], sep=' ', count=1)[0]
-                if TRACE:
-                    logger.debug(
-                        f'>>PARV | pos {file.tell()} | {par_idx=} | {parameter_types[par_idx]} | {repr(b_array)} | {value}')
-            parameter_data.append(value)
-            par_idx += 1
-
-        # Assign data to the parameters
-        if not page_skip:
-            for i, el in enumerate(parameters):
-                el.data.append(parameter_data[i])
-
-        arrays_data = []
-        array_idx = 0
-        while array_idx < len(arrays_type):
-            a = sdds.arrays[array_idx]
-            mapped_t = arrays_type[array_idx]
-
-            # Array dimensions
-            b_array = buffered_line or __get_next_line(file)
-            buffered_line = None
-            if b_array is None:
-                raise Exception(f'>>ARRS | pos {file.tell()} | unexpected EOF at page {page_idx}')
-
-            dimensions = np.fromstring(b_array, dtype=int, sep=' ', count=-1)
-            # dimensions_strings = _array.split()
-            n_elements = np.prod(dimensions)
-            if len(dimensions) != a.dimensions:
-                raise ValueError(f'>>Array {a.name} dimensions {b_array} did not match expected count {a.dimensions}')
-            logger.debug(f'>>Array {a.name} has dimensions {dimensions}, total of {n_elements}')
-
-            # Start reading array
-            n_lines_read = 0
-            n_elements_read = 0
-            line_values = []
-            if arrays_type[array_idx] == object:
-                # Strings need special treatment
-                while True:
-                    b_array = __get_next_line(file).strip()
-                    n_lines_read += 1
-                    if b_array is None:
-                        raise Exception(f'>>ARRV | {file.tell()} | unexpected EOF at page {page_idx}')
-                    values = shlex.split(b_array, posix=True)
-                    logger.debug(
-                        f'>>ARRV | {file.tell()} | {array_idx=} | {mapped_t} | {repr(b_array)} | {values} | {n_elements=} | {n_lines_read=}')
-                    n_elements_read += len(values)
-                    line_values.append(values)
-                    if n_elements_read < n_elements:
-                        continue
-                    elif n_elements_read == n_elements:
-                        # Done
-                        break
-                    else:
-                        raise Exception(
-                            f'Too many elements read during array parsing: {n_elements_read} (need {n_elements})')
-            else:
-                # Primitive types
-                while True:
-                    b_array = __get_next_line(file)
-                    n_lines_read += 1
-                    if b_array is None:
-                        raise Exception(f'>>ARRV | {file.tell()} | unexpected EOF at page {page_idx}')
-                    values = np.fromstring(b_array, dtype=mapped_t, sep=' ', count=-1)
-                    if TRACE:
-                        logger.debug(
-                            f'>>ARRV | {file.tell()} | {array_idx=} | {mapped_t} | {repr(b_array)} | {values} | {n_elements=} | {n_lines_read=}')
-                    n_elements_read += len(values)
-                    line_values.append(values)
-                    if n_elements_read < n_elements:
-                        continue
-                    elif n_elements_read == n_elements:
-                        # Done
-                        break
-                    else:
-                        raise Exception(
-                            f'Too many elements read during array parsing: {n_elements_read} (need {n_elements})')
-
-            if arrays_mask[array_idx]:
-                values = np.concatenate(line_values)
-
-                # Arrays are initialized in C order by default, matching SDDS
-                if mapped_t == str:
-                    data_array = np.empty(dimensions, dtype=object)
-                else:
-                    data_array = np.empty(dimensions, dtype=mapped_t)
-                data_array[:] = values[:]
-                arrays_data.append(data_array)
-
-            array_idx += 1
-
-        # Read column page size
-        b_array = buffered_line or __get_next_line(file)
-        buffered_line = None
-        if b_array is None:
-            raise Exception(f'>>COLS | {file.tell()} | unexpected EOF at page {page_idx}')
-
-        page_size = int(b_array)
-        assert 0 <= page_size <= 1e7
-        logger.debug(f'>>COLS | {file.tell()} | page size: {page_size}')
-
-        # Columns data init
-        columns_data = []
-        if not page_skip:
-            for i, c in enumerate(sdds.columns):
-                if columns_mask[i]:
-                    columns_data.append(np.empty(page_size, dtype=columns_store_type[i]))
-
-        if columns_all_numeric:
-            outlist = []
-            gen = (__get_next_line(file, accept_meta_commands=False, strip=True) for _ in range(page_size))
-            # for line in gen:
-            #    if len(line) == 0:
-            #        raise ValueError(f'Unexpected empty string at position {file.tell()}')
-            # if not page_skip:
-            outlist = np.loadtxt(gen, dtype=struct_type)
-            # outlist.append(out)
-            # if TRACE:
-            #     logger.debug(f'>COL ROW {row} | {len(out)}: {out=}')
-
-            if not page_skip:
-                data = outlist  # np.hstack(outlist)
-                col_idx_active = 0
-                for col_idx in range(len(columns_mask)):
-                    if columns_mask[col_idx]:
-                        columns_data[col_idx_active] = data[f'f{col_idx}']
-                        col_idx_active += 1
-
-        else:
-            for row in range(page_size):
-                line = __get_next_line(file, accept_meta_commands=False, strip=True)
-                line_len = len(line)
-                if line_len == 0:
-                    raise ValueError(f'Unexpected empty string at position {file.tell()}')
-
-                col_idx_active = 0
-                col_idx = 0
-                values = shlex.split(line, posix=True)
-                if TRACE:
-                    logger.debug(f'>COL ROW {row} | {len(values)}: {values=}')
-                for c in sdds.columns:
-                    if columns_mask[col_idx]:
-                        t = columns_type[col_idx]
-                        if t == object:
-                            value = values[col_idx]
-                        else:
-                            value = np.fromstring(values[col_idx], dtype=t, count=1, sep=' ')[0]
-                        columns_data[col_idx_active][row] = value
-                        if TRACE:
-                            logger.debug(f'>>CR {row=} | {c.name}:{value}')
-                        col_idx_active += 1
-                    col_idx += 1
-            # else:
-            #     # a simple state machine that seeks using two indices (start, end)
-            #     col_idx = 0
-            #     col_idx_active = 0
-            #     pointer_last = 0
-            #     if TRACE:
-            #         logger.debug(f'>COL ROW {row}')
-            #
-            #     # Two state flag booleans (instead of an enum, for performance reasons)
-            #     # True if inside quotes ("), and all characters should be treated literally, False otherwise
-            #     is_literal_mode = False
-            #     # Next character will be treated as escaped
-            #     is_escape_mode = False
-            #     value_contains_escape_sequences = False
-            #     # True if scanning within a value, False if scanning the space between columns
-            #     is_reading_spacing = True
-            #
-            #     for pointer in range(line_len):
-            #         char = line[pointer]
-            #         if char == '!':
-            #             # everything afterwards should be ignored
-            #             assert not is_literal_mode
-            #             assert is_reading_spacing
-            #             logger.debug(f'>>CR {pointer=} {row=} > {char=} COMMENT SKIP REST')
-            #             break
-            #         if TRACE:
-            #             logger.debug(
-            #                 f'>>CR {row=} | {col_idx=} | {col_idx_active=} | {pointer_last=} | {pointer=} | {char=}')
-            #         if is_reading_spacing:
-            #             if char == ' ':
-            #                 # skip spaces
-            #                 pointer_last = pointer
-            #                 continue
-            #             else:
-            #                 # start reading next value
-            #                 pointer_last = pointer
-            #                 is_reading_spacing = False
-            #
-            #         if char == ' ' or pointer == line_len - 1:
-            #             if is_escape_mode:
-            #                 raise Exception
-            #             if pointer == line_len - 1:
-            #                 if is_literal_mode:
-            #                     # Closing quote of line
-            #                     assert char == '"'
-            #                     is_literal_mode = False
-            #                 # shift by one at end of string
-            #                 pointer += 1
-            #             if is_literal_mode:
-            #                 # advance
-            #                 continue
-            #             else:
-            #                 # end of value
-            #                 # we should not be in literal mode
-            #                 assert not is_literal_mode
-            #                 # add to data if column in mask
-            #                 if columns_mask[col_idx]:
-            #                     value_str = line[pointer_last:pointer]
-            #                     if columns_type[col_idx] == str:
-            #                         if value_str.startswith('"') and value_str.endswith('"'):
-            #                             value = value_str[1:-1]
-            #                         else:
-            #                             value = value_str
-            #                         if value_contains_escape_sequences:
-            #                             value = value.replace('\\"', '"')
-            #                     else:
-            #                         value = np.fromstring(value_str, dtype=columns_type[col_idx], count=1, sep=' ')[0]
-            #                     columns_data[col_idx_active][row] = value
-            #                     col_idx_active += 1
-            #                     if TRACE:
-            #                         logger.debug(
-            #                             f'>>CR {row=} | {file.tell()} | {pointer_last=} | {pointer=} | {line[pointer_last:pointer]} | {value}')
-            #                 else:
-            #                     # l.debug(f'>>CR {row=} | {file.tell()} | {pointer_last=} | {pointer=} | {line[pointer_last:pointer]} | SKIP')
-            #                     pass
-            #                 is_reading_spacing = True
-            #                 col_idx += 1
-            #         elif char == '"':
-            #             if not is_escape_mode:
-            #                 # literal mode toggle
-            #                 is_literal_mode = not is_literal_mode
-            #             else:
-            #                 is_escape_mode = False
-            #                 continue
-            #         elif char == '\\':
-            #             if not is_escape_mode:
-            #                 is_escape_mode = True
-            #                 value_contains_escape_sequences = True
-            #             else:
-            #                 continue
-            #         else:
-            #             if is_escape_mode:
-            #                 is_escape_mode = False
-            #             # any other characted gets added to value
-            #             continue
-
-            # # Sanity checks
-            # assert col_idx == len(sdds.columns)
-            # assert 1 <= col_idx_active <= col_idx
-
-        # Assign data to the columns
-        if not page_skip:
-            col_idx_active = 0
-            for i, c in enumerate(sdds.columns):
-                if columns_mask[i]:
-                    c.data.append(columns_data[col_idx_active])
-                    c._page_numbers.append(page_idx)
-                    col_idx_active += 1
-            page_stored_idx += 1
-        page_idx += 1
-
-    sdds.n_pages = page_stored_idx
-
-
 def _read_pages_ascii_mixed_lines(file: IO[bytes],
                                   sdds: SDDSFile,
                                   arrays_mask: List[bool],
@@ -1589,16 +1216,20 @@ def _read_pages_ascii_mixed_lines(file: IO[bytes],
     """ Line by line numeric data parser for lines_per_row == 1 """
 
     parameters = sdds.parameters
-    parameter_types = [_NUMPY_DTYPES[el.type] for el in parameters]
-    logger.debug(f'Parameter types: {parameter_types}')
+    parameters_type = [_NUMPY_DTYPES[el.type] for el in parameters]
+    n_parameters = len(parameters)
+    logger.debug(f'Parameter types: {parameters_type}')
 
     arrays = sdds.arrays
     arrays_type = [_NUMPY_DTYPES[el.type] for el in arrays]
+    n_arrays = len(arrays)
+    logger.debug(f'Array types: {arrays_type}')
 
     columns = sdds.columns
     columns_type = [_NUMPY_DTYPES[el.type] for el in columns]
     columns_store_type = [_NUMPY_DTYPE_FINAL[el.type] for el in columns]
-    pd_column_dict = {i: columns_store_type [i] if columns_store_type [i] != object else str for i in range(len(columns_type))}
+    pd_column_dict = {i: columns_store_type[i] if columns_store_type[i] != object else str for i in
+                      range(len(columns_type))}
     assert object in columns_type
     struct_type = None
 
@@ -1624,53 +1255,41 @@ def _read_pages_ascii_mixed_lines(file: IO[bytes],
             logger.debug(f'>>PG | pos %d | reading page %d', file.tell(), page_idx)
 
         # Read parameters
-        parameter_data = []
         par_idx = 0
-        par_line_num = 0
-        while par_idx < len(parameter_types):
-            b_array = __get_next_line(file)
+        while par_idx < n_parameters:
+            b_array = __get_next_line(file, strip=True)
             if b_array is None:
                 raise Exception(f'>>PARS | pos {file.tell()} | unexpected EOF at page {page_idx}')
-            par_line_num += 1
-
-            if par_line_num > 10000:
-                raise Exception('Did not finish parsing parameters after 10000 lines - something is wrong')
-
-            if parameter_types[par_idx] == object:
-                value = b_array.strip()
-                # Indicates a variable length string
-                if value.startswith('"') and value.endswith('"'):
-                    value = value[1:-1]
-                if TRACE:
-                    logger.debug(
-                        f'>>PARS | pos {file.tell()} | {par_idx=} | {parameter_types[par_idx]} | {repr(b_array)} | {value}')
-            else:
-                # Primitive types
-                value = np.fromstring(b_array, dtype=parameter_types[par_idx], sep=' ', count=1)[0]
-                if TRACE:
-                    logger.debug(
-                        f'>>PARV | pos {file.tell()} | {par_idx=} | {parameter_types[par_idx]} | {repr(b_array)} | {value}')
-            parameter_data.append(value)
+            if not page_skip:
+                if parameters_type[par_idx] == object:
+                    value = b_array.strip()
+                    # Indicates a variable length string
+                    if value.startswith('"') and value.endswith('"'):
+                        value = value[1:-1]
+                    if TRACE:
+                        logger.debug(
+                            f'>>PARS | pos {file.tell()} | {par_idx=} | {parameters_type[par_idx]} | {repr(b_array)} | {value}')
+                else:
+                    # Primitive types
+                    value = np.fromstring(b_array, dtype=parameters_type[par_idx], sep=' ', count=1)[0]
+                    if TRACE:
+                        logger.debug(
+                            f'>>PARV | pos {file.tell()} | {par_idx=} | {parameters_type[par_idx]} | {repr(b_array)} | {value}')
+                parameters[par_idx].data.append(value)
             par_idx += 1
 
-        # Assign data to the parameters
-        if not page_skip:
-            for i, el in enumerate(parameters):
-                el.data.append(parameter_data[i])
-
-        arrays_data = []
+        # Read arrays
         array_idx = 0
-        while array_idx < len(arrays_type):
-            a = sdds.arrays[array_idx]
+        while array_idx < n_arrays:
+            a = arrays[array_idx]
             mapped_t = arrays_type[array_idx]
 
             # Array dimensions
-            b_array = __get_next_line(file)
+            b_array = __get_next_line(file, strip=True)
             if b_array is None:
                 raise Exception(f'>>ARRS | pos {file.tell()} | unexpected EOF at page {page_idx}')
 
-            dimensions = np.fromstring(b_array, dtype=int, sep=' ', count=-1)
-            # dimensions_strings = _array.split()
+            dimensions = np.fromstring(b_array, dtype=int, sep=' ')
             n_elements = np.prod(dimensions)
             if len(dimensions) != a.dimensions:
                 raise ValueError(f'>>Array {a.name} dimensions {b_array} did not match expected count {a.dimensions}')
@@ -1722,17 +1341,15 @@ def _read_pages_ascii_mixed_lines(file: IO[bytes],
                         raise Exception(
                             f'Too many elements read during array parsing: {n_elements_read} (need {n_elements})')
 
-            if arrays_mask[array_idx]:
+            if arrays_mask[array_idx] and not page_skip:
                 values = np.concatenate(line_values)
-
                 # Arrays are initialized in C order by default, matching SDDS
                 if mapped_t == str:
                     data_array = np.empty(dimensions, dtype=object)
                 else:
                     data_array = np.empty(dimensions, dtype=mapped_t)
                 data_array[:] = values[:]
-                arrays_data.append(data_array)
-
+                arrays[array_idx].data.append(data_array)
             array_idx += 1
 
         # Read column page size
@@ -1770,7 +1387,7 @@ def _read_pages_ascii_mixed_lines(file: IO[bytes],
             # iowrap.detach()
             df = pd.read_table(buf, encoding='ascii', **opts)
             # df = pd.read_table(file, encoding='ascii', **opts)
-            print(df.dtypes)
+            # print(df.dtypes)
             # Assign data to the columns
             if not page_skip:
                 col_idx_active = 0
@@ -1822,6 +1439,111 @@ def _read_pages_ascii_mixed_lines(file: IO[bytes],
                         col_idx_active += 1
                 page_stored_idx += 1
             page_idx += 1
+        # elif _ASCII_TEXT_PARSE_METHOD == 'state_machine':
+        # # Columns data init
+        # columns_data = []
+        # if not page_skip:
+        #     for i, c in enumerate(sdds.columns):
+        #         if columns_mask[i]:
+        #             columns_data.append(np.empty(page_size, dtype=columns_store_type[i]))
+        #     # a simple state machine that seeks using two indices (start, end)
+        #     col_idx = 0
+        #     col_idx_active = 0
+        #     pointer_last = 0
+        #     if TRACE:
+        #         logger.debug(f'>COL ROW {row}')
+        #
+        #     # Two state flag booleans (instead of an enum, for performance reasons)
+        #     # True if inside quotes ("), and all characters should be treated literally, False otherwise
+        #     is_literal_mode = False
+        #     # Next character will be treated as escaped
+        #     is_escape_mode = False
+        #     value_contains_escape_sequences = False
+        #     # True if scanning within a value, False if scanning the space between columns
+        #     is_reading_spacing = True
+        #
+        #     for pointer in range(line_len):
+        #         char = line[pointer]
+        #         if char == '!':
+        #             # everything afterwards should be ignored
+        #             assert not is_literal_mode
+        #             assert is_reading_spacing
+        #             logger.debug(f'>>CR {pointer=} {row=} > {char=} COMMENT SKIP REST')
+        #             break
+        #         if TRACE:
+        #             logger.debug(
+        #                 f'>>CR {row=} | {col_idx=} | {col_idx_active=} | {pointer_last=} | {pointer=} | {char=}')
+        #         if is_reading_spacing:
+        #             if char == ' ':
+        #                 # skip spaces
+        #                 pointer_last = pointer
+        #                 continue
+        #             else:
+        #                 # start reading next value
+        #                 pointer_last = pointer
+        #                 is_reading_spacing = False
+        #
+        #         if char == ' ' or pointer == line_len - 1:
+        #             if is_escape_mode:
+        #                 raise Exception
+        #             if pointer == line_len - 1:
+        #                 if is_literal_mode:
+        #                     # Closing quote of line
+        #                     assert char == '"'
+        #                     is_literal_mode = False
+        #                 # shift by one at end of string
+        #                 pointer += 1
+        #             if is_literal_mode:
+        #                 # advance
+        #                 continue
+        #             else:
+        #                 # end of value
+        #                 # we should not be in literal mode
+        #                 assert not is_literal_mode
+        #                 # add to data if column in mask
+        #                 if columns_mask[col_idx]:
+        #                     value_str = line[pointer_last:pointer]
+        #                     if columns_type[col_idx] == str:
+        #                         if value_str.startswith('"') and value_str.endswith('"'):
+        #                             value = value_str[1:-1]
+        #                         else:
+        #                             value = value_str
+        #                         if value_contains_escape_sequences:
+        #                             value = value.replace('\\"', '"')
+        #                     else:
+        #                         value = np.fromstring(value_str, dtype=columns_type[col_idx], count=1, sep=' ')[0]
+        #                     columns_data[col_idx_active][row] = value
+        #                     col_idx_active += 1
+        #                     if TRACE:
+        #                         logger.debug(
+        #                             f'>>CR {row=} | {file.tell()} | {pointer_last=} | {pointer=} | {line[pointer_last:pointer]} | {value}')
+        #                 else:
+        #                     # l.debug(f'>>CR {row=} | {file.tell()} | {pointer_last=} | {pointer=} | {line[pointer_last:pointer]} | SKIP')
+        #                     pass
+        #                 is_reading_spacing = True
+        #                 col_idx += 1
+        #         elif char == '"':
+        #             if not is_escape_mode:
+        #                 # literal mode toggle
+        #                 is_literal_mode = not is_literal_mode
+        #             else:
+        #                 is_escape_mode = False
+        #                 continue
+        #         elif char == '\\':
+        #             if not is_escape_mode:
+        #                 is_escape_mode = True
+        #                 value_contains_escape_sequences = True
+        #             else:
+        #                 continue
+        #         else:
+        #             if is_escape_mode:
+        #                 is_escape_mode = False
+        #             # any other characted gets added to value
+        #             continue
+
+        # # Sanity checks
+        # assert col_idx == len(sdds.columns)
+        # assert 1 <= col_idx_active <= col_idx
         else:
             raise Exception(f'Unrecognized parse method: {_ASCII_TEXT_PARSE_METHOD}')
 
@@ -1898,13 +1620,13 @@ def _read_pages_ascii_numeric_lines(file: IO[bytes],
                     value = value[1:-1]
                 if TRACE:
                     logger.debug(
-                    f'>>PARS | pos {file.tell()} | {par_idx=} | {parameter_types[par_idx]} | {repr(b_array)} | {value}')
+                        f'>>PARS | pos {file.tell()} | {par_idx=} | {parameter_types[par_idx]} | {repr(b_array)} | {value}')
             else:
                 # Primitive types
                 value = np.fromstring(b_array, dtype=parameter_types[par_idx], sep=' ', count=1)[0]
                 if TRACE:
                     logger.debug(
-                    f'>>PARV | pos {file.tell()} | {par_idx=} | {parameter_types[par_idx]} | {repr(b_array)} | {value}')
+                        f'>>PARV | pos {file.tell()} | {par_idx=} | {parameter_types[par_idx]} | {repr(b_array)} | {value}')
             parameter_data.append(value)
             par_idx += 1
 
@@ -1913,7 +1635,6 @@ def _read_pages_ascii_numeric_lines(file: IO[bytes],
             for i, el in enumerate(parameters):
                 el.data.append(parameter_data[i])
 
-        arrays_data = []
         array_idx = 0
         while array_idx < len(arrays_type):
             a = sdds.arrays[array_idx]
@@ -1925,7 +1646,6 @@ def _read_pages_ascii_numeric_lines(file: IO[bytes],
                 raise Exception(f'>>ARRS | pos {file.tell()} | unexpected EOF at page {page_idx}')
 
             dimensions = np.fromstring(b_array, dtype=int, sep=' ', count=-1)
-            # dimensions_strings = _array.split()
             n_elements = np.prod(dimensions)
             if len(dimensions) != a.dimensions:
                 raise ValueError(f'>>Array {a.name} dimensions {b_array} did not match expected count {a.dimensions}')
@@ -1977,17 +1697,15 @@ def _read_pages_ascii_numeric_lines(file: IO[bytes],
                         raise Exception(
                             f'Too many elements read during array parsing: {n_elements_read} (need {n_elements})')
 
-            if arrays_mask[array_idx]:
+            if arrays_mask[array_idx] and not page_skip:
                 values = np.concatenate(line_values)
-
                 # Arrays are initialized in C order by default, matching SDDS
                 if mapped_t == str:
                     data_array = np.empty(dimensions, dtype=object)
                 else:
                     data_array = np.empty(dimensions, dtype=mapped_t)
                 data_array[:] = values[:]
-                arrays_data.append(data_array)
-
+                arrays[array_idx].data.append(data_array)
             array_idx += 1
 
         # Read column page size
@@ -2037,7 +1755,7 @@ def _read_pages_ascii_numeric_lines(file: IO[bytes],
             # iowrap.detach()
             df = pd.read_table(buf, encoding='ascii', **opts)
             # df = pd.read_table(file, encoding='ascii', **opts)
-            #print(df.dtypes)
+            # print(df.dtypes)
             # Assign data to the columns
             if not page_skip:
                 col_idx_active = 0
