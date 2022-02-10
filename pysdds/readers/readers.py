@@ -797,7 +797,7 @@ def _read_pages_binary(file: IO[bytes],
     columns_structs = []
     columns_store_type = []
     columns_len: List[Optional[int]] = []
-    combined_struct = combined_size = None
+    combined_struct = combined_size = combined_dtype = None
     columns = sdds.columns
     for i, c in enumerate(columns):
         t = c.type
@@ -818,11 +818,26 @@ def _read_pages_binary(file: IO[bytes],
     logger.debug(f'Column lengths: {columns_len}')
     logger.debug(f'All numeric: {columns_all_numeric}')
 
+    if sdds.data.column_major_order != 0:
+        pass
+    elif columns_all_numeric and sdds._meta_fixed_rowcount:
+        # Numeric types but fixed rows - have to parse row by row
+        logger.debug('All columns are numeric and data is row order -> reading whole rows')
+    elif columns_all_numeric and not sdds._meta_fixed_rowcount and sdds._source_file_size > 500e6:
+        # Row by row parsing with single struct - memory efficient and fast
+        logger.debug('All columns numeric, no fixed rows, data is row order, large size -> using row-wide struct')
+    elif columns_all_numeric and not sdds._meta_fixed_rowcount:
+        # Whole page parsing by using buffer as structured array - the fastest, zero copy method
+        logger.debug(f'All columns numeric, no fixed rows, row order, small size -> using structured array')
+        # must specify endianness, or linux/windows struct lengths will differ!!!
+        combined_dtype = np.dtype([(str(i), c.descr[0][1]) for i, c in enumerate(columns_type)])
+    else:
+        # Most general row-order parser
+        logger.debug('Not all columns numeric, data is row order -> using slow sequential parser')
+
     page_idx = 0
     page_stored_idx = 0
     while True:
-        parameter_data = []
-        arrays_data = []
         columns_data = []
 
         # Main loop
@@ -844,7 +859,7 @@ def _read_pages_binary(file: IO[bytes],
         logger.debug(f'Page {page_idx} size is {page_size} | {byte_array=}')
 
         # Parameter loop
-        for i in range(n_parameters):
+        for i, el in enumerate(parameters):
             type_len = parameter_lengths[i]
             if type_len is None:
                 # Indicates a variable length string
@@ -874,19 +889,17 @@ def _read_pages_binary(file: IO[bytes],
             if TRACE:
                 logger.debug(
                     f'>>PAR pos {file.tell()} | {parameter_types[i]} | {parameter_lengths[i]} | {type_len} | {val} | {byte_array}')
-            parameter_data.append(val)
 
-        # Assign data to the parameters
-        if not page_skip:
-            for i, el in enumerate(parameters):
+            # Assign data to the parameters
+            if not page_skip:
                 if TRACE:
-                    logger.debug(f'{i}:{el}:{parameter_data[i]}')
-                el.data.append(parameter_data[i])
+                    logger.debug(f'{i}:{el}:{val}')
+                el.data.append(val)
 
         # Array reading loop
         for i in range(n_arrays):
             a = sdds.arrays[i]
-            mask = arrays_mask[i] and not page_skip
+            flag = arrays_mask[i] and not page_skip
             type_len = arrays_size[i]
             mapped_t = arrays_type[i]
             if TRACE:
@@ -906,31 +919,31 @@ def _read_pages_binary(file: IO[bytes],
 
             if type_len is None:
                 # Strings need special treatment
-                data_array = np.empty(dimensions, dtype=object) if mask else None
+                data_array = np.empty(dimensions, dtype=object) if flag else None
                 for j in range(n_elements):
                     byte_array = file.read(4)
                     assert len(byte_array) == 4
                     string_len_actual = int.from_bytes(byte_array, endianness)
                     assert 0 <= string_len_actual <= 10000
                     if string_len_actual == 0:
-                        if mask:
+                        if flag:
                             data_array[j] = ''
                     else:
-                        if mask:
+                        if flag:
                             data_array[j] = file.read(string_len_actual).decode('ascii')
-                if mask:
+                if flag:
                     arrays[i].data.append(data_array)
             else:
                 # Should read the right number of bytes or EOF
                 data_bytes = file.read(type_len * n_elements)
                 if len(data_bytes) < type_len * n_elements:
                     raise ValueError(f'>>Array {a.name} read failed because of EOF')
-                if mask:
+                if flag:
                     # Arrays are initialized in C order by default, matching SDDS
                     values = np.frombuffer(data_bytes, dtype=mapped_t)
-                    data_array = np.empty(dimensions, dtype=mapped_t)
-                    data_array[:] = values[:]
-                    arrays[i].data.append(data_array)
+                    #data_array = np.empty(dimensions, dtype=mapped_t)
+                    #data_array[:] = values[:]
+                    arrays[i].data.append(values.reshape(dimensions))
 
         # Column reading loop
         fixed_rowcount_eof = False
@@ -938,9 +951,7 @@ def _read_pages_binary(file: IO[bytes],
             # Column major order
             for i in range(n_columns):
                 type_len = columns_len[i]
-                mapped_t = columns_type[i]
-                mask = columns_mask[i]
-                flag = mask and not page_skip
+                flag = columns_mask[i] and not page_skip
                 column_array = None
                 if type_len is None:
                     if flag:
@@ -967,7 +978,7 @@ def _read_pages_binary(file: IO[bytes],
                     # primitive type -> read in full column
                     byte_array = file.read(type_len * page_size)
                     if flag:
-                        column_array = np.frombuffer(byte_array, dtype=mapped_t, count=page_size)
+                        column_array = np.frombuffer(byte_array, dtype=columns_type[i], count=page_size)
                         if type_len == 1:
                             # Decode uint8 to <U1 to object
                             column_array = np.char.decode(column_array.view('S1'), 'ascii').astype(object)
@@ -976,21 +987,16 @@ def _read_pages_binary(file: IO[bytes],
                     logger.debug(f'>COL {i} END | {file.tell()=}')
 
                 # Assign data
-                sdds.columns[i].data.append(column_array)
-                sdds.columns[i]._page_numbers.append(page_idx)
+                if flag:
+                    sdds.columns[i].data.append(column_array)
+                    sdds.columns[i]._page_numbers.append(page_idx)
 
             if not page_skip:
                 page_stored_idx += 1
-
-            if TRACE:
-                logger.debug(f'Page {page_idx} data copy finished')
         elif columns_all_numeric and sdds._meta_fixed_rowcount:
             for i in range(n_columns):
                 if columns_mask[i]:
                     columns_data.append(np.empty(page_size, dtype=columns_store_type[i]))
-
-            # Numeric types but fixed rows - have to parse row by row
-            logger.debug('All columns are numeric and data is row order -> reading whole rows')
             st = struct.Struct(combined_struct)
             page_size_actual = None
             for row in range(page_size):
@@ -1021,6 +1027,7 @@ def _read_pages_binary(file: IO[bytes],
                 for i, c in enumerate(sdds.columns):
                     if columns_mask[i]:
                         if sdds._meta_fixed_rowcount and page_size_actual < page_size:
+                            # Hopefully no copy?
                             arr = columns_data[idx_active][:page_size_actual]
                             if columns_len[i] == 1:
                                 c.data.append(np.char.decode(arr.view('S1'), 'ascii').astype(object))
@@ -1039,9 +1046,6 @@ def _read_pages_binary(file: IO[bytes],
             for i in range(n_columns):
                 if columns_mask[i]:
                     columns_data.append(np.empty(page_size, dtype=columns_store_type[i]))
-
-            # Row by row parsing with single struct - memory efficient and fast
-            logger.debug('All columns numeric, no fixed rows, data is row order, large size -> using row-wide struct')
             st = struct.Struct(combined_struct)
             byte_array = file.read(combined_size * page_size)
             if len(byte_array) < combined_size * page_size:
@@ -1066,30 +1070,26 @@ def _read_pages_binary(file: IO[bytes],
                         idx_active += 1
                 page_stored_idx += 1
         elif columns_all_numeric and not sdds._meta_fixed_rowcount:
-            # must specify endianness, or linux/windows struct lengths will differ!!!
-            #struct_type = np.dtype(', '.join(columns_type))
-            struct_type = np.dtype([c.descr[0] for c in columns_type])
-            # Whole page parsing by using buffer as structured array - the fastest, zero copy method
-            logger.debug(f'All columns numeric, no fixed rows, row order, small size -> using structured array')
-            if (combined_size * page_size) % struct_type.itemsize != 0:
+            if (combined_size * page_size) % combined_dtype.itemsize != 0:
                 raise ValueError(f'Type length mismatch: {combined_size=} {page_size=} {combined_size*page_size=}'
-                                 f' {struct_type.itemsize=} {(combined_size * page_size) % struct_type.itemsize=}')
+                                 f' {combined_dtype.itemsize=} {(combined_size * page_size) % combined_dtype.itemsize=}')
 
             byte_array = file.read(combined_size * page_size)
             if len(byte_array) != combined_size * page_size:
                 raise ValueError(f'Unexpected EOF - got {len(byte_array)} bytes, wanted {combined_size * page_size}')
 
             if not page_skip:
-                array = np.frombuffer(byte_array, struct_type)
+                array = np.frombuffer(byte_array, combined_dtype)
                 idx_active = 0
-                for i, c in enumerate(sdds.columns):
+                for i, c in enumerate(columns):
                     if columns_mask[i]:
-                        arr = array[f'f{i}'].copy()
+                        # arr = array[f'f{i}'].copy()
                         if columns_len[i] == 1:
                             # c.data.append(np.char.decode(arr.view('S1'), 'ascii'))
-                            c.data.append(np.char.decode(arr.view('S1'), 'ascii').astype(object))
+                            c.data.append(np.char.decode(array[str(i)].view('S1'), 'ascii').astype(object))
                         else:
-                            c.data.append(arr)
+                            # For now, make a copy to be safe
+                            c.data.append(array[str(i)].copy())
                         c._page_numbers.append(page_idx)
                         idx_active += 1
                 page_stored_idx += 1
@@ -1097,9 +1097,6 @@ def _read_pages_binary(file: IO[bytes],
             for i in range(n_columns):
                 if columns_mask[i]:
                     columns_data.append(np.empty(page_size, dtype=columns_store_type[i]))
-
-            # Most general row-order parser
-            logger.debug('Not all columns numeric, data is row order -> using slow sequential parser')
             page_size_actual = None
             for row in range(page_size):
                 idx_active = 0
@@ -1108,7 +1105,7 @@ def _read_pages_binary(file: IO[bytes],
                 for i in range(n_columns):
                     type_len = columns_len[i]
                     mapped_t = columns_type[i]
-                    mask = columns_mask[i]
+                    flag = columns_mask[i]
                     if type_len is None:
                         # string column
                         byte_array = file.read(4)
@@ -1126,13 +1123,13 @@ def _read_pages_binary(file: IO[bytes],
                         assert 0 <= string_len_actual <= 10000  # sanity check
                         if string_len_actual == 0:
                             # empty string
-                            if mask and not page_skip:
+                            if flag and not page_skip:
                                 columns_data[idx_active][row] = ''
                                 # l.debug(f'>>COL S {i} {file.tell()} | {columns_type[i]} | {columns_size[i]} | {s} | {columns_data[i][row]} | {b_array}')
                                 idx_active += 1
                         else:
                             byte_array = file.read(string_len_actual)
-                            if mask and not page_skip:
+                            if flag and not page_skip:
                                 columns_data[idx_active][row] = byte_array.decode('ascii')
                                 # l.debug(f'>>COL S {i} {file.tell()} | {columns_type[i]} | {columns_size[i]} | {s} | {columns_data[i][row]} | {b_array}')
                                 idx_active += 1
@@ -1149,7 +1146,7 @@ def _read_pages_binary(file: IO[bytes],
                                 break
                             else:
                                 raise ValueError(f'Unexpected EOF at row {row}, column {i}')
-                        if mask and not page_skip:
+                        if flag and not page_skip:
                             value = columns_structs[i].unpack(byte_array)[0]
                             # value = np.frombuffer(byte_array, dtype=mapped_t, count=1)[0]
                             if type_len == 1:
