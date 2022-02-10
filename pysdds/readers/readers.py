@@ -878,8 +878,9 @@ def _read_pages_binary(file: IO[bytes],
             elif type_len == 1:
                 byte_array = file.read(type_len)
                 assert len(byte_array) == type_len
-                val = np.frombuffer(byte_array, dtype=parameter_types[i], count=1)[0]
-                val = np.char.decode(val.view('S1'), 'ascii')
+                val = np.frombuffer(byte_array, dtype=parameter_types[i], count=1)
+                val = np.char.decode(val.view('S1'), 'ascii').astype(object)
+                val = val[0]
             else:
                 # All primitive types
                 byte_array = file.read(type_len)
