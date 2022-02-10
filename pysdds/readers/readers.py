@@ -22,16 +22,20 @@ _NUMPY_DTYPES = {'short': 'i2', 'ushort': 'u2', 'long': 'i4', 'float': 'f4', 'do
                  'character': object, 'string': object}
 
 # On all 'reasonable' architectures, things will be little endian, but plenty of old files floating around
-_NUMPY_DTYPE_STRINGS_LE = {'short': '<i2', 'ushort': '<u2', 'long': '<i4',
-                           'float': '<f4', 'double': '<f8', 'character': '<i1', 'string': object}
-_NUMPY_DTYPE_STRINGS_BE = {'short': '>i2', 'ushort': '>u2', 'long': '>i4',
-                           'float': '>f4', 'double': '>f8', 'character': '>i1', 'string': object}
-_NUMPY_DTYPE_FINAL = {'short': 'i2', 'ushort': 'u2', 'long': 'i4',
-                      'float': 'f4', 'double': 'f8', 'character': object, 'string': object}  # np.dtype('U1')
+_NUMPY_DTYPE_STRINGS_LE = {'short': np.dtype('<i2'), 'ushort': np.dtype('<u2'), 'long': np.dtype('<i4'),
+                           'float': np.dtype('<f4'), 'double': np.dtype('<f8'), 'character': np.dtype('<i1'),
+                           'string': object}
+_NUMPY_DTYPE_STRINGS_BE = {'short': np.dtype('>i2'), 'ushort': np.dtype('>u2'), 'long': np.dtype('>i4'),
+                           'float': np.dtype('>f4'), 'double': np.dtype('>f8'), 'character': np.dtype('>i1'),
+                           'string': object}
+_NUMPY_DTYPE_FINAL = {'short': np.dtype('i2'), 'ushort': np.dtype('u2'), 'long': np.dtype('i4'),
+                      'float': np.dtype('f4'), 'double': np.dtype('f8'), 'character': object,
+                      'string': object}
 _STRUCT_DTYPE_STRINGS_LE = {'short': '<h', 'ushort': '<H', 'long': '<l',
                             'float': '<f', 'double': '<d', 'character': '<c', 'string': object}
 _STRUCT_DTYPE_STRINGS_BE = {'short': '>h', 'ushort': '>H', 'long': '>l',
                             'float': '>f', 'double': '>d', 'character': '>c', 'string': object}
+
 # Expected field lengths in bytes for 32bit architecture (which SDDS was made for initially)
 _NUMPY_DTYPE_SIZES = {'short': 2, 'ushort': 2, 'long': 4, 'float': 4, 'double': 8, 'character': 1, 'string': None}
 
@@ -1063,7 +1067,8 @@ def _read_pages_binary(file: IO[bytes],
                 page_stored_idx += 1
         elif columns_all_numeric and not sdds._meta_fixed_rowcount:
             # must specify endianness, or linux/windows struct lengths will differ!!!
-            struct_type = np.dtype(', '.join(columns_type))
+            #struct_type = np.dtype(', '.join(columns_type))
+            struct_type = np.dtype([c.descr[0] for c in columns_type])
             # Whole page parsing by using buffer as structured array - the fastest, zero copy method
             logger.debug(f'All columns numeric, no fixed rows, row order, small size -> using structured array')
             if (combined_size * page_size) % struct_type.itemsize != 0:
