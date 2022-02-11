@@ -144,7 +144,7 @@ def _open_file(filepath: Path, compression: str, use_magic_values: bool = False)
         raise ex
 
 
-def read(filepath: Union[Path, str],
+def read(filepath: Union[Path, str, IO[bytes]],
          mode: Optional[str] = 'auto',
          endianness: Optional[str] = 'auto',
          compression: Optional[str] = 'auto',
@@ -156,8 +156,8 @@ def read(filepath: Union[Path, str],
 
     Parameters
     ----------
-    filepath : str or Path
-        A valid absolute or relative file path, or a concrete Path object
+    filepath : str or Path or file-like object
+        A valid absolute or relative file path, or a concrete Path object, or a byte stream (file, BytesIO, etc.)
     mode : str, optional
         SDDS mode to use for reading the file, one of 'auto', 'binary', or 'ascii'. Defaults to 'auto'.
     endianness : str, optional
@@ -187,7 +187,7 @@ def read(filepath: Union[Path, str],
     # Argument verification
     if isinstance(filepath, str):
         filepath = Path(filepath)
-    elif isinstance(filepath, Path):
+    elif isinstance(filepath, (Path, io.IOBase)):
         pass
     else:
         raise Exception('Filepath is not a string or Path object')
@@ -239,10 +239,15 @@ def read(filepath: Union[Path, str],
     logger.info(f'Opening file "%s"', str(filepath))
     logger.info(f'Mode (%s), compression (%s), endianness (%s)', mode, compression, endianness)
     t_start = time.perf_counter()
-    # File is opened in binary mode because it is necessary for data parsing,
-    # reopening after header parsing would interfere with IO buffering
-    file = _open_file(filepath, compression, use_magic_values=False)
-    sdds._source_file_size = filepath.stat().st_size
+    if isinstance(filepath, Path):
+        # File is opened in binary mode because it is necessary for data parsing,
+        # reopening after header parsing would interfere with IO buffering
+        file = _open_file(filepath, compression, use_magic_values=False)
+        sdds._source_file_size = filepath.stat().st_size
+    else:
+        file = filepath
+        sdds._source_file_size = 0
+
     try:
         # First, read the header
         _read_header_fullstream(file, sdds, mode, endianness)
@@ -1454,7 +1459,19 @@ def _read_pages_ascii_mixed_lines(file: IO[bytes],
         else:
             raise Exception(f'Unrecognized parse method: {_ASCII_TEXT_PARSE_METHOD}')
 
-        next_byte = file.peek(1)
+        while True:
+            # Look for next important character (this is rough heuristic)
+            next_byte = file.peek(1)
+            if len(next_byte) > 0:
+                next_char = next_byte[:1].decode('ascii')
+                #print(repr(next_char))
+                if next_char == '\n':
+                    file.read(1)
+                    continue
+                else:
+                    break
+            else:
+                break
         if len(next_byte) > 0:
             # More data exists
             if pages_mask is not None and page_idx == len(pages_mask):
@@ -1674,7 +1691,19 @@ def _read_pages_ascii_numeric_lines(file: IO[bytes],
                 page_stored_idx += 1
             page_idx += 1
 
-        next_byte = file.peek(1)
+        while True:
+            # Look for next important character (this is rough heuristic)
+            next_byte = file.peek(1)
+            if len(next_byte) > 0:
+                next_char = next_byte[:1].decode('ascii')
+                #print(repr(next_char))
+                if next_char == '\n':
+                    file.read(1)
+                    continue
+                else:
+                    break
+            else:
+                break
         if len(next_byte) > 0:
             # More data exists
             if pages_mask is not None and page_idx == len(pages_mask):
