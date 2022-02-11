@@ -354,94 +354,6 @@ def read(filepath: Union[Path, str],
     return sdds
 
 
-def _read_header(file: BinaryIO, sdds: SDDSFile, mode: str, endianness: str) -> None:
-    """
-    Read SDDS header - the ASCII text that described the data contained in the SDDS file
-    """
-    # Hopefully no malicious files are fed - do not check line length
-    version_line = file.readline().decode('ascii').rstrip()
-    line_num = 1
-    if version_line[:4] != 'SDDS' or len(version_line) != 5:
-        raise AttributeError(f'Header parsing failed on line {line_num}: {repr(version_line)} is not a valid version')
-
-    try:
-        sdds_version = int(version_line[4])
-    except Exception:
-        raise AttributeError(f'Unrecognized SDDS version: {version_line[5]}')
-
-    if sdds_version > 3:
-        raise ValueError(f'This library only supports up to SDDS version 3, file is version {sdds_version}')
-
-    logger.debug(f'File version: {version_line}')
-
-    namelists = []
-
-    while True:
-        # Read one line at a time and process it
-        line = file.readline().decode('ascii').strip()
-        line_num += 1
-        if TRACE:
-            logger.debug(f'Line {line_num}: {line}')
-        if line.startswith('!'):
-            # '!' is a comment line
-            continue
-        else:
-            # must be a namelist command
-            assert line.endswith('&end')
-
-        command, namelist = line[:-4].split(None, 1)
-        nm_dict = _parse_namelist(namelist)
-        logger.debug(f'>Parse result: {nm_dict}')
-        nm_keys = set(nm_dict.keys())
-        namelists.append(nm_dict)
-
-        # expected_keys = None
-        if command == '&description':
-            if sdds.description is not None:
-                raise ValueError('Duplicate description entry found')
-            expected_keys = _KEYS_DESCRIPTION
-            if not nm_keys.issubset(expected_keys):
-                raise AttributeError(f'Namelist keys {nm_keys} unexpected for namelist {command}')
-            sdds.description = Description(nm_dict)
-        elif command == '&parameter':
-            expected_keys = _KEYS_PARAMETER
-            if not nm_keys.issubset(expected_keys):
-                raise AttributeError(f'Namelist keys {nm_keys} unexpected for namelist {command}')
-            sdds.parameters.append(Parameter(nm_dict))
-        elif command == '&array':
-            expected_keys = _KEYS_ARRAY
-            if not nm_keys.issubset(expected_keys):
-                raise AttributeError(f'Namelist keys {nm_keys} unexpected for namelist {command}')
-            sdds.arrays.append(Array(nm_dict))
-        elif command == '&column':
-            expected_keys = _KEYS_COLUMN
-            if not nm_keys.issubset(expected_keys):
-                raise AttributeError(f'Namelist keys {nm_keys} unexpected for namelist {command}')
-            sdds.columns.append(Column(nm_dict, sdds))
-        elif command == '&data':
-            # This should be last command
-            expected_keys = _KEYS_DATA
-            if not nm_keys.issubset(expected_keys):
-                raise AttributeError(f'Namelist keys {nm_keys} unexpected for namelist {command}')
-            file_mode = nm_dict['mode']
-            if mode != 'auto':
-                assert mode == file_mode
-            else:
-                if not (file_mode == 'binary' or file_mode == 'ascii'):
-                    raise Exception(f'Unrecognized mode ({file_mode}) found in file')
-            sdds.mode = file_mode
-            sdds.data = Data(nm_dict)
-            break
-        elif command == '&include':
-            raise ValueError('This package does not support &include namelist command')
-        else:
-            raise ValueError(f'Unrecognized namelist command {command} on line {line_num}')
-
-    if sdds.columns or sdds.parameters or sdds.arrays:
-        if sdds.data is None:
-            raise AttributeError('SDDS file contains columns, arrays, or parameters - &data namelist is required')
-
-
 def __get_next_line(stream: IO[bytes], accept_meta_commands: bool = True, strip: bool = False) -> str:
     """ Find next line that has valid SDDS data """
     while True:
@@ -522,8 +434,6 @@ def _read_header_fullstream(file: IO[bytes], sdds: SDDSFile, mode: str, endianne
                     raise Exception('Unexpected EOF')
                 buffer += line
             buffer2 = buffer.strip()
-            if not buffer2.endswith('&end'):
-                raise Exception
         return buffer2
 
     while True:
@@ -565,10 +475,9 @@ def _read_header_fullstream(file: IO[bytes], sdds: SDDSFile, mode: str, endianne
         def __parse_namelist_entry():
             nonlocal line, pos
             tokens = []
-            # key = ''
             no_chars_allowed = False
             while True:
-                # l.debug(f'Char {line[pos]} | tokens {tokens} | nca {no_chars_allowed}')
+                #logger.debug(f'Char {line[pos]} | tokens {tokens} | nca {no_chars_allowed}')
                 if line[pos] == ' ':
                     no_chars_allowed = True
                 elif line[pos] == '=':
@@ -583,18 +492,16 @@ def _read_header_fullstream(file: IO[bytes], sdds: SDDSFile, mode: str, endianne
                 pos += 1
                 if pos >= len_line:
                     raise Exception(f'End of line reached')
-
             if key == '':
                 raise Exception
 
             pos += 1
-            # value = ''
             no_chars_allowed = False
             literal_mode = False
             value_tokens = []
             while True:
                 c = line[pos]
-                # l.debug(f'{pos} | char {c} | tokens {value_tokens} | nca {no_chars_allowed}')
+                #logger.debug(f'{pos} | char {c} | nca {no_chars_allowed} | l {literal_mode} | tokens {value_tokens}')
                 if literal_mode:
                     # Inside the quotes
                     if c == '"':
@@ -1778,19 +1685,3 @@ def _read_pages_ascii_numeric_lines(file: IO[bytes],
             break
     sdds.n_pages = page_stored_idx
 
-
-def _parse_namelist(namelist: str) -> dict:
-    # Don't want to use f90nml, so have to write our own namelist parser
-    # Initial namelist is name1=val1, name2="str2" etc...
-    kvpairs = [el.strip() for el in namelist.strip().rstrip(',').split(',')]
-    data = {}
-    for pair in kvpairs:
-        k, v = pair.split('=', 1)
-        k = k.strip()
-        v = v.strip()
-        # if have a string
-        if v.startswith("\"") and v.endswith("\""):
-            v = v[1:-1]
-        data[k] = v
-
-    return data
