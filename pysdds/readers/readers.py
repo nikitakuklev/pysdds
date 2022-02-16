@@ -1,43 +1,24 @@
 import io
+import sys
 import logging
 import time
 import shlex
 from pathlib import Path
-from typing import Union, Iterable, List, IO, BinaryIO, Optional
+from typing import Union, Iterable, List, IO, Optional
 import struct
 
 import numpy as np
 import pandas as pd
 
 from ..structures import *
+from ..util.constants import _NUMPY_DTYPES, _NUMPY_DTYPE_LE, _NUMPY_DTYPE_BE, _NUMPY_DTYPE_FINAL,\
+    _STRUCT_STRINGS_LE, _STRUCT_STRINGS_BE, _NUMPY_DTYPE_SIZES
 
 # The proper way to implement conditional logging is to check current level,
 # but this creates too much overhead in hot loops. So, old school global vars it is.
 logger = logging.getLogger(__name__)
 DEBUG2 = False  # one more level from debug
 TRACE = False  # two more levels from debug
-
-# SDDS specification has short, long, float, double, character, or string
-_NUMPY_DTYPES = {'short': 'i2', 'ushort': 'u2', 'long': 'i4', 'float': 'f4', 'double': 'f8',
-                 'character': object, 'string': object}
-
-# On all 'reasonable' architectures, things will be little endian, but plenty of old files floating around
-_NUMPY_DTYPE_STRINGS_LE = {'short': np.dtype('<i2'), 'ushort': np.dtype('<u2'), 'long': np.dtype('<i4'),
-                           'float': np.dtype('<f4'), 'double': np.dtype('<f8'), 'character': np.dtype('<i1'),
-                           'string': object}
-_NUMPY_DTYPE_STRINGS_BE = {'short': np.dtype('>i2'), 'ushort': np.dtype('>u2'), 'long': np.dtype('>i4'),
-                           'float': np.dtype('>f4'), 'double': np.dtype('>f8'), 'character': np.dtype('>i1'),
-                           'string': object}
-_NUMPY_DTYPE_FINAL = {'short': np.dtype('i2'), 'ushort': np.dtype('u2'), 'long': np.dtype('i4'),
-                      'float': np.dtype('f4'), 'double': np.dtype('f8'), 'character': object,
-                      'string': object}
-_STRUCT_DTYPE_STRINGS_LE = {'short': '<h', 'ushort': '<H', 'long': '<l',
-                            'float': '<f', 'double': '<d', 'character': '<c', 'string': object}
-_STRUCT_DTYPE_STRINGS_BE = {'short': '>h', 'ushort': '>H', 'long': '>l',
-                            'float': '>f', 'double': '>d', 'character': '>c', 'string': object}
-
-# Expected field lengths in bytes for 32bit architecture (which SDDS was made for initially)
-_NUMPY_DTYPE_SIZES = {'short': 2, 'ushort': 2, 'long': 4, 'float': 4, 'double': 8, 'character': 1, 'string': None}
 
 # Expected keys for various SDDS namelists
 _KEYS_DESCRIPTION = {'text', 'contents'}
@@ -359,7 +340,7 @@ def read(filepath: Union[Path, str, IO[bytes]],
     return sdds
 
 
-def __get_next_line(stream: IO[bytes], accept_meta_commands: bool = True, strip: bool = False) -> str:
+def __get_next_line(stream: IO[bytes], accept_meta_commands: bool = True, strip: bool = False) -> Optional[str]:
     """ Find next line that has valid SDDS data """
     while True:
         line = stream.readline().decode('ascii')
@@ -655,13 +636,13 @@ def _read_pages_binary(file: IO[bytes],
     endianness = sdds.endianness
     flip_bytes = False
     if endianness == 'big':
-        NUMPY_DTYPE_STRINGS = _NUMPY_DTYPE_STRINGS_BE
-        STRUCT_DTYPE_STRINGS = _STRUCT_DTYPE_STRINGS_BE
+        NUMPY_DTYPE_STRINGS = _NUMPY_DTYPE_BE
+        STRUCT_DTYPE_STRINGS = _STRUCT_STRINGS_BE
         if convert_to_native_endianness:
             flip_bytes = True
     elif endianness == 'little':
-        NUMPY_DTYPE_STRINGS = _NUMPY_DTYPE_STRINGS_LE
-        STRUCT_DTYPE_STRINGS = _STRUCT_DTYPE_STRINGS_LE
+        NUMPY_DTYPE_STRINGS = _NUMPY_DTYPE_LE
+        STRUCT_DTYPE_STRINGS = _STRUCT_STRINGS_LE
     else:
         raise ValueError(f'SDDS endianness ({endianness}) is invalid')
     length_dtype = np.dtype(NUMPY_DTYPE_STRINGS['long'])
@@ -1017,7 +998,6 @@ def _read_pages_binary(file: IO[bytes],
                     logger.debug(f'>COL ROW {row} | {file.tell()=}')
                 for i in range(n_columns):
                     type_len = columns_len[i]
-                    mapped_t = columns_type[i]
                     flag = columns_mask[i]
                     if type_len is None:
                         # string column
@@ -1713,4 +1693,3 @@ def _read_pages_ascii_numeric_lines(file: IO[bytes],
             # End of file
             break
     sdds.n_pages = page_stored_idx
-
