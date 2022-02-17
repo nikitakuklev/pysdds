@@ -48,32 +48,38 @@ def test_read_header(file_root):
 
 @pytest.mark.parametrize("file_root", files_sources)
 def test_read(file_root):
-    pysdds.read(file_root)
+    sdds = pysdds.read(file_root)
+    sdds.validate_data()
 
 
 @pytest.mark.parametrize("file_root", files_binary_colmajor)
 def test_read_binary1(file_root):
-    pysdds.read(file_root)
+    sdds = pysdds.read(file_root)
+    sdds.validate_data()
 
 
 @pytest.mark.parametrize("file_root", files_binary_rowmajor)
 def test_read_binary2(file_root):
-    pysdds.read(file_root)
+    sdds = pysdds.read(file_root)
+    sdds.validate_data()
 
 
 @pytest.mark.parametrize("file_root", files_ascii)
 def test_read_ascii(file_root):
-    pysdds.read(file_root)
+    sdds = pysdds.read(file_root)
+    sdds.validate_data()
 
 
 @pytest.mark.parametrize("file_root", files_compressed)
 def test_read_compressed(file_root):
-    pysdds.read(file_root)
+    sdds = pysdds.read(file_root)
+    sdds.validate_data()
 
 
 @pytest.mark.parametrize("file_root", files_large)
 def test_read_large(file_root):
-    pysdds.read(file_root)
+    sdds = pysdds.read(file_root)
+    sdds.validate_data()
 
 
 @pytest.mark.parametrize("file_root", ['files/sources/timeSeries.sdds'])
