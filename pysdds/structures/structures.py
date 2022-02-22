@@ -40,6 +40,16 @@ def _compare_arrays(one, two, eps=None) -> bool:
         raise Exception(f'Comparison of two different types - {type(one)} vs {type(two)}')
 
 
+def _namelist_to_str(nm_dict):
+    kv_strings = []
+    for k, v in nm_dict.items():
+        if isinstance(v, str) and (' ' in v or '"' in v or "," in v or "$" in v):
+            kv_strings.append(f'{k}="{v}"')
+        else:
+            kv_strings.append(f'{k}={v}')
+    return ", ".join(kv_strings)
+
+
 class Description:
     """
     Data Set Description
@@ -60,6 +70,12 @@ class Description:
 
     def __eq__(self, other):
         return self.compare(other)
+
+    def __str__(self):
+        return f'&description {_namelist_to_str(self.nm)}, &end'
+
+    def to_sdds(self):
+        return f'&description {_namelist_to_str(self.nm)}, &end'
 
     def compare(self, other: 'Description', raise_error: bool = False) -> bool:
         """ Compare to another object """
@@ -115,7 +131,7 @@ class Parameter:
         self.nm = namelist
         # Data list is a list of values, 1 per page
         # It will generated dynamically for fixed value parameters
-        #if self.fixed_value is None:
+        # if self.fixed_value is None:
         #    self.data = []
         self._data = []
         self.__cached_data = None
@@ -123,13 +139,16 @@ class Parameter:
         self.sdds = sdds
 
     def __str__(self):
-        return f'Parameter "{self.name}" <{self.type}>'
+        return f'Parameter "{self.name}" type=<{self.type}>'
 
     def __repr__(self):
         return self.__str__()
 
     def __eq__(self, other: "Parameter"):
         return self.compare(other)
+
+    def to_sdds(self):
+        return f'&parameter {_namelist_to_str(self.nm)},  &end'
 
     def compare(self, other, eps: Optional[float] = None, raise_error: bool = False,
                 fixed_equivalent: bool = True) -> bool:
@@ -283,6 +302,9 @@ class Array:
     def __eq__(self, other: "Array"):
         return self.compare(other, eps=None)
 
+    def to_sdds(self):
+        return f'&array {_namelist_to_str(self.nm)},  &end'
+
     def compare(self, other: "Array", eps: Optional[float] = None, raise_error: bool = False) -> bool:
         fail_str = f'Array {self.name} mismatch: '
 
@@ -380,6 +402,9 @@ class Column:
     def __eq__(self, other: "Column"):
         return self.compare(other, eps=None)
 
+    def to_sdds(self):
+        return f'&column {_namelist_to_str(self.nm)},  &end'
+
     def compare(self, other: "Column", eps: Optional[float] = None, raise_error: bool = False) -> bool:
         """ Compare to another Column, optionally with tolerance and other options """
         fail_str = f'Column {self.name} mismatch: '
@@ -413,7 +438,7 @@ class Column:
                     return False
             else:
                 if not _compare_arrays(self.data[i], other.data[i]):
-                    err('values strict', i, self.data[i], other.data[i])
+                    err(f'{self.name} values strict', i, self.data[i], other.data[i])
                     return False
         return True
 
@@ -462,6 +487,9 @@ class Data:
 
     def __eq__(self, other):
         return self.compare(other)
+
+    def to_sdds(self):
+        return f'&data {_namelist_to_str(self.nm)}, &end'
 
     def compare(self, other, raise_error: bool = False) -> bool:
         fail_str = f'Data mismatch: '
@@ -719,6 +747,30 @@ class SDDSFile:
         cd = {el.name: el for el in self.parameters}
         return cd[parameter]
 
+    def set_mode(self, mode: Literal["binary", "ascii"], **kwargs):
+        """ Set SDDS file mode, affecting how file will be written. Data namelist will be modified and reset. """
+        if mode not in ['ascii', 'binary']:
+            raise Exception
+        if mode == self.mode:
+            if self.data is not None:
+                assert self.data.mode == mode
+        else:
+            self.mode = mode
+            if self.data is not None:
+                if mode == 'binary':
+                    self.data.nm = {'mode': mode, 'endian': self.endianness}
+                else:
+                    self.data.nm = {'mode': mode, **kwargs}
+
+    def set_endianness(self, endianness: Literal["big", "little"]):
+        if endianness == self.endianness:
+            if self.mode == 'binary' and self.data is not None and 'endian' in self.data.nm:
+                assert self.data.nm['endian'] == endianness
+        else:
+            self.endianness = endianness
+            if self.mode == 'binary' and self.data is not None:
+                self.data.nm['endian'] = endianness
+
     def columns_to_df(self, page: int = 0):
         """
         Retrieve a copy of column data in specific page as a pandas dataframe
@@ -783,3 +835,28 @@ class SDDSFile:
         data.update({p.name: np.full(page_size, p.data[page]) for p in parameters})
         df = pd.DataFrame(data=data, columns=column_names + parameter_names)
         return df
+
+    def validate_data(self):
+        """ Validate current data for self-consistency """
+        n_pages = self.n_pages
+        from ..util.constants import _NUMPY_DTYPE_FINAL, _PYTHON_TYPE_FINAL
+
+        for el in self.parameters:
+            data = el.data
+            assert len(data) == n_pages
+            assert isinstance(data, list)
+            for v in data:
+                if type(v) != _PYTHON_TYPE_FINAL[el.type]:
+                    raise Exception(f'Parameter type {type(v)} ({v}) does not match {_PYTHON_TYPE_FINAL[el.type]}')
+
+        for el in self.arrays:
+            data = el.data
+            assert len(data) == n_pages
+            assert all(isinstance(v, np.ndarray) for v in data)
+            assert all(v.dtype == _NUMPY_DTYPE_FINAL[el.type] for v in data)
+
+        for el in self.columns:
+            data = el.data
+            assert len(data) == n_pages
+            assert all(isinstance(v, np.ndarray) for v in data)
+            assert all(v.dtype == _NUMPY_DTYPE_FINAL[el.type] for v in data)
