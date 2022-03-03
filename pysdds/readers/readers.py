@@ -422,6 +422,7 @@ def _read_header_fullstream(file: IO[bytes], sdds: SDDSFile, mode: str, endianne
             buffer2 = buffer.strip()
         return buffer2
 
+    meta_endianness_set = False
     while True:
         line = __find_next_namelist(file, accept_meta_commands=True)
         # line = file.readline().decode('ascii').strip('\n')
@@ -436,12 +437,14 @@ def _read_header_fullstream(file: IO[bytes], sdds: SDDSFile, mode: str, endianne
                 if endianness == 'auto' or endianness == 'big':
                     sdds.endianness = 'big'
                     logger.debug(f'Binary file endianness set to ({sdds.endianness})')
+                    meta_endianness_set = True
                 else:
                     raise ValueError(f'File endianness ({line}) does not match requested one ({endianness})')
             elif line == '!# little-endian':
                 if endianness == 'auto' or endianness == 'little':
                     sdds.endianness = 'little'
                     logger.debug(f'Binary file endianness set to ({sdds.endianness})')
+                    meta_endianness_set = True
                 else:
                     raise ValueError(f'File endianness ({line}) does not match requested one ({endianness})')
             elif line == '!# fixed-rowcount':
@@ -586,6 +589,13 @@ def _read_header_fullstream(file: IO[bytes], sdds: SDDSFile, mode: str, endianne
             else:
                 if not (file_mode == 'binary' or file_mode == 'ascii'):
                     raise Exception(f'Unrecognized mode ({file_mode}) found in file')
+            if 'endian' in nm_keys:
+                data_endianness = nm_dict['endian']
+                if meta_endianness_set:
+                    if data_endianness != sdds.endianness:
+                        raise Exception(f'Mismatch of data and meta-command endianness')
+                sdds.endianness = nm_dict['endian']
+                logger.debug(f'Binary file endianness set to ({sdds.endianness}) from data namelist')
             sdds.mode = file_mode
             sdds.data = Data(nm_dict)
             break
@@ -670,6 +680,7 @@ def _read_pages_binary(file: IO[bytes],
     # Arrays go here
     arrays = sdds.arrays
     arrays_type = []
+    arrays_store_type = []
     arrays_size: List[Optional[int]] = []
     for i, a in enumerate(arrays):
         t = a.type
@@ -678,6 +689,7 @@ def _read_pages_binary(file: IO[bytes],
         else:
             mapped_t = NUMPY_DTYPE_STRINGS[t]
         arrays_type.append(mapped_t)
+        arrays_store_type.append(_NUMPY_DTYPE_FINAL[t])
         arrays_size.append(_NUMPY_DTYPE_SIZES[t])
     n_arrays = len(arrays_type)
     logger.debug(f'Arrays to parse: {len(arrays_type)}')
@@ -1088,15 +1100,16 @@ def _read_pages_binary(file: IO[bytes],
     if flip_bytes:
         # parameters should already be in native format
         for i, el in enumerate(sdds.arrays):
-            if arrays_mask[i]:
+            if arrays_mask[i] and el.type not in ['string', 'character']:
                 for j in range(len(el.data)):
-                    el.data[j] = el.data[j].byteswap().newbyteorder()
+                    el.data[j] = el.data[j].astype(arrays_store_type[i], copy=False)#.newbyteorder().byteswap()
 
-        for i, c in enumerate(sdds.columns):
-            if columns_mask[i]:
-                for j in range(len(c.data)):
-                    c.data[j] = c.data[j].byteswap().newbyteorder()
-
+        for i, el in enumerate(sdds.columns):
+            if columns_mask[i] and el.type not in ['string', 'character']:
+                for j in range(len(el.data)):
+                    # If struct parser was used, data is already native, otherwise need to flip
+                    el.data[j] = el.data[j].astype(columns_store_type[i], copy=False)
+        logging.info(f'Data converted to native {sys.byteorder}-endian format, disable for max performance')
     sdds.n_pages = page_stored_idx
 
 
