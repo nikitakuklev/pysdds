@@ -5,6 +5,8 @@ import pysdds
 import glob
 from pathlib import Path
 import itertools
+import pandas as pd
+import numpy as np
 
 root_sources = 'files/sources/'
 root_binary_rowmajor = 'files/binary_rowmajor/'
@@ -13,8 +15,8 @@ root_ascii = 'files/ascii/'
 
 files_sources = glob.glob(root_sources + '*')
 files_ascii = glob.glob(root_ascii + '*')
-files_binary_colmajor = glob.glob(root_binary_colmajor+'*')
-files_binary_rowmajor = glob.glob(root_binary_rowmajor+'*')
+files_binary_colmajor = glob.glob(root_binary_colmajor + '*')
+files_binary_rowmajor = glob.glob(root_binary_rowmajor + '*')
 files_compressed = glob.glob('files/sources_compressed/*')
 files_large = glob.glob('files/sources_large/*')
 
@@ -29,7 +31,8 @@ set_ascii_rowmajor = set(get_names(files_ascii))
 set_binary_rowmajor = set(get_names(files_binary_rowmajor))
 set_binary_colmajor = set(get_names(files_binary_colmajor))
 
-set_union = set_sources.intersection(set_ascii_rowmajor).intersection(set_binary_rowmajor).intersection(set_binary_colmajor)
+set_union = set_sources.intersection(set_ascii_rowmajor).intersection(set_binary_rowmajor).intersection(
+    set_binary_colmajor)
 sets_list = []
 for f in set_sources:
     if f in set_union:
@@ -107,3 +110,17 @@ def test_round_trip_sources_bincol_be(file_root):
     sdds2 = pysdds.read(io.BufferedReader(buf))
     assert sdds2.endianness == 'big'
     sdds.compare(sdds2)
+
+
+def test_write_from_df():
+    meas_df = {'ControlName': ['foo', 'bar'], 'LowerLimit': [-2, -2], 'UpperLimit': [-2.0, -2.0]}
+    df_meas = pd.DataFrame.from_dict(meas_df)
+    parameters = {'par1': [1], 'par2': [1.0], 'par3': ['foo']}
+    sdds = pysdds.SDDSFile.from_df([df_meas], parameter_dict=parameters, mode='ascii')
+    sdds.validate_data()
+    buf = io.BytesIO()
+    pysdds.write(sdds, buf)
+    sdds = pysdds.SDDSFile.from_df([df_meas], parameter_dict=parameters, mode='binary')
+    sdds.validate_data()
+    buf = io.BytesIO()
+    pysdds.write(sdds, buf)
