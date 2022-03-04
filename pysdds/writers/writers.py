@@ -29,7 +29,8 @@ ARRAY_MAX_VALUES_PER_LINE = 10
 def write(sdds: SDDSFile,
           filepath: Union[Path, str, BytesIO],
           endianness: Optional[str] = 'auto',
-          compression: Optional[str] = 'auto'):
+          compression: Optional[str] = 'auto',
+          overwrite: Optional[bool] = False):
     """
 
     Parameters
@@ -72,7 +73,7 @@ def write(sdds: SDDSFile,
     logger.info(f'Mode (%s), compression (%s), endianness (%s)', mode, compression, endianness)
 
     if isinstance(filepath, Path):
-        file = _open_write_file(filepath)
+        file = _open_write_file(filepath, overwrite_ok=overwrite)
     else:
         # IO is already a stream
         file = filepath
@@ -88,35 +89,38 @@ def write(sdds: SDDSFile,
     # logger.debug(f'Columns numeric: {is_columns_numeric}')
 
 
-def _open_write_file(filepath: Path, compression: str = None):
+def _open_write_file(filepath: Path, compression: str = None, overwrite_ok: bool = False):
     assert isinstance(filepath, Path)
 
     if filepath.exists():
-        raise IOError(f'File path already exists')
+        if not overwrite_ok:
+            raise IOError(f'File path already exists')
+        else:
+            logger.warning(f'File will be overwritten')
     if filepath.is_dir():
         raise IOError(f'File path is a directory, expect a file')
     if not filepath.parent.exists():
         raise IOError(f'Parent directory {filepath.parent} does not exist')
-    if not filepath.is_file():
-        raise IOError(f'File ({filepath}) does not exist or cannot be read')
+    #if not filepath.is_file():
+    #    raise IOError(f'File ({filepath}) does not exist or cannot be read')
 
     if compression is not None and compression not in ['xz', 'gz', 'bz2']:
         raise ValueError(f'Compression format ({compression}) is not recognized')
 
     try:
-        buffered_stream = open(filepath, 'xb', buffering=2097152)  # 2**20
+        buffered_stream = open(filepath, 'wb', buffering=2097152)  # 2**20
         if compression == 'xz':
             import lzma
-            stream = lzma.open(buffered_stream, 'xb')
+            stream = lzma.open(buffered_stream, 'wb')
         elif compression == 'gz':
             import gzip
-            stream = gzip.open(buffered_stream, 'xb')
+            stream = gzip.open(buffered_stream, 'wb')
         elif compression == 'bz2':
             import bz2
-            stream = bz2.open(buffered_stream, 'xb')
+            stream = bz2.open(buffered_stream, 'wb')
         elif compression == 'zip':
             import zipfile
-            stream = zipfile.ZipFile(buffered_stream, 'x')
+            stream = zipfile.ZipFile(buffered_stream, 'w')
         else:
             stream = buffered_stream
         if TRACE:
