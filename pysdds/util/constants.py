@@ -4,6 +4,11 @@ import numpy as np
 _NUMPY_DTYPES = {'short': 'i2', 'ushort': 'u2', 'long': 'i4', 'float': 'f4', 'double': 'f8',
                  'character': object, 'string': object}
 
+# Need to look into i8 support
+_NUMPY_DTYPES_INV = {np.dtype(np.int16): 'short', np.dtype(np.int32): 'long', np.dtype(np.int64): 'long',
+                     np.dtype(np.float64): 'double', np.dtype(np.float32): 'float',
+                     object: 'string', np.dtype('O'): 'string'}
+
 # On all 'reasonable' architectures, things will be little endian, but plenty of old files floating around
 _NUMPY_DTYPE_LE = {'short': np.dtype('<i2'), 'ushort': np.dtype('<u2'), 'long': np.dtype('<i4'),
                    'float': np.dtype('<f4'), 'double': np.dtype('<f8'), 'character': np.dtype('<i1'),
@@ -17,6 +22,7 @@ _NUMPY_DTYPE_FINAL = {'short': np.dtype('i2'), 'ushort': np.dtype('u2'), 'long':
 _PYTHON_TYPE_FINAL = {'short': np.dtype('i2'), 'ushort': np.dtype('u2'), 'long': np.dtype('i4'),
                       'float': np.dtype('f4'), 'double': np.dtype('f8'), 'character': str,
                       'string': str}
+_PYTHON_TYPE_INV = {int: 'long', float: 'double', str: 'string'}
 _STRUCT_STRINGS_LE = {'short': '<h', 'ushort': '<H', 'long': '<l',
                       'float': '<f', 'double': '<d', 'character': '<c', 'string': object}
 _STRUCT_STRINGS_BE = {'short': '>h', 'ushort': '>H', 'long': '>l',
