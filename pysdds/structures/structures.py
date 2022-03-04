@@ -1,10 +1,15 @@
 __all__ = ['Description', 'Parameter', 'Array', 'Column', 'Data', 'SDDSFile']
 
+import logging
 import math
-from typing import List, Optional, Literal
+from typing import List, Optional, Literal, Dict
 
 import numpy as np
 import pandas as pd
+
+from ..util import constants
+
+logger = logging.getLogger(__name__)
 
 
 def _compare_arrays(one, two, eps=None) -> bool:
@@ -771,6 +776,47 @@ class SDDSFile:
             if self.mode == 'binary' and self.data is not None:
                 self.data.nm['endian'] = endianness
 
+    @staticmethod
+    def from_df(df_list: [pd.DataFrame], parameter_dict: Optional[Dict[str, list]] = None,
+                mode: Literal["binary", "ascii"] = 'binary'):
+        assert len(df_list) == 1
+        df = df_list[0]
+
+        sdds = SDDSFile()
+        columns = df.columns
+
+        for i, c in enumerate(columns):
+            if df.dtypes[i] == np.dtype(np.int64):
+                val = df.iloc[:, i].values.astype(np.int32)
+            else:
+                val = df.iloc[:, i].values
+            sdds_type = constants._NUMPY_DTYPES_INV[df.dtypes[i]]
+            namelist = {'name': c, 'type': sdds_type}
+            col = Column(namelist, sdds)
+            sdds.columns.append(col)
+            col.data.append(val)
+
+        if parameter_dict is not None:
+            for i, (k, v) in enumerate(parameter_dict.items()):
+                #dtype = np.array(v).dtype
+                namelist = {'name': k, 'type': constants._PYTHON_TYPE_INV[type(v[0])]}
+                par = Parameter(namelist, sdds)
+                sdds.parameters.append(par)
+                if type(v[0]) == str:
+                    par.data = list(np.array(v, dtype=object))
+                else:
+                    arr = np.array(v)
+                    if arr.dtype == np.dtype(np.int64):
+                        arr = arr.astype(np.int32)
+                    par.data = list(arr)
+
+        sdds.data = Data({'mode': mode})
+        sdds.n_columns = len(sdds.columns)
+        sdds.n_parameters = len(sdds.parameters)
+        sdds.n_pages = 1
+        sdds.set_mode(mode)
+        return sdds
+
     def columns_to_df(self, page: int = 0):
         """
         Retrieve a copy of column data in specific page as a pandas dataframe
@@ -841,6 +887,10 @@ class SDDSFile:
         n_pages = self.n_pages
         from ..util.constants import _NUMPY_DTYPE_FINAL, _PYTHON_TYPE_FINAL
 
+        assert self.n_parameters == len(self.parameters)
+        assert self.n_arrays == len(self.arrays)
+        assert self.n_columns == len(self.columns)
+
         for el in self.parameters:
             data = el.data
             assert len(data) == n_pages
@@ -859,4 +909,4 @@ class SDDSFile:
             data = el.data
             assert len(data) == n_pages
             assert all(isinstance(v, np.ndarray) for v in data)
-            assert all(v.dtype == _NUMPY_DTYPE_FINAL[el.type] for v in data)
+            assert all(v.dtype == _NUMPY_DTYPE_FINAL[el.type] for v in data), f'dtypes: {[v.dtype for v in data]} {el.type}'
