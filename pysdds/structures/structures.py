@@ -460,9 +460,9 @@ class Column:
 
     def __str__(self):
         if self.data:
-            return f'SDDS Column ({len(self.data)} pages) at <{hex(id(self))}>: {self.nm}'
+            return f'Column ({len(self.data)} pages) at <{hex(id(self))}>: {self.nm}'
         else:
-            return f'SDDS Column (empty) at <{hex(id(self))}>: {self.nm}'
+            return f'Column (empty) at <{hex(id(self))}>: {self.nm}'
 
     def __repr__(self):
         return self.__str__()
