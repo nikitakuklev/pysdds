@@ -1164,7 +1164,7 @@ def _read_pages_ascii_mixed_lines(file: IO[bytes],
         while par_idx < n_parameters:
             b_array = __get_next_line(file, strip=True)
             if b_array is None:
-                raise Exception(f'>>PARS | pos {file.tell()} | unexpected EOF at page {page_idx}')
+                raise Exception(f'>>PARS | {page_idx=} {par_idx=} | pos {file.tell()} | unexpected EOF at page {page_idx}')
             if not page_skip:
                 if parameters_type[par_idx] == object:
                     value = b_array.strip()
@@ -1462,6 +1462,7 @@ def _read_pages_ascii_mixed_lines(file: IO[bytes],
                     file.read(1)
                     continue
                 else:
+                    logger.debug(f'Found character {repr(next_char)} at {file.tell()}, continuing to next page')
                     break
             else:
                 break

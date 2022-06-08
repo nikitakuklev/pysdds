@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 
 from ..structures import *
-from ..util.constants import _NUMPY_DTYPES, _NUMPY_DTYPE_LE, _NUMPY_DTYPE_BE, _NUMPY_DTYPE_FINAL,\
+from ..util.constants import _NUMPY_DTYPES, _NUMPY_DTYPE_LE, _NUMPY_DTYPE_BE, _NUMPY_DTYPE_FINAL, \
     _STRUCT_STRINGS_LE, _STRUCT_STRINGS_BE, _NUMPY_DTYPE_SIZES
 
 # The proper way to implement conditional logging is to check current level,
@@ -29,16 +29,21 @@ ARRAY_MAX_VALUES_PER_LINE = 10
 def write(sdds: SDDSFile,
           filepath: Union[Path, str, BytesIO],
           endianness: Optional[str] = 'auto',
-          compression: Optional[str] = 'auto',
+          compression: Optional[str] = None,
           overwrite: Optional[bool] = False):
     """
-
     Parameters
     ----------
     sdds : SDDSFile
         A valid SDDSFile instance to be written
     filepath : str, path object, file-like object
         Output file path or stream implementing write() function. If None, a bytes array is returned.
+    endianness : str
+        Endianness to use for numerical values, one of 'auto', 'big', 'little'. Defaults to 'auto'.
+    compression : str
+        Compression to use when writing file. One of None, 'auto', 'xz', 'gz', 'bz2'. Defaults to None.
+    overwrite : bool
+        If true, existing file at filepath will be overwritten
     """
     assert isinstance(sdds, SDDSFile)
 
@@ -47,20 +52,20 @@ def write(sdds: SDDSFile,
     elif isinstance(filepath, (Path, io.IOBase)):
         pass
     else:
-        raise Exception('Filepath is not a string, Path, or BytesIO object')
+        raise Exception(f'Filepath is {type(filepath)}, which is not a string, Path, or BytesIO object')
 
     mode = sdds.mode
 
     if endianness not in ['auto', 'big', 'little']:
         raise ValueError(f'SDDS binary endianness ({endianness}) is not recognized')
 
-    if compression not in [None, 'auto', 'xz', 'gz', 'bz2', 'zip']:
+    if compression not in [None, 'auto', 'xz', 'gz', 'bz2']:
         raise ValueError(f'SDDS compression ({compression}) is not recognized')
 
     sdds.validate_data()
 
     if endianness == 'auto':
-        #endianness = sys.byteorder
+        # endianness = sys.byteorder
         endianness = sdds.endianness
 
     if sdds.data.lines_per_row != 1:
@@ -79,7 +84,7 @@ def write(sdds: SDDSFile,
         file = filepath
 
     _dump_header(sdds, file)
-    logger.info(f'Header written OK')
+    logger.info(f'Header write OK')
 
     if mode == 'ascii':
         _dump_data_ascii(sdds, file)
@@ -94,14 +99,14 @@ def _open_write_file(filepath: Path, compression: str = None, overwrite_ok: bool
 
     if filepath.exists():
         if not overwrite_ok:
-            raise IOError(f'File path already exists')
+            raise IOError(f'File path {filepath} already exists')
         else:
-            logger.warning(f'File will be overwritten')
+            logger.warning(f'File {filepath} will be overwritten')
     if filepath.is_dir():
-        raise IOError(f'File path is a directory, expect a file')
+        raise IOError(f'File path {filepath} is a directory, expect a file')
     if not filepath.parent.exists():
         raise IOError(f'Parent directory {filepath.parent} does not exist')
-    #if not filepath.is_file():
+    # if not filepath.is_file():
     #    raise IOError(f'File ({filepath}) does not exist or cannot be read')
 
     if compression is not None and compression not in ['xz', 'gz', 'bz2']:
@@ -128,7 +133,7 @@ def _open_write_file(filepath: Path, compression: str = None, overwrite_ok: bool
             logger.debug(f'Final stream: {stream}')
         return stream
     except IOError as ex:
-        logger.exception(f'File {str(filepath)} file IO opening failed')
+        logger.exception(f'File {str(filepath)} IO failed')
         raise ex
 
 
@@ -179,16 +184,17 @@ def _dump_data_ascii(sdds: SDDSFile, file: IO[bytes]):
 
     # Quoting needs to be handled carefully....
     opts = dict(
-                header=False,
-                index=False,
-                mode='wb',
-                encoding='ascii',
-                compression=None,
-                line_terminator=NEWLINE_CHAR,
-                quotechar='"',
-                doublequote=False,
-                escapechar='\\',
-                float_format='%.15e')
+        header=False,
+        index=False,
+        mode='wb',
+        encoding='ascii',
+        compression=None,
+        line_terminator=NEWLINE_CHAR,
+        quotechar='"',
+        doublequote=False,
+        escapechar='\\',
+        #float_format='%.15e'
+    )
 
     param_df = sdds.parameters_to_df()
     for page_idx in range(sdds.n_pages):
@@ -207,9 +213,31 @@ def _dump_data_ascii(sdds: SDDSFile, file: IO[bytes]):
             page_size = len(sdds.columns[0].data[page_idx])
             append(str(page_size))
 
+            # This creates issues with quoted numeric values after formatting
+            # Also there are issues with escaping carriage returns
             df = sdds.columns_to_df(page_idx)
             df.to_csv(file, **opts, sep=' ', quoting=csv.QUOTE_NONNUMERIC)
 
+            # Slower way but hopefully works
+            # df = sdds.columns_to_df(page_idx)
+            # for c, col in zip(sdds.columns, df.columns):
+            #     if c.type == 'string':
+            #         df.loc[:, col] = df.loc[:, col].apply(lambda x: '"{}"'.format(x))
+            #     elif c.type == 'double':
+            #         df.loc[:, col] = df.loc[:, col].apply(lambda x: '{:.15e}'.format(x))
+            # opts2 = dict(
+            #     header=False,
+            #     index=False,
+            #     mode='wb',
+            #     encoding='ascii',
+            #     compression=None,
+            #     line_terminator=NEWLINE_CHAR,
+            #     quotechar=None,
+            #     doublequote=False,
+            #     escapechar='\\',
+            #     #float_format='%.15e',
+            # )
+            # df.to_csv(file, **opts2, sep=' ', quoting=csv.QUOTE_NONE)
         append('')
 
 
@@ -282,7 +310,7 @@ def _dump_data_binary(sdds: SDDSFile, file: IO[bytes], endianness):
                 file.write(el.data[page_idx])
 
         for i, el in enumerate(sdds.arrays):
-            #file.write(el.data[page_idx].shape.view(NUMPY_DTYPE['character'])])
+            # file.write(el.data[page_idx].shape.view(NUMPY_DTYPE['character'])])
             for d in el.data[page_idx].shape:
                 file.write(d.to_bytes(4, endianness))
             t = el.type
@@ -312,5 +340,3 @@ def _dump_data_binary(sdds: SDDSFile, file: IO[bytes], endianness):
                     file.write(page_data[i][row])
                 else:
                     file.write(page_data[i][row])
-
-
