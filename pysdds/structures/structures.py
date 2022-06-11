@@ -152,6 +152,13 @@ class Parameter:
     def __eq__(self, other: "Parameter"):
         return self.compare(other)
 
+    def __getitem__(self, key):
+        if not isinstance(key, int):
+            raise ValueError('Only integer indexing is allowed for parameters')
+        if key >= len(self._data) or key < 0:
+            raise KeyError(f'Index {key} invalid for data length {len(self._data)}')
+        return self._data[key]
+
     def to_sdds(self):
         return f'&parameter {_namelist_to_str(self.nm)},  &end'
 
@@ -406,6 +413,21 @@ class Column:
 
     def __eq__(self, other: "Column"):
         return self.compare(other, eps=None)
+
+    def __getitem__(self, key):
+        if isinstance(key, int):
+            if key >= len(self.data) or key < 0:
+                raise KeyError(f'Index {key} invalid for data length {len(self.data)}')
+            return self.data[key]
+        elif isinstance(key, tuple):
+            assert len(key) == 2, f'Tuple {key} index length != 2'
+            assert all(isinstance(k, int) for k in key), f'Not all indices in tuple {key} are integers'
+            page_data = self.data[key[0]]
+            if key[1] >= len(page_data) or key[1] < 0:
+                raise KeyError(f'Index {key} invalid - page {key[0]} length is {len(page_data)}')
+            return page_data[key[1]]
+        else:
+            raise ValueError(f'Only integer or integer tuple indexing is allowed for columns')
 
     def to_sdds(self):
         return f'&column {_namelist_to_str(self.nm)},  &end'
