@@ -1,6 +1,8 @@
+import _io
 import csv
 import io
 import struct
+import tempfile
 from io import BytesIO
 import logging
 import sys
@@ -49,7 +51,9 @@ def write(sdds: SDDSFile,
 
     if isinstance(filepath, str):
         filepath = Path(filepath)
-    elif isinstance(filepath, (Path, io.IOBase)):
+    elif isinstance(filepath, (Path, io.IOBase, tempfile.SpooledTemporaryFile)):
+        pass
+    elif issubclass(filepath.__class__, _io.IOBase):
         pass
     else:
         raise Exception(f'Filepath is {type(filepath)}, which is not a string, Path, or BytesIO object')
