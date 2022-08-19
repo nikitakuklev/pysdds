@@ -2,6 +2,7 @@ __all__ = ['Description', 'Parameter', 'Array', 'Column', 'Data', 'SDDSFile']
 
 import logging
 import math
+import sys
 from typing import List, Optional, Literal, Dict
 
 import numpy as np
@@ -144,7 +145,10 @@ class Parameter:
         self.sdds = sdds
 
     def __str__(self):
-        return f'Parameter "{self.name}" type=<{self.type}>'
+        if self.data:
+            return f'Parameter "{self.name}" ({len(self.data)} pages) at <{hex(id(self))}>: {self.nm}'
+        else:
+            return f'Parameter "{self.name}" (empty) at <{hex(id(self))}>: {self.nm}'
 
     def __repr__(self):
         return self.__str__()
@@ -482,9 +486,9 @@ class Column:
 
     def __str__(self):
         if self.data:
-            return f'Column ({len(self.data)} pages) at <{hex(id(self))}>: {self.nm}'
+            return f'Column "{self.name}" ({len(self.data)} pages) at <{hex(id(self))}>: {self.nm}'
         else:
-            return f'Column (empty) at <{hex(id(self))}>: {self.nm}'
+            return f'Column "{self.name}" (empty) at <{hex(id(self))}>: {self.nm}'
 
     def __repr__(self):
         return self.__str__()
@@ -799,11 +803,40 @@ class SDDSFile:
                 self.data.nm['endian'] = endianness
 
     @staticmethod
-    def from_df(df_list: [pd.DataFrame], parameter_dict: Optional[Dict[str, list]] = None,
-                mode: Literal["binary", "ascii"] = 'binary'):
-        assert len(df_list) == 1
-        df = df_list[0]
+    def from_df(df_list: List[pd.DataFrame],
+                parameter_dict: Optional[Dict[str, list]] = None,
+                mode: Literal["binary", "ascii"] = 'binary',
+                endianness: Literal["big", "little"] = None) -> "SDDSFile":
 
+        """
+        Create SDDS object from lists of dataframes
+
+        Parameters
+        ----------
+        df_list : List of dataframes
+            List of dataframes to use for data, with same columns in each. Not copy-safe.
+        parameter_dict : dict
+            Dictionary with keys representing parameter names and values containing arrays of data, 1 per page.
+            Length of each array must match that of df_list.
+        mode : str
+            SDDS mode
+        endianness : str
+            SDDS endianness
+
+        Returns
+        -------
+        sdds : SDDSFile
+            New SDDS object
+        """
+
+        if endianness is None or endianness == 'auto':
+            endianness = sys.byteorder
+        if endianness not in ['auto', 'big', 'little']:
+            raise ValueError(f'SDDS binary endianness ({endianness}) is not recognized')
+
+        page_idx = 0
+        n_pages = len(df_list)
+        df = df_list[page_idx]
         sdds = SDDSFile()
         columns = df.columns
 
@@ -820,7 +853,7 @@ class SDDSFile:
 
         if parameter_dict is not None:
             for i, (k, v) in enumerate(parameter_dict.items()):
-                #dtype = np.array(v).dtype
+                assert len(v) == n_pages, f'Length {len(v)} of parameter {k} not equal to df list length {n_pages}'
                 namelist = {'name': k, 'type': constants._PYTHON_TYPE_INV[type(v[0])]}
                 par = Parameter(namelist, sdds)
                 sdds.parameters.append(par)
@@ -832,14 +865,23 @@ class SDDSFile:
                         arr = arr.astype(np.int32)
                     par.data = list(arr)
 
+        for page_idx in range(1, len(df_list)):
+            for i, c in enumerate(columns):
+                if df.dtypes[i] == np.dtype(np.int64):
+                    val = df.iloc[:, i].values.astype(np.int32)
+                else:
+                    val = df.iloc[:, i].values
+                assert sdds.columns[i].data[0].dtype == val.dtype
+                sdds.columns[i].data.append(val)
+
         sdds.data = Data({'mode': mode})
         sdds.n_columns = len(sdds.columns)
         sdds.n_parameters = len(sdds.parameters)
-        sdds.n_pages = 1
         sdds.set_mode(mode)
+        sdds.n_pages = n_pages
         return sdds
 
-    def columns_to_df(self, page: int = 0):
+    def columns_to_df(self, page: int = 0) -> pd.DataFrame:
         """
         Retrieve a copy of column data in specific page as a pandas dataframe
 
@@ -863,7 +905,7 @@ class SDDSFile:
         df = pd.DataFrame(data=data, columns=column_names)
         return df
 
-    def parameters_to_df(self):
+    def parameters_to_df(self) -> pd.DataFrame:
         """
         Retrieve parameters as a pandas dataframe. Indices correspond to pages, and column labels to parameter names.
 
@@ -880,7 +922,8 @@ class SDDSFile:
 
     def page_to_df(self, page=0) -> pd.DataFrame:
         """
-        Transforms parameters and columns into a single dataframe, expanding parameter values to columns
+        Transforms parameters and columns from single page into a single dataframe, expanding parameter values to
+        columns
 
         Parameters
         ----------
