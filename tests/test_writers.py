@@ -1,4 +1,4 @@
-import io
+import io, os
 
 import pytest
 import pysdds
@@ -65,7 +65,7 @@ def test_round_trip_ascii_ascii(file_root):
 def test_round_trip_sources(file_root):
     sdds = pysdds.read(file_root)
     buf = io.BytesIO()
-    pysdds.write(sdds, buf, endianness=sdds.endianness)
+    pysdds.write(sdds, buf)
     buf.seek(0)
     sdds2 = pysdds.read(io.BufferedReader(buf))
     assert sdds2.endianness == sdds.endianness
@@ -87,13 +87,17 @@ def test_round_trip_sources_ascii(file_root):
         print(repr(l))
         pass
     print("=====================================")
-    #
+
     # with open(file_root+'_writeback', "wb") as f:
     #     f.write(buf.getbuffer())
-    #
+
     sdds2 = pysdds.read(io.BufferedReader(buf))
     sdds.compare(sdds2)
 
+    # sdds3 = pysdds.read(file_root+'_writeback')
+    # sdds.compare(sdds3)
+    # sdds2.compare(sdds3)
+    # os.remove(os.path.abspath(file_root+'_writeback'))
 
 @pytest.mark.parametrize("file_root", files_sources)
 def test_round_trip_sources_bincol_le(file_root):
@@ -125,7 +129,7 @@ def test_round_trip_sources_bincol_be(file_root):
 
 
 def test_write_from_df():
-    meas_df = {'ControlName': ['foo', 'bar'], 'LowerLimit': [-2, -2], 'UpperLimit': [-2.0, -2.0]}
+    meas_df = {'ControlName': ['foo-_~|aaaa', 'bar\n\r\005'], 'LowerLimit': [-2, -2], 'UpperLimit': [-2.0, -2.0]}
     df_meas = pd.DataFrame.from_dict(meas_df)
     parameters = {'par1': [1], 'par2': [1.0], 'par3': ['foo']}
     sdds = pysdds.SDDSFile.from_df([df_meas], parameter_dict=parameters, mode='ascii')
