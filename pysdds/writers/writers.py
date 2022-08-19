@@ -3,6 +3,7 @@ import csv
 import io
 import struct
 import tempfile
+import time
 from io import BytesIO
 import logging
 import sys
@@ -27,10 +28,12 @@ NEWLINE_CHAR = '\n'
 
 ARRAY_MAX_VALUES_PER_LINE = 10
 
+_ASCII_TEXT_WRITE_METHOD = 'sequential_python'
+
 
 def write(sdds: SDDSFile,
           filepath: Union[Path, str, BytesIO],
-          endianness: Optional[str] = 'auto',
+          #          endianness: Optional[str] = 'auto',
           compression: Optional[str] = None,
           overwrite: Optional[bool] = False):
     """
@@ -47,7 +50,7 @@ def write(sdds: SDDSFile,
     overwrite : bool
         If true, existing file at filepath will be overwritten
     """
-    assert isinstance(sdds, SDDSFile)
+    assert isinstance(sdds, SDDSFile), "Data structure is not an SDDSFile!"
 
     if isinstance(filepath, str):
         filepath = Path(filepath)
@@ -56,21 +59,16 @@ def write(sdds: SDDSFile,
     elif issubclass(filepath.__class__, _io.IOBase):
         pass
     else:
-        raise Exception(f'Filepath is {type(filepath)}, which is not a string, Path, or BytesIO object')
+        raise Exception(f'Filepath type {type(filepath)} is not a string, Path, or BytesIO object')
 
     mode = sdds.mode
-
-    if endianness not in ['auto', 'big', 'little']:
-        raise ValueError(f'SDDS binary endianness ({endianness}) is not recognized')
 
     if compression not in [None, 'auto', 'xz', 'gz', 'bz2']:
         raise ValueError(f'SDDS compression ({compression}) is not recognized')
 
     sdds.validate_data()
 
-    if endianness == 'auto':
-        # endianness = sys.byteorder
-        endianness = sdds.endianness
+    endianness = sdds.endianness
 
     if sdds.data.lines_per_row != 1:
         raise NotImplementedError("lines_per_row != 1 is not yet supported")
@@ -80,12 +78,13 @@ def write(sdds: SDDSFile,
 
     logger.info(f'Writing file to "%s"', str(filepath))
     logger.info(f'Mode (%s), compression (%s), endianness (%s)', mode, compression, endianness)
+    t_start = time.perf_counter()
 
     if isinstance(filepath, Path):
-        file = _open_write_file(filepath, overwrite_ok=overwrite)
+        file = _open_write_file(filepath, compression=compression, overwrite_ok=overwrite)
     else:
         # IO is already a stream
-        file = filepath
+        file = _open_write_stream(filepath, compression=compression)
 
     _dump_header(sdds, file)
     logger.info(f'Header write OK')
@@ -94,8 +93,38 @@ def write(sdds: SDDSFile,
         _dump_data_ascii(sdds, file)
     else:
         _dump_data_binary(sdds, file, endianness)
+
+    logger.info(f'Finished in {(time.perf_counter() - t_start) * 1e3:.3f} ms')
     # is_columns_numeric = not any(el.type == 'string' for el in sdds.columns)
     # logger.debug(f'Columns numeric: {is_columns_numeric}')
+
+
+def _open_write_stream(stream: BytesIO, compression: str = None):
+    if compression is not None and compression not in ['xz', 'gz', 'bz2']:
+        raise ValueError(f'Compression format ({compression}) is not recognized')
+    buffered_stream = stream
+    try:
+        if compression == 'xz':
+            import lzma
+            stream = lzma.open(buffered_stream, 'wb')
+        elif compression == 'gz':
+            import gzip
+            stream = gzip.open(buffered_stream, 'wb')
+        elif compression == 'bz2':
+            import bz2
+            stream = bz2.open(buffered_stream, 'wb')
+        elif compression == 'zip':
+            import zipfile
+            stream = zipfile.ZipFile(buffered_stream, 'w')
+        else:
+            stream = buffered_stream
+        if TRACE:
+            logger.debug(f'File stream: {buffered_stream}')
+            logger.debug(f'Final stream: {stream}')
+        return stream
+    except IOError as ex:
+        logger.exception(f'Buffer IO failed')
+        raise ex
 
 
 def _open_write_file(filepath: Path, compression: str = None, overwrite_ok: bool = False):
@@ -186,63 +215,183 @@ def _dump_data_ascii(sdds: SDDSFile, file: IO[bytes]):
     def append(s):
         file.write((s + NEWLINE_CHAR).encode('ascii'))
 
-    # Quoting needs to be handled carefully....
-    opts = dict(
-        header=False,
-        index=False,
-        mode='wb',
-        encoding='ascii',
-        compression=None,
-        line_terminator=NEWLINE_CHAR,
-        quotechar='"',
-        doublequote=False,
-        escapechar='\\',
-        #float_format='%.15e'
-    )
+    def encode_if_needed(s):
+        if len(s) == 0:
+            return '\"\"'
+        result = ''
+        flag = False
+        for ch in s:
+            if 32 <= ord(ch) < 127:
+                if ch == ' ':
+                    flag = True
+                    result += ch
+                elif ch in ('\\', '"'):
+                    flag = True
+                    result += '\\' + ch
+                else:
+                    result += ch
+            else:
+                if ord(ch) >= 127:
+                    raise Exception(f'Non-ascii character {repr(ch)}')
+                else:
+                    result += f'\\{ord(ch):03o}'
+                    flag = True
+        if flag:
+            return '"' + result + '"'
+        else:
+            return result
 
-    param_df = sdds.parameters_to_df()
-    for page_idx in range(sdds.n_pages):
-        append(f'! page number {page_idx}')
+    # if _ASCII_TEXT_WRITE_METHOD == 'sequential':
+    #     # Quoting needs to be handled carefully....
+    #     opts = dict(
+    #         header=False,
+    #         index=False,
+    #         mode='wb',
+    #         encoding='utf-8',
+    #         compression=None,
+    #         line_terminator=NEWLINE_CHAR,
+    #         quotechar='"',
+    #         doublequote=False,
+    #         escapechar='\\',
+    #         # float_format='%.15e'
+    #     )
+    #
+    #     param_df = sdds.parameters_to_df()
+    #     for page_idx in range(sdds.n_pages):
+    #         append(f'! page number {page_idx}')
+    #
+    #         if len(sdds.parameters) > 0:
+    #             param_df.iloc[page_idx, :].to_csv(file, **opts, sep='\n', quoting=csv.QUOTE_NONNUMERIC)
+    #
+    #         for i, el in enumerate(sdds.arrays):
+    #             data = el.data[page_idx]
+    #             append(' '.join([str(i) for i in data.shape]) + f' ! {len(data.shape)}-dimensional array {el.name}')
+    #             array_df = pd.DataFrame({'data': data}).T
+    #             array_df.to_csv(file, **opts, sep=' ', quoting=csv.QUOTE_MINIMAL)
+    #
+    #         if len(sdds.columns) > 0:
+    #             page_size = len(sdds.columns[0].data[page_idx])
+    #             append(str(page_size))
+    #
+    #             # Convert strings to escaped form
+    #             df = sdds.columns_to_df(page_idx)
+    #             for i, c in enumerate(sdds.columns):
+    #                 if c.type == 'string':
+    #                     df.iloc[:, i] = df.iloc[:, i].map(encode_if_needed)
+    #
+    #             for i in range(len(df)):
+    #                 append(df.iloc[i:i + 1, :].to_string(index=False, header=False, float_format='%.15e'))
 
-        if len(sdds.parameters) > 0:
-            param_df.iloc[page_idx, :].to_csv(file, **opts, sep='\n', quoting=csv.QUOTE_MINIMAL)
+    if _ASCII_TEXT_WRITE_METHOD == 'sequential_python':
+        # Quoting needs to be handled carefully....
+        opts = dict(
+            header=False,
+            index=False,
+            mode='wb',
+            encoding='utf-8',
+            compression=None,
+            line_terminator=NEWLINE_CHAR,
+            quotechar='"',
+            doublequote=False,
+            escapechar='\\',
+            # float_format='%.15e'
+        )
 
-        for i, el in enumerate(sdds.arrays):
-            data = el.data[page_idx]
-            append(' '.join([str(i) for i in data.shape]) + f' ! {len(data.shape)}-dimensional array {el.name}')
-            array_df = pd.DataFrame({'data': data}).T
-            array_df.to_csv(file, **opts, sep=' ', quoting=csv.QUOTE_MINIMAL)
+        for page_idx in range(sdds.n_pages):
+            append(f'! page number {page_idx}')
+            for j, p in enumerate(sdds.parameters):
+                v = p.data[page_idx]
+                if p.type == 'string':
+                    append(encode_if_needed(v))
+                elif p.type == 'double':
+                    append(f'{v:.15e}')
+                else:
+                    append(str(v))
 
-        if len(sdds.columns) > 0:
-            page_size = len(sdds.columns[0].data[page_idx])
-            append(str(page_size))
+            for i, el in enumerate(sdds.arrays):
+                data = el.data[page_idx]
+                append(' '.join([str(i) for i in data.shape]) + f' ! {len(data.shape)}-dimensional array {el.name}')
+                if el.type == 'string':
+                    sl = [encode_if_needed(v) for v in data]
+                elif el.type == 'double':
+                    sl = [f'{v:.15e}' for v in data]
+                else:
+                    sl = [str(v) for v in data]
+                append(' '.join(sl))
 
-            # This creates issues with quoted numeric values after formatting
-            # Also there are issues with escaping carriage returns
-            df = sdds.columns_to_df(page_idx)
-            df.to_csv(file, **opts, sep=' ', quoting=csv.QUOTE_NONNUMERIC)
+            if len(sdds.columns) > 0:
+                page_size = len(sdds.columns[0].data[page_idx])
+                append(str(page_size))
+                for i in range(page_size):
+                    sl = []
+                    for j, c in enumerate(sdds.columns):
+                        v = c.data[page_idx][i]
+                        if c.type == 'string':
+                            sl.append(encode_if_needed(v))
+                        elif c.type == 'double':
+                            sl.append(f'{v:.15e}')
+                        else:
+                            sl.append(str(v))
+                    append(' '.join(sl))
 
-            # Slower way but hopefully works
-            # df = sdds.columns_to_df(page_idx)
-            # for c, col in zip(sdds.columns, df.columns):
-            #     if c.type == 'string':
-            #         df.loc[:, col] = df.loc[:, col].apply(lambda x: '"{}"'.format(x))
-            #     elif c.type == 'double':
-            #         df.loc[:, col] = df.loc[:, col].apply(lambda x: '{:.15e}'.format(x))
-            # opts2 = dict(
-            #     header=False,
-            #     index=False,
-            #     mode='wb',
-            #     encoding='ascii',
-            #     compression=None,
-            #     line_terminator=NEWLINE_CHAR,
-            #     quotechar=None,
-            #     doublequote=False,
-            #     escapechar='\\',
-            #     #float_format='%.15e',
-            # )
-            # df.to_csv(file, **opts2, sep=' ', quoting=csv.QUOTE_NONE)
-        append('')
+    elif _ASCII_TEXT_WRITE_METHOD == 'pandas':
+        # Quoting needs to be handled carefully....
+        opts = dict(
+            header=False,
+            index=False,
+            mode='wb',
+            encoding='ascii',
+            compression=None,
+            line_terminator=NEWLINE_CHAR,
+            quotechar='"',
+            doublequote=False,
+            escapechar='\\',
+            # float_format='%.15e'
+        )
+
+        param_df = sdds.parameters_to_df()
+        for page_idx in range(sdds.n_pages):
+            append(f'! page number {page_idx}')
+
+            if len(sdds.parameters) > 0:
+                param_df.iloc[page_idx, :].to_csv(file, **opts, sep='\n', quoting=csv.QUOTE_MINIMAL)
+
+            for i, el in enumerate(sdds.arrays):
+                data = el.data[page_idx]
+                append(' '.join([str(i) for i in data.shape]) + f' ! {len(data.shape)}-dimensional array {el.name}')
+                array_df = pd.DataFrame({'data': data}).T
+                array_df.to_csv(file, **opts, sep=' ', quoting=csv.QUOTE_MINIMAL)
+
+            if len(sdds.columns) > 0:
+                page_size = len(sdds.columns[0].data[page_idx])
+                append(str(page_size))
+
+                # This creates issues with quoted numeric values after formatting
+                # Also there are issues with escaping carriage returns
+                df = sdds.columns_to_df(page_idx)
+                df.to_csv(file, **opts, sep=' ', quoting=csv.QUOTE_NONNUMERIC)
+
+                # Slower way but hopefully works
+                # df = sdds.columns_to_df(page_idx)
+                # for c, col in zip(sdds.columns, df.columns):
+                #     if c.type == 'string':
+                #         df.loc[:, col] = df.loc[:, col].apply(lambda x: '"{}"'.format(x))
+                #     elif c.type == 'double':
+                #         df.loc[:, col] = df.loc[:, col].apply(lambda x: '{:.15e}'.format(x))
+                # opts2 = dict(
+                #     header=False,
+                #     index=False,
+                #     mode='wb',
+                #     encoding='ascii',
+                #     compression=None,
+                #     line_terminator=NEWLINE_CHAR,
+                #     quotechar=None,
+                #     doublequote=False,
+                #     escapechar='\\',
+                #     #float_format='%.15e',
+                # )
+                # df.to_csv(file, **opts2, sep=' ', quoting=csv.QUOTE_NONE)
+            # append('')
 
 
 def _dump_data_binary(sdds: SDDSFile, file: IO[bytes], endianness):
