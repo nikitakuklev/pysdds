@@ -1,3 +1,4 @@
+import csv
 import io
 import sys
 import logging
@@ -33,7 +34,8 @@ _ASCII_TEXT_PARSE_METHOD = 'read_table'
 _ASCII_NUMERIC_PARSE_METHOD = 'read_table'  # 'fromtxt'
 
 
-def _open_file(filepath: Path, compression: str, use_magic_values: bool = False) -> IO[bytes]:
+def _open_file(filepath: Path, compression: str, use_magic_values: bool = False, buffer_size: int = None)\
+        -> (IO[bytes], int, bool):
     """Open the file path for reading as a raw byte stream. Compression is determined based on either file extension,
     or magic strings If no matches are found, file is assumed to be uncompressed
 
@@ -96,33 +98,67 @@ def _open_file(filepath: Path, compression: str, use_magic_values: bool = False)
             logger.info(f'Auto compression resolved as ({compression}) from file extension')
 
     # By default, Python reads in small blocks of io.DEFAULT_BUFFER_SIZE = 8192
-    # To encourage large reads and fully consuming small files, a large 2MB buffer is specified
+    # To encourage large reads and fully consuming small files, a large buffer is specified
     # For decompression, the decompress function is called on small blocks regardless, so we supply
     # a buffered reader to at least read large chunks from network storage
+    # If file size is small enough, we try to buffer whole file immediately
     # See bpo-41486 for Python 3.10 patch that will improve decompress performance
-    try:
-        buffered_stream = open(filepath, 'rb', buffering=2097152)  # 2**20
-        if compression == 'xz':
-            import lzma
-            stream = lzma.open(buffered_stream, 'rb')
-        elif compression == 'gz':
-            import gzip
-            stream = gzip.open(buffered_stream, 'rb')
-        elif compression == 'bz2':
-            import bz2
-            stream = bz2.open(buffered_stream, 'rb')
-        elif compression == 'zip':
-            import zipfile
-            stream = zipfile.ZipFile(buffered_stream, 'r')
-        else:
-            stream = buffered_stream
-        if TRACE:
-            logger.debug(f'File stream: {buffered_stream}')
-            logger.debug(f'Final stream: {stream}')
-        return stream
-    except IOError as ex:
-        logger.exception(f'File {str(filepath)} IO failed')
-        raise ex
+    if buffer_size == 0 and filesize < 8388608:
+        try:
+            with open(filepath, 'rb', buffering=8388608) as f:
+                buf = f.read()
+            if compression == 'xz':
+                import lzma
+                buf_decompressed = lzma.decompress(buf)
+            elif compression == 'gz':
+                import gzip
+                buf_decompressed = gzip.decompress(buf)
+            elif compression == 'bz2':
+                import bz2
+                buf_decompressed = bz2.decompress(buf)
+            else:
+                buf_decompressed = buf
+            stream_size = len(buf_decompressed)
+            # BytesIO will do copy-on-write on 3.5+, which in our case means never
+            # https://hg.python.org/cpython/rev/79a5fbe2c78f
+            stream = io.BytesIO(buf_decompressed)
+            # Need peak() method...this will do a copy...
+            # Will avoid peaking during parsing, so ok to not buffer
+            buffered_stream = stream #io.BufferedReader(stream, buffer_size=filesize)
+            if TRACE:
+                logger.debug(f'File size {filesize} and parsing settings allow for full buffering')
+                logger.debug(f'Final stream: {buffered_stream}')
+            return buffered_stream, stream_size, False
+        except IOError as ex:
+            logger.exception(f'File {str(filepath)} memory-buffered IO failed')
+            raise ex
+    else:
+        try:
+            if buffer_size is None:
+                buffered_stream = open(filepath, 'rb')
+            else:
+                # If file was too large to ingest fully, fall back to standard buffer
+                # Too large a value might be detrimental due to CPU caches
+                sbuf = 1048576 if buffer_size == 0 else buffer_size  # 2**20
+                buffered_stream = open(filepath, 'rb', buffering=sbuf)
+            if compression == 'xz':
+                import lzma
+                stream = lzma.open(buffered_stream, 'rb')
+            elif compression == 'gz':
+                import gzip
+                stream = gzip.open(buffered_stream, 'rb')
+            elif compression == 'bz2':
+                import bz2
+                stream = bz2.open(buffered_stream, 'rb')
+            else:
+                stream = buffered_stream
+            if TRACE:
+                logger.debug(f'File stream: {buffered_stream}')
+                logger.debug(f'Final stream: {stream}')
+            return stream, None, True
+        except IOError as ex:
+            logger.exception(f'File {str(filepath)} IO failed')
+            raise ex
 
 
 def read(filepath: Union[Path, str, IO[bytes]],
@@ -212,22 +248,39 @@ def read(filepath: Union[Path, str, IO[bytes]],
             raise ValueError(f'Pagelist is not an array-like object of ints')
     else:
         pages_mask = None
-        pages = None
 
     sdds = SDDSFile()
     sdds.__source_file = str(filepath)
 
     logger.info(f'Opening file "%s"', str(filepath))
     logger.info(f'Mode (%s), compression (%s), endianness (%s)', mode, compression, endianness)
+    if header_only:
+        # Header needs a small read amount - use python default (typically 1 block, 8192)
+        buffer_size = None
+    elif cols is None and pages is None:
+        # We are reading full file - try to buffer whole file aggressively
+        # If too large, fallback with large buffer will be used
+        buffer_size = 0
+    else:
+        # Use a middle-ground option
+        buffer_size = 1048576
+
     t_start = time.perf_counter()
     if isinstance(filepath, Path):
         # File is opened in binary mode because it is necessary for data parsing,
         # reopening after header parsing would interfere with IO buffering
-        file = _open_file(filepath, compression, use_magic_values=False)
-        sdds._source_file_size = filepath.stat().st_size
+        file, file_size, peek_available = _open_file(filepath, compression, use_magic_values=False,
+                                                     buffer_size=buffer_size)
+        sdds._source_file_size = file_size
+        logger.debug(f'Path opened as file in %.3f ms, size (%s)',
+                     (time.perf_counter() - t_start) * 1e3, file_size)
     else:
         file = filepath
+        file_size = len(filepath)
+        peek_available = True
         sdds._source_file_size = 0
+        logger.debug(f'Path opened as byte stream in %.3f ms, size (%s)',
+                     (time.perf_counter() - t_start) * 1e3, file_size)
 
     try:
         # First, read the header
@@ -301,8 +354,13 @@ def read(filepath: Union[Path, str, IO[bytes]],
                     file.readline()
 
         if sdds.mode == 'binary':
-            _read_pages_binary(file, sdds, arrays_mask=array_mask, columns_mask=column_mask, pages_mask=pages_mask)
+            _read_pages_binary(file, sdds, file_size=file_size, arrays_mask=array_mask,
+                               columns_mask=column_mask, pages_mask=pages_mask)
         else:
+            # Need to use BufferedReader since file end is detected by peak()
+            if not peek_available:
+                logger.debug('Wrapping stream in buffered reader since peek() was not available')
+                file = io.BufferedReader(file)
             # Streaming ascii data is not yet supported because performance is bad
             if sdds.data.lines_per_row != 1:
                 raise NotImplementedError("lines_per_row != 1 is not yet supported")
@@ -615,10 +673,12 @@ def _read_header_fullstream(file: IO[bytes], sdds: SDDSFile, mode: str, endianne
 
 def _read_pages_binary(file: IO[bytes],
                        sdds: SDDSFile,
+                       file_size: int,
                        arrays_mask: List[bool],
                        columns_mask: List[bool],
                        pages_mask: Optional[List[bool]],
-                       convert_to_native_endianness: bool = True):
+                       convert_to_native_endianness: bool = True,
+                       ):
     """Read a binary page of SDDS file. Page length is given by 4 bytes ('long') at the start of the segment.
 
     If file contains string fields, we will have to ingest input stream to determine the length of each string (given
@@ -728,7 +788,7 @@ def _read_pages_binary(file: IO[bytes],
     elif columns_all_numeric and sdds._meta_fixed_rowcount:
         # Numeric types but fixed rows - have to parse row by row
         logger.debug('All columns are numeric and data is row order -> reading whole rows')
-    elif columns_all_numeric and not sdds._meta_fixed_rowcount and sdds._source_file_size > 500e6:
+    elif columns_all_numeric and not sdds._meta_fixed_rowcount and sdds._source_file_size is not None and sdds._source_file_size > 500e6:
         # Row by row parsing with single struct - memory efficient and fast
         logger.debug('All columns numeric, no fixed rows, data is row order, large size -> using row-wide struct')
     elif columns_all_numeric and not sdds._meta_fixed_rowcount:
@@ -758,7 +818,7 @@ def _read_pages_binary(file: IO[bytes],
         byte_array = file.read(4)
         assert len(byte_array) == 4
         page_size = int.from_bytes(byte_array, endianness)
-        if not 0 <= page_size <= 1e7:
+        if not 0 <= page_size <= 1e9:
             raise ValueError(
                 f'Page size ({page_size}) ({byte_array}) is unreasonable - is file not {endianness}-endian?')
         logger.debug(f'Page {page_idx} size is {page_size} | {byte_array=}')
@@ -948,7 +1008,7 @@ def _read_pages_binary(file: IO[bytes],
                         c._page_numbers.append(page_idx)
                         idx_active += 1
                 page_stored_idx += 1
-        elif columns_all_numeric and not sdds._meta_fixed_rowcount and sdds._source_file_size > 500e6:
+        elif columns_all_numeric and not sdds._meta_fixed_rowcount and sdds._source_file_size is not None and sdds._source_file_size > 500e6:
             for i in range(n_columns):
                 if columns_mask[i]:
                     columns_data.append(np.empty(page_size, dtype=columns_store_type[i]))
@@ -1087,15 +1147,28 @@ def _read_pages_binary(file: IO[bytes],
         if fixed_rowcount_eof:
             break
 
-        next_byte = file.peek(1)
-        if len(next_byte) > 0:
-            # More data exists
-            if pages_mask is not None and page_idx == len(pages_mask):
-                logger.warning(f'Pages mask {pages_mask} is too short - have at least {len(next_byte)} extra bytes')
+        if file_size is not None:
+            pos = file.tell()
+            if pos < file_size:
+                # More data exists
+                if pages_mask is not None and page_idx == len(pages_mask):
+                    logger.warning(f'Pages mask {pages_mask} is too short - expect {file_size-pos} more bytes')
+                    break
+            elif pos > file_size:
+                raise Exception(f'{pos=} is beyond file size {file_size=}???')
+            else:
+                # End of file
                 break
         else:
-            # End of file
-            break
+            next_byte = file.peek(1)
+            if len(next_byte) > 0:
+                # More data exists
+                if pages_mask is not None and page_idx == len(pages_mask):
+                    logger.warning(f'Pages mask {pages_mask} is too short - have at least {len(next_byte)} more bytes')
+                    break
+            else:
+                # End of file
+                break
 
     if flip_bytes:
         # parameters should already be in native format
@@ -1164,7 +1237,7 @@ def _read_pages_ascii_mixed_lines(file: IO[bytes],
         while par_idx < n_parameters:
             b_array = __get_next_line(file, strip=True)
             if b_array is None:
-                raise Exception(f'>>PARS | {page_idx=} {par_idx=} | pos {file.tell()} | unexpected EOF at page {page_idx}')
+                raise Exception(f'Unexpected EOF during parameter parsing at page {page_idx} | {page_idx=} {par_idx=} | pos {file.tell()}')
             if not page_skip:
                 if parameters_type[par_idx] == object:
                     value = b_array.strip()
@@ -1264,7 +1337,7 @@ def _read_pages_ascii_mixed_lines(file: IO[bytes],
 
         page_size = int(b_array)
         assert 0 <= page_size <= 1e7
-        logger.debug(f'>>COLS | {file.tell()} | page {page_idx} size: {page_size}')
+        logger.debug(f'>>C ({file.tell()}) | page {page_idx} declared size {page_size}')
 
         # line = file.readline().decode('ascii')
         # list instead of generator to hopefully preallocate space
@@ -1276,9 +1349,12 @@ def _read_pages_ascii_mixed_lines(file: IO[bytes],
             # buf = io.StringIO('\n'.join(lines))
             # lines = [file.readline() for i in range(page_size)]
             # buf = io.BytesIO(b''.join(lines))
-            opts = dict(delim_whitespace=True, comment='!',
-                        header=None, escapechar='\\',
-                        nrows=page_size, skip_blank_lines=True,
+            opts = dict(delim_whitespace=True,
+                        comment='!',
+                        header=None,
+                        escapechar='\\',
+                        nrows=page_size,
+                        skip_blank_lines=True,
                         skipinitialspace=True,
                         doublequote=False,
                         dtype=pd_column_dict,
@@ -1286,6 +1362,8 @@ def _read_pages_ascii_mixed_lines(file: IO[bytes],
                         low_memory=False,
                         na_filter=False,
                         na_values=None,
+                        quotechar='\"',
+                        quoting=csv.QUOTE_NONNUMERIC,
                         keep_default_na=False)
             # iowrap = io.TextIOWrapper(file, encoding='ascii')
             # df = pd.read_table(iowrap, **opts)

@@ -513,8 +513,8 @@ class Data:
 
     __slots__ = ('__dict__', 'nm', 'data', 'sdds')
 
-    def __init__(self, namelist):
-        self.nm = namelist
+    def __init__(self, namelist=None):
+        self.nm = namelist or {}
 
     def __eq__(self, other):
         return self.compare(other)
@@ -542,7 +542,7 @@ class Data:
         """ The mode field is required, and may have one of the values “ascii” or “binary”. If binary mode
     is specified, the other entries of the command are irrelevant and are ignored. In ASCII mode, these entries are
     optional."""
-        return self.nm.get('mode', 0)
+        return self.nm.get('mode', 'binary')
 
     @property
     def additional_header_lines(self):
@@ -635,7 +635,8 @@ class SDDSFile:
 
     def describe(self):
         line = ''
-        line += f'SDDSFile: {self.n_pages} pages, {len(self.parameters)} parameters, {len(self.arrays)} arrays, {len(self.columns)} columns\n'
+        line += f'SDDSFile: {self.n_pages} pages, {len(self.parameters)} parameters, {len(self.arrays)} arrays,' \
+                f' {len(self.columns)} columns, mode {self.mode}, endianness {self.endianness}\n'
         columns = [c for c in self.columns if c._enabled]
         if len(columns) > 0:
             data = columns[0].data
@@ -779,19 +780,15 @@ class SDDSFile:
         return cd[parameter]
 
     def set_mode(self, mode: Literal["binary", "ascii"], **kwargs):
-        """ Set SDDS file mode, affecting how file will be written. Data namelist will be modified and reset. """
+        """ Set SDDS file mode, affecting how file will be written. Data namelist will be modified if present. """
         if mode not in ['ascii', 'binary']:
             raise Exception
-        if mode == self.mode:
-            if self.data is not None:
-                assert self.data.mode == mode
-        else:
-            self.mode = mode
-            if self.data is not None:
-                if mode == 'binary':
-                    self.data.nm = {'mode': mode, 'endian': self.endianness}
-                else:
-                    self.data.nm = {'mode': mode, **kwargs}
+        self.mode = mode
+        if self.data is not None:
+            if mode == 'binary':
+                self.data.nm.update({'mode': mode, 'endian': self.endianness})
+            else:
+                self.data.nm.update({'mode': mode, **kwargs})
 
     def set_endianness(self, endianness: Literal["big", "little"]):
         if endianness == self.endianness:
