@@ -1,6 +1,6 @@
 include versioneer.py
 include pysdds/_version.py
-include README.md LICENSE
+include README.md LICENSE MANIFEST.in
 recursive-include pysdds *
 recursive-include demos *
 recursive-include tests *
