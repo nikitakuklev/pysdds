@@ -1,6 +1,6 @@
 include versioneer.py
 include pysdds/_version.py
 include README.md LICENSE
-graft pysdds *
-graft demos *
-graft tests *
+recursive-include pysdds *
+recursive-include demos *
+recursive-include tests *
