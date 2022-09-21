@@ -46,6 +46,14 @@ def _compare_arrays(one, two, eps=None) -> bool:
         raise Exception(f'Comparison of two different types - {type(one)} vs {type(two)}')
 
 
+def _find_different_indices(one, two):
+    idxs = []
+    for i,(x,y) in enumerate(zip(one, two)):
+        if x != y:
+            idxs.append(i)
+    return idxs
+
+
 def _namelist_to_str(nm_dict):
     kv_strings = []
     for k, v in nm_dict.items():
@@ -465,6 +473,9 @@ class Column:
         for i in range(len(self._page_numbers)):
             if eps is not None:
                 if not _compare_arrays(self.data[i], other.data[i], eps):
+                    different_idxs = _find_different_indices(self.data[i], other.data[i])
+                    logger.error(f'Comparison at page {i} had diffences at indices {different_idxs}')
+                    logger.error(f'Value tuples: {[(self.data[i][j], other.data[i][j]) for j in different_idxs]}')
                     err('values eps', i, self.data[i].dtype, other.data[i].dtype, self.data[i], other.data[i])
                     return False
             else:
