@@ -973,7 +973,7 @@ def _read_pages_binary(file: IO[bytes],
                         page_size_actual = row
                         fixed_rowcount_eof = True
                         if len(byte_array) > 0:
-                            logger.warning(f'Weird leftover {repr(byte_array)}, ignoring')
+                            logger.debug(f'Have leftover bytes {repr(byte_array)} in fixed rowcount mode, ignoring')
                         break
                     else:
                         raise ValueError(f'Unexpected EOF at row {row}')
