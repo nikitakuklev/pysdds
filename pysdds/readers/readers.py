@@ -3,7 +3,8 @@ import io
 import sys
 import logging
 import time
-import shlex
+from shlex import shlex, split
+from .shlex_sdds import shlex_sdds, split_sdds
 from pathlib import Path
 from typing import Union, Iterable, List, IO, Optional
 import struct
@@ -30,7 +31,7 @@ _KEYS_COLUMN = {'name', 'symbol', 'units', 'description', 'format_string', 'type
 _KEYS_DATA = {'mode', 'lines_per_row', 'no_row_counts', 'additional_header_lines', 'column_major_order', 'endian'}
 
 _ASCII_TEXT_PARSE_METHOD = 'read_table'
-# _ASCII_TEXT_PARSE_METHOD = 'shlex'
+_ASCII_TEXT_PARSE_METHOD = 'shlex'
 _ASCII_NUMERIC_PARSE_METHOD = 'read_table'  # 'fromtxt'
 
 
@@ -1284,7 +1285,7 @@ def _read_pages_ascii_mixed_lines(file: IO[bytes],
                     n_lines_read += 1
                     if b_array is None:
                         raise Exception(f'>>ARRV | {file.tell()} | unexpected EOF at page {page_idx}')
-                    values = shlex.split(b_array, posix=True)
+                    values = split_sdds(b_array, posix=True)
                     logger.debug(
                         f'>>ARRV | {file.tell()} | {array_idx=} | {mapped_t} | {repr(b_array)} | {values} | {n_elements=} | {n_lines_read=}')
                     n_elements_read += len(values)
@@ -1396,7 +1397,7 @@ def _read_pages_ascii_mixed_lines(file: IO[bytes],
 
                     col_idx_active = 0
                     col_idx = 0
-                    values = shlex.split(line, posix=True)
+                    values = split_sdds(line, posix=True)
                     if TRACE:
                         logger.debug(f'>COL ROW {row} | {len(values)}: {values=}')
                     for c in sdds.columns:
@@ -1658,7 +1659,7 @@ def _read_pages_ascii_numeric_lines(file: IO[bytes],
                     n_lines_read += 1
                     if b_array is None:
                         raise Exception(f'>>ARRV | {file.tell()} | unexpected EOF at page {page_idx}')
-                    values = shlex.split(b_array, posix=True)
+                    values = split_sdds(b_array, posix=True)
                     logger.debug(
                         f'>>ARRV | {file.tell()} | {array_idx=} | {mapped_t} | {repr(b_array)} | {values} | {n_elements=} | {n_lines_read=}')
                     n_elements_read += len(values)
