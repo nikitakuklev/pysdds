@@ -410,7 +410,7 @@ def __get_next_line(stream: IO[bytes], accept_meta_commands: bool = True, strip:
         if '!' in line:
             # Even though both 'in' and 'find' operations are aliased to C code, using 'in' as initial check is
             # significantly faster (~10x), and makes sense since midpoint comments are expected to be rare
-            if line.startswith('!'):
+            if line.lstrip().startswith('!'):
                 # Full comment line, most common case
                 if line.startswith('!#'):
                     # Meta-command
@@ -420,17 +420,19 @@ def __get_next_line(stream: IO[bytes], accept_meta_commands: bool = True, strip:
                         raise ValueError(f'Meta-command {line} encountered unexpectedly')
                 else:
                     if TRACE:
-                        logger.debug(f'>>NXL | pos %s | SKIP FULL %s', stream.tell(), repr(line))
+                        logger.debug(f'>>NXL | pos {stream.tell()} | SKIP FULL {repr(line)}')
                     continue
             else:
                 # Partial comment line
                 idx = line.find('!')
+                # Only remove if not escaped
+                # TODO: recursively continue looking for more comments?
                 if TRACE:
-                    logger.debug(f'>>NXL | pos {stream.tell()} | SKIP PARTIAL {repr(line)} | ret {line[:idx]}')
+                    logger.debug(f'>>NXL | pos {stream.tell()} | SKIP PAR {repr(line)} | {repr(line_cut)}')
                 if strip:
-                    return line[:idx].strip()
+                    return line_cut.strip()
                 else:
-                    return line[:idx]
+                    return line_cut
         else:
             if strip:
                 return line.strip()
