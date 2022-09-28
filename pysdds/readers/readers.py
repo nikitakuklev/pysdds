@@ -427,6 +427,10 @@ def __get_next_line(stream: IO[bytes], accept_meta_commands: bool = True, strip:
                 idx = line.find('!')
                 # Only remove if not escaped
                 # TODO: recursively continue looking for more comments?
+                if line[idx - 1] != '\\':
+                    line_cut = line[:idx]
+                else:
+                    line_cut = line
                 if TRACE:
                     logger.debug(f'>>NXL | pos {stream.tell()} | SKIP PAR {repr(line)} | {repr(line_cut)}')
                 if strip:
