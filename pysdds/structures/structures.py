@@ -771,7 +771,12 @@ class SDDSFile:
 
     @property
     def columns_dict(self):
+        # Deprecated
         return {c.nm['name']: c for c in self.columns}
+
+    @property
+    def column_dict(self):
+        return self.columns_dict
 
     @property
     def column_names(self):
