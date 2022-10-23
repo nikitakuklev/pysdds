@@ -163,19 +163,29 @@ def _open_file(filepath: Path, compression: str, use_magic_values: bool = False,
 
 
 def read(filepath: Union[Path, str, IO[bytes]],
-         mode: Optional[str] = 'auto',
-         endianness: Optional[str] = 'auto',
-         compression: Optional[str] = 'auto',
          pages: Optional[Iterable[int]] = None,
          arrays: Optional[Union[Iterable[int], Iterable[str]]] = None,
          cols: Optional[Union[Iterable[int], Iterable[str]]] = None,
-         header_only: Optional[bool] = False) -> SDDSFile:
-    """Read in an SDDS file
+         mode: Optional[str] = 'auto',
+         endianness: Optional[str] = 'auto',
+         compression: Optional[str] = 'auto',
+         header_only: Optional[bool] = False,
+         allow_longdouble: Optional[bool] = False) -> SDDSFile:
+    """
+    Read in an SDDS file
 
     Parameters
     ----------
     filepath : str or Path or file-like object
         A valid absolute or relative file path, or a concrete Path object, or a byte stream (file, BytesIO, etc.)
+    pages : array-like, optional
+        If given, the list of page indices to read (starting from page 0). Note that page numbers in resulting SDDSFile
+        will be renumbered in sequence. In other words, if pages=[0,2], valid indices for SDDSFile data would be page=0
+        and page=1. This behaviour might change in the future.
+    arrays : array-like, optional
+        If given, the list of arrays to read. All entries must be either array indices or names.
+    cols : array-like, optional
+        If given, the list of columns to read. All entries must be either column indices or names.
     mode : str, optional
         SDDS mode to use for reading the file, one of 'auto', 'binary', or 'ascii'. Defaults to 'auto'.
     endianness : str, optional
@@ -186,15 +196,10 @@ def read(filepath: Union[Path, str, IO[bytes]],
     header_only : bool, optional
         If True, only the header is parsed. This leaves SDDS object in an invalid state with no data structures,
         but increases performance when only header metadata is of interest.
-    pages : array-like, optional
-        If given, the list of page indices to read (starting from page 0). Note that page numbers in resulting SDDSFile
-        will be renumbered in sequence. In other words, if pages=[0,2], valid indices for SDDSFile data would be page=0
-        and page=1. This behaviour might change in the future.
-    arrays : array-like, optional
-        If given, the list of arrays to read. All entries must be either array indices or names.
-    cols : array-like, optional
-        If given, the list of columns to read. All entries must be either column indices or names.
-
+    allow_longdouble: bool, optional
+        Allow reading longdouble data type. Because of significant issues with handling this type in a portable manner,
+        effort is made to support it on x86-64 linux only. No correctness guarantees are made, and on certain platforms
+        silent precision loss or parsing failures might occur. Avoid longdouble if at all possible.
 
     Returns
     -------
@@ -296,6 +301,25 @@ def read(filepath: Union[Path, str, IO[bytes]],
         if header_only:
             return sdds
 
+        # Handle the longdouble mess conservatively
+        if any(el.type == 'longdouble' for el in sdds.parameters) \
+                or any(el.type == 'longdouble' for el in sdds.arrays) \
+                or any(el.type == 'longdouble' for el in sdds.columns):
+            if not allow_longdouble:
+                raise ValueError(f'Encountered longdouble data type, which is strongly discouraged. Override with '
+                                 f'"allow_longdouble" to attempt parsing.')
+            else:
+                ldinfo = np.finfo(np.longdouble)
+                import ctypes
+                ldlen = ctypes.sizeof(ctypes.c_longdouble)
+                if ldinfo.dtype == np.dtype(np.float64):
+                    assert ldlen == 8
+                    raise Exception('longdouble is float64 on this platform, parsing not possible')
+                elif ldinfo.dtype == np.dtype(np.float128):
+                    assert ldlen == 16
+                    logger.warning('longdouble values will be treated as np.float128 (80-bit, padded to 128bit)')
+                else:
+                    raise Exception(f'Unexpected longdouble length ({ldinfo=})({ldlen=}), aborting')
         if sdds._meta_fixed_rowcount:
             if sdds.mode != 'binary':
                 raise ValueError(f'Meta-command "!#fixed-rowcount" requires binary mode, not {sdds.mode}')
@@ -462,8 +486,8 @@ def _read_header_fullstream(file: IO[bytes], sdds: SDDSFile, mode: str, endianne
     except Exception:
         raise AttributeError(f'Unrecognized SDDS version: {version_line[5]}')
 
-    if sdds_version > 3:
-        raise ValueError(f'This package only supports SDDS version 3 or lower, file is version {sdds_version}')
+    if sdds_version > 5:
+        raise ValueError(f'This package only supports SDDS version 5 or lower, file is version {sdds_version}')
 
     logger.debug(f'File version: {version_line}')
 
