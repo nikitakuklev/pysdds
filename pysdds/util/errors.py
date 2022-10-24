@@ -1,0 +1,2 @@
+class SDDSReadException(Exception):
+    pass

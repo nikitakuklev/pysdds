@@ -4,6 +4,9 @@ import sys
 import logging
 import time
 from shlex import shlex, split
+
+from .tokenizers import tokenize_namelist
+from ..util.errors import SDDSReadException
 from .shlex_sdds import shlex_sdds, split_sdds
 from pathlib import Path
 from typing import Union, Iterable, List, IO, Optional
@@ -13,7 +16,7 @@ import numpy as np
 import pandas as pd
 
 from ..structures import *
-from ..util.constants import _NUMPY_DTYPES, _NUMPY_DTYPE_LE, _NUMPY_DTYPE_BE, _NUMPY_DTYPE_FINAL,\
+from ..util.constants import _NUMPY_DTYPES, _NUMPY_DTYPE_LE, _NUMPY_DTYPE_BE, _NUMPY_DTYPE_FINAL, \
     _STRUCT_STRINGS_LE, _STRUCT_STRINGS_BE, _NUMPY_DTYPE_SIZES
 
 # The proper way to implement conditional logging is to check current level,
@@ -30,12 +33,14 @@ _KEYS_ARRAY = {'name', 'symbol', 'units', 'description', 'format_string', 'type'
 _KEYS_COLUMN = {'name', 'symbol', 'units', 'description', 'format_string', 'type', 'field_length'}
 _KEYS_DATA = {'mode', 'lines_per_row', 'no_row_counts', 'additional_header_lines', 'column_major_order', 'endian'}
 
-_ASCII_TEXT_PARSE_METHOD = 'read_table'
+_HEADER_PARSE_METHOD = 'v2'
+
+#_ASCII_TEXT_PARSE_METHOD = 'read_table'
 _ASCII_TEXT_PARSE_METHOD = 'shlex'
 _ASCII_NUMERIC_PARSE_METHOD = 'read_table'  # 'fromtxt'
 
 
-def _open_file(filepath: Path, compression: str, use_magic_values: bool = False, buffer_size: int = None)\
+def _open_file(filepath: Path, compression: str, use_magic_values: bool = False, buffer_size: int = None) \
         -> (IO[bytes], int, bool):
     """Open the file path for reading as a raw byte stream. Compression is determined based on either file extension,
     or magic strings If no matches are found, file is assumed to be uncompressed
@@ -125,7 +130,7 @@ def _open_file(filepath: Path, compression: str, use_magic_values: bool = False,
             stream = io.BytesIO(buf_decompressed)
             # Need peak() method...this will do a copy...
             # Will avoid peaking during parsing, so ok to not buffer
-            buffered_stream = stream #io.BufferedReader(stream, buffer_size=filesize)
+            buffered_stream = stream  # io.BufferedReader(stream, buffer_size=filesize)
             if TRACE:
                 logger.debug(f'File size {filesize} and parsing settings allow for full buffering')
                 logger.debug(f'Final stream: {buffered_stream}')
@@ -290,7 +295,10 @@ def read(filepath: Union[Path, str, IO[bytes]],
 
     try:
         # First, read the header
-        _read_header_fullstream(file, sdds, mode, endianness)
+        if _HEADER_PARSE_METHOD == 'v2':
+            _read_header_v2(file, sdds, mode, endianness)
+        else:
+            _read_header_fullstream(file, sdds, mode, endianness)
         logger.info(f'Header parsed: {len(sdds.parameters)} parameters, {len(sdds.arrays)} arrays,'
                     f' {len(sdds.columns)} columns')
         if TRACE:
@@ -423,7 +431,10 @@ def read(filepath: Union[Path, str, IO[bytes]],
     return sdds
 
 
-def __get_next_line(stream: IO[bytes], accept_meta_commands: bool = True, strip: bool = False) -> Optional[str]:
+def __get_next_line(stream: IO[bytes],
+                    accept_meta_commands: bool = True,
+                    cut_midline_comments: bool = True,
+                    strip: bool = False) -> Optional[str]:
     """ Find next line that has valid SDDS data """
     while True:
         line = stream.readline().decode('ascii')
@@ -434,29 +445,36 @@ def __get_next_line(stream: IO[bytes], accept_meta_commands: bool = True, strip:
         if '!' in line:
             # Even though both 'in' and 'find' operations are aliased to C code, using 'in' as initial check is
             # significantly faster (~10x), and makes sense since midpoint comments are expected to be rare
-            if line.lstrip().startswith('!'):
+            ls_line = line.lstrip()
+            if ls_line.startswith('!'):
                 # Full comment line, most common case
-                if line.startswith('!#'):
+                if ls_line.startswith('!#'):
                     # Meta-command
                     if accept_meta_commands:
                         return line
                     else:
                         raise ValueError(f'Meta-command {line} encountered unexpectedly')
                 else:
+                    # Regular comment
                     if TRACE:
                         logger.debug(f'>>NXL | pos {stream.tell()} | SKIP FULL {repr(line)}')
                     continue
             else:
-                # Partial comment line
-                idx = line.find('!')
-                # Only remove if not escaped
-                # TODO: recursively continue looking for more comments?
-                if line[idx - 1] != '\\':
-                    line_cut = line[:idx]
+                if cut_midline_comments:
+                    # Partial comment line
+                    idx = line.find('!')
+                    # Only remove if not escaped
+                    # TODO: recursively continue looking for more comments?
+                    if line[idx - 1] != '\\':
+                        line_cut = line[:idx]
+                        if TRACE:
+                            logger.debug(f'>>NXL {stream.tell()} | CUT LINE {repr(line)} -> {repr(line_cut)}')
+                    else:
+                        line_cut = line
+                        if TRACE:
+                            logger.debug(f'>>NXL {stream.tell()} | escaped comment, not cutting {repr(line)}')
                 else:
                     line_cut = line
-                if TRACE:
-                    logger.debug(f'>>NXL | pos {stream.tell()} | SKIP PAR {repr(line)} | {repr(line_cut)}')
                 if strip:
                     return line_cut.strip()
                 else:
@@ -475,8 +493,7 @@ def _read_header_fullstream(file: IO[bytes], sdds: SDDSFile, mode: str, endianne
     than using native python split/find/etc. functions
     """
     logger.debug('Parsing header with streaming reader')
-    # Hopefully no malicious files are fed, 10000 length should be enough for normal files
-    version_line = file.readline(10000).decode('ascii').rstrip()
+    version_line = file.readline(10).decode('ascii').rstrip()
     line_num = 1
     if version_line[:4] != 'SDDS' or len(version_line) != 5:
         raise AttributeError(f'Header parsing failed on line {line_num}: {repr(version_line)} is not a valid version')
@@ -486,7 +503,7 @@ def _read_header_fullstream(file: IO[bytes], sdds: SDDSFile, mode: str, endianne
     except Exception:
         raise AttributeError(f'Unrecognized SDDS version: {version_line[5]}')
 
-    if sdds_version > 5:
+    if sdds_version > 5 or sdds_version < 1:
         raise ValueError(f'This package only supports SDDS version 5 or lower, file is version {sdds_version}')
 
     logger.debug(f'File version: {version_line}')
@@ -495,18 +512,17 @@ def _read_header_fullstream(file: IO[bytes], sdds: SDDSFile, mode: str, endianne
 
     def __find_next_namelist(stream, accept_meta_commands=False):
         # accumulate multi-line parameters
-        line = buffer = __get_next_line(stream, accept_meta_commands)  # file.readline().decode('ascii')
+        line = buffer = __get_next_line(stream, accept_meta_commands=accept_meta_commands,
+                                        cut_midline_comments=False)  # file.readline().decode('ascii')
         if accept_meta_commands and line.startswith('!#'):
             return buffer.strip()
         else:
             while not line.rstrip().endswith('&end'):
-                line = stream.readline().decode('ascii')
-                if line.strip().startswith('!'):
-                    logger.debug(f'MULTILINE PAR > COMMENT SKIP {line}')
-                    continue
-                logger.debug(f'MULTILINE PAR > adding line {line}')
-                if len(line) is None:
-                    raise Exception('Unexpected EOF')
+                line = __get_next_line(stream, accept_meta_commands=False,
+                                       cut_midline_comments=False)  # stream.readline().decode('ascii')
+                logger.debug(f'Adding line {line} to multi-line namelist')
+                if line is None:
+                    raise SDDSReadException('Unexpected EOF during header parsing')
                 buffer += line
             buffer2 = buffer.strip()
         return buffer2
@@ -555,7 +571,7 @@ def _read_header_fullstream(file: IO[bytes], sdds: SDDSFile, mode: str, endianne
             tokens = []
             no_chars_allowed = False
             while True:
-                #logger.debug(f'Char {line[pos]} | tokens {tokens} | nca {no_chars_allowed}')
+                # logger.debug(f'Char {line[pos]} | tokens {tokens} | nca {no_chars_allowed}')
                 if line[pos] == ' ':
                     no_chars_allowed = True
                 elif line[pos] == '=':
@@ -579,7 +595,7 @@ def _read_header_fullstream(file: IO[bytes], sdds: SDDSFile, mode: str, endianne
             value_tokens = []
             while True:
                 c = line[pos]
-                #logger.debug(f'{pos} | char {c} | nca {no_chars_allowed} | l {literal_mode} | tokens {value_tokens}')
+                # logger.debug(f'{pos} | char {c} | nca {no_chars_allowed} | l {literal_mode} | tokens {value_tokens}')
                 if literal_mode:
                     # Inside the quotes
                     if c == '"':
@@ -636,6 +652,156 @@ def _read_header_fullstream(file: IO[bytes], sdds: SDDSFile, mode: str, endianne
                 nm_dict[k] = v
 
         logger.debug(f'>Parse result %s | %s', command, nm_dict)
+        # hack around newlines in escaped strings
+        if command == '&parameter':
+            if 'fixed_value' in nm_dict:
+                nm_dict['fixed_value'] = nm_dict['fixed_value'].replace('\n', ' ')
+
+        nm_keys = set(nm_dict.keys())
+        namelists.append(nm_dict)
+
+        # expected_keys = None
+        if command == '&description':
+            if sdds.description is not None:
+                raise ValueError('Duplicate description entry found')
+            expected_keys = _KEYS_DESCRIPTION
+            if not nm_keys.issubset(expected_keys):
+                raise AttributeError(f'Namelist keys {nm_keys} unexpected for namelist {command}')
+            sdds.description = Description(nm_dict)
+        elif command == '&parameter':
+            expected_keys = _KEYS_PARAMETER
+            if not nm_keys.issubset(expected_keys):
+                raise AttributeError(f'Namelist keys {nm_keys} unexpected for namelist {command}')
+            sdds.parameters.append(Parameter(nm_dict, sdds=sdds))
+        elif command == '&array':
+            expected_keys = _KEYS_ARRAY
+            if not nm_keys.issubset(expected_keys):
+                raise AttributeError(f'Namelist keys {nm_keys} unexpected for namelist {command}')
+            sdds.arrays.append(Array(nm_dict, sdds=sdds))
+        elif command == '&column':
+            expected_keys = _KEYS_COLUMN
+            if not nm_keys.issubset(expected_keys):
+                raise AttributeError(f'Namelist keys {nm_keys} unexpected for namelist {command}')
+            sdds.columns.append(Column(nm_dict))
+        elif command == '&data':
+            # This should be last command
+            expected_keys = _KEYS_DATA
+            if not nm_keys.issubset(expected_keys):
+                raise AttributeError(f'Namelist keys {nm_keys} unexpected for namelist {command}')
+            file_mode = nm_dict['mode']
+            if mode != 'auto':
+                assert mode == file_mode
+            else:
+                if not (file_mode == 'binary' or file_mode == 'ascii'):
+                    raise Exception(f'Unrecognized mode ({file_mode}) found in file')
+            if 'endian' in nm_keys:
+                data_endianness = nm_dict['endian']
+                if meta_endianness_set:
+                    if data_endianness != sdds.endianness:
+                        raise Exception(f'Mismatch of data and meta-command endianness')
+                sdds.endianness = nm_dict['endian']
+                logger.debug(f'Binary file endianness set to ({sdds.endianness}) from data namelist')
+            sdds.mode = file_mode
+            sdds.data = Data(nm_dict)
+            break
+        elif command == '&include':
+            raise ValueError('This package does not support &include namelist command')
+        else:
+            raise ValueError(f'Unrecognized namelist command {command} on line {line_num}')
+
+    if sdds.columns or sdds.parameters or sdds.arrays:
+        if sdds.data is None:
+            raise AttributeError('SDDS file contains columns, arrays, or parameters - &data namelist is required')
+
+    sdds.n_parameters = len(sdds.parameters)
+    sdds.n_arrays = len(sdds.arrays)
+    sdds.n_columns = len(sdds.columns)
+
+
+def _read_header_v2(file: IO[bytes], sdds: SDDSFile, mode: str, endianness: str) -> None:
+    """
+    Read SDDS header - the ASCII text that described the data contained in the SDDS file. This parser uses the common
+    approach of ingesting a stream of bytes and checking tokens, meaning it works on more input types but is slower
+    than using native python split/find/etc. functions
+    """
+    logger.debug('Parsing header with streaming reader')
+    version_line = file.readline(10).decode('ascii').rstrip()
+    line_num = 1
+    if version_line[:4] != 'SDDS' or len(version_line) != 5:
+        raise AttributeError(f'Header parsing failed on line {line_num}: {repr(version_line)} is not a valid version')
+
+    try:
+        sdds_version = int(version_line[4])
+    except Exception:
+        raise AttributeError(f'Unrecognized SDDS version: {version_line[5]}')
+
+    if sdds_version > 5 or sdds_version < 1:
+        raise ValueError(f'This package only supports SDDS version 5 or lower, file is version {sdds_version}')
+
+    logger.debug(f'File version: {version_line}')
+
+    namelists = []
+
+    def __find_next_namelist(stream, accept_meta_commands=False):
+        # accumulate multi-line parameters
+        line = buffer = __get_next_line(stream, accept_meta_commands=accept_meta_commands,
+                                        cut_midline_comments=False)  # file.readline().decode('ascii')
+        if accept_meta_commands and line.startswith('!#'):
+            return buffer.strip()
+        else:
+            while not line.rstrip().endswith('&end'):
+                line = __get_next_line(stream, accept_meta_commands=False,
+                                       cut_midline_comments=False)  # stream.readline().decode('ascii')
+                logger.debug(f'Adding line {line} to multi-line namelist')
+                if line is None:
+                    raise SDDSReadException('Unexpected EOF during header parsing')
+                buffer += line
+            buffer2 = buffer.strip()
+        return buffer2
+
+    meta_endianness_set = False
+    while True:
+        line = __find_next_namelist(file, accept_meta_commands=True)
+        # line = file.readline().decode('ascii').strip('\n')
+        len_line = len(line)
+        line_num += 1
+        if TRACE:
+            logger.debug(f'Line %d: %s', line_num, line)
+        if line.startswith('!'):
+            if not line.startswith('!#'):
+                raise Exception(line)
+            if line == '!# big-endian':
+                if endianness == 'auto' or endianness == 'big':
+                    sdds.endianness = 'big'
+                    logger.debug(f'Binary file endianness set to ({sdds.endianness})')
+                    meta_endianness_set = True
+                else:
+                    raise ValueError(f'File endianness ({line}) does not match requested one ({endianness})')
+            elif line == '!# little-endian':
+                if endianness == 'auto' or endianness == 'little':
+                    sdds.endianness = 'little'
+                    logger.debug(f'Binary file endianness set to ({sdds.endianness})')
+                    meta_endianness_set = True
+                else:
+                    raise ValueError(f'File endianness ({line}) does not match requested one ({endianness})')
+            elif line == '!# fixed-rowcount':
+                sdds._meta_fixed_rowcount = True
+            else:
+                raise Exception(f'Meta command {line} is not recognized')
+            continue
+
+        try:
+            tags, keys, values = tokenize_namelist(line)
+        except Exception as ex:
+            raise SDDSReadException(f'Failed to parse namelist from "{line}" ({ex=})')
+
+        assert len(tags) == 2
+        assert tags[1] == '&end'
+        assert len(keys) == len(values)
+        command = tags[0]
+        nm_dict = {k: v for k, v in zip(keys, values)}
+        logger.debug(f'>Parse result %s | %s', command, nm_dict)
+
         # hack around newlines in escaped strings
         if command == '&parameter':
             if 'fixed_value' in nm_dict:
@@ -938,8 +1104,8 @@ def _read_pages_binary(file: IO[bytes],
                 if flag:
                     # Arrays are initialized in C order by default, matching SDDS
                     values = np.frombuffer(data_bytes, dtype=mapped_t)
-                    #data_array = np.empty(dimensions, dtype=mapped_t)
-                    #data_array[:] = values[:]
+                    # data_array = np.empty(dimensions, dtype=mapped_t)
+                    # data_array[:] = values[:]
                     arrays[i].data.append(values.reshape(dimensions))
 
         # Column reading loop
@@ -1183,7 +1349,7 @@ def _read_pages_binary(file: IO[bytes],
             if pos < file_size:
                 # More data exists
                 if pages_mask is not None and page_idx == len(pages_mask):
-                    logger.warning(f'Pages mask {pages_mask} is too short - expect {file_size-pos} more bytes')
+                    logger.warning(f'Pages mask {pages_mask} is too short - expect {file_size - pos} more bytes')
                     break
             elif pos > file_size:
                 raise Exception(f'{pos=} is beyond file size {file_size=}???')
@@ -1206,7 +1372,7 @@ def _read_pages_binary(file: IO[bytes],
         for i, el in enumerate(sdds.arrays):
             if arrays_mask[i] and el.type not in ['string', 'character']:
                 for j in range(len(el.data)):
-                    el.data[j] = el.data[j].astype(arrays_store_type[i], copy=False)#.newbyteorder().byteswap()
+                    el.data[j] = el.data[j].astype(arrays_store_type[i], copy=False)  # .newbyteorder().byteswap()
 
         for i, el in enumerate(sdds.columns):
             if columns_mask[i] and el.type not in ['string', 'character']:
@@ -1268,7 +1434,8 @@ def _read_pages_ascii_mixed_lines(file: IO[bytes],
         while par_idx < n_parameters:
             b_array = __get_next_line(file, strip=True)
             if b_array is None:
-                raise Exception(f'Unexpected EOF during parameter parsing at page {page_idx} | {page_idx=} {par_idx=} | pos {file.tell()}')
+                raise Exception(
+                    f'Unexpected EOF during parameter parsing at page {page_idx} | {page_idx=} {par_idx=} | pos {file.tell()}')
             if not page_skip:
                 if parameters_type[par_idx] == object:
                     value = b_array.strip()
@@ -1566,7 +1733,7 @@ def _read_pages_ascii_mixed_lines(file: IO[bytes],
             next_byte = file.peek(1)
             if len(next_byte) > 0:
                 next_char = next_byte[:1].decode('ascii')
-                #print(repr(next_char))
+                # print(repr(next_char))
                 if next_char == '\n':
                     file.read(1)
                     continue
@@ -1799,7 +1966,7 @@ def _read_pages_ascii_numeric_lines(file: IO[bytes],
             next_byte = file.peek(1)
             if len(next_byte) > 0:
                 next_char = next_byte[:1].decode('ascii')
-                #print(repr(next_char))
+                # print(repr(next_char))
                 if next_char == '\n':
                     file.read(1)
                     continue
