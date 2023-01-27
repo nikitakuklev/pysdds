@@ -4,19 +4,25 @@ import glob
 from pathlib import Path
 import itertools
 
-root_sources = 'files/sources/'
-root_binary_rowmajor = 'files/binary_rowmajor/'
-root_binary_colmajor = 'files/binary_colmajor/'
-root_ascii = 'files/ascii/'
+root_sources = Path('files')
+subroots = ['sources', 'sources_binary_rowmajor', 'sources_binary_colmajor', 'sources_ascii']
+folders = {sub: root_sources / sub for sub in subroots}
+files = {sub: list(d.glob('*')) for sub, d in folders.items()}
 
-files_sources = glob.glob(root_sources + '*')
-files_ascii = glob.glob(root_ascii + '*')
-files_binary_colmajor = glob.glob(root_binary_colmajor+'*')
-files_binary_rowmajor = glob.glob(root_binary_rowmajor+'*')
+to_str = lambda l: [str(s) for s in l]
+
+files_sources = to_str((root_sources / 'sources').glob('*'))
+files_ascii = to_str((root_sources / 'sources_ascii').glob('*'))
+files_binary_colmajor = to_str((root_sources / 'sources_binary_colmajor').glob('*'))
+files_binary_rowmajor = to_str((root_sources / 'sources_binary_rowmajor').glob('*'))
 files_compressed = glob.glob('files/sources_compressed/*')
 files_large = glob.glob('files/sources_large/*')
 
-all_files = files_sources + files_ascii + files_binary_colmajor + files_binary_rowmajor + files_large
+all_files_sources = files_sources + files_ascii + files_binary_colmajor + files_binary_rowmajor
+all_files_sources_large = list(glob.glob('files/sources_large*/*'))
+all_files_compressed = list(glob.glob('files/sources_compressed*/*'))
+
+all_files = files_sources + files_ascii + files_binary_colmajor + files_binary_rowmajor + all_files_sources_large + all_files_compressed
 
 get_names = lambda xa: [Path(x).name for x in xa]
 get_name = lambda x: Path(x).name
@@ -27,11 +33,14 @@ set_ascii_rowmajor = set(get_names(files_ascii))
 set_binary_rowmajor = set(get_names(files_binary_rowmajor))
 set_binary_colmajor = set(get_names(files_binary_colmajor))
 
-set_union = set_sources.intersection(set_ascii_rowmajor).intersection(set_binary_rowmajor).intersection(set_binary_colmajor)
+set_union = set_sources.intersection(set_ascii_rowmajor, set_binary_rowmajor, set_binary_colmajor)
 sets_list = []
 for f in set_sources:
     if f in set_union:
-        sets_list.append([root_sources + f, root_binary_colmajor + f, root_binary_rowmajor + f, root_ascii + f])
+        sets_list.append([str(root_sources / ('sources') / f),
+                          str(root_sources / ('sources_binary_colmajor') / f),
+                          str(root_sources / ('sources_binary_rowmajor') / f),
+                          str(root_sources / ('sources_ascii') / f)])
     else:
         continue
 
@@ -66,6 +75,12 @@ def test_read_binary2(file_root):
 
 @pytest.mark.parametrize("file_root", files_ascii)
 def test_read_ascii(file_root):
+    sdds = pysdds.read(file_root)
+    sdds.validate_data()
+
+
+@pytest.mark.parametrize("file_root", all_files)
+def test_read_all(file_root):
     sdds = pysdds.read(file_root)
     sdds.validate_data()
 
