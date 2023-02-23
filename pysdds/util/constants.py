@@ -1,4 +1,5 @@
 import numpy as np
+import os
 
 # SDDS specification has short, long, float, double, character, or string
 # SDDS 2 adds ulong, ushort
@@ -9,15 +10,19 @@ _NUMPY_DTYPES = {'short': 'i2', 'ushort': 'u2',
                  'long': 'i4', 'ulong': 'u4',
                  'long64': 'i8', 'ulong64': 'u8',
                  'float': 'f4', 'double': 'f8',
-                 'longdouble': 'g',
                  'character': object, 'string': object}
 
 _NUMPY_DTYPES_INV = {np.dtype(np.int16): 'short', np.dtype(np.uint16): 'ushort',
                      np.dtype(np.int32): 'long', np.dtype(np.int32): 'ulong',
                      np.dtype(np.int64): 'long64', np.dtype(np.int64): 'ulong64',
                      np.dtype(np.float64): 'double', np.dtype(np.float32): 'float',
-                     np.dtype(np.longdouble): 'longdouble',
                      object: 'string', np.dtype('O'): 'string'}
+
+# Only add them is likely available, since otherwise np.dtype(np.longdouble) == np.dtype(np.float64)
+# which confuses dict type lookups
+if os.name == 'posix':
+    _NUMPY_DTYPES.update({'longdouble': 'g'})
+    _NUMPY_DTYPES_INV.update({np.dtype(np.longdouble): 'longdouble'})
 
 # On all 'reasonable' architectures, things will be little endian, but plenty of old files floating around
 _NUMPY_DTYPE_LE = {'short': np.dtype('<i2'), 'ushort': np.dtype('<u2'),
