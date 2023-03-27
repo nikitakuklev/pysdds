@@ -12,9 +12,10 @@ _NUMPY_DTYPES = {'short': 'i2', 'ushort': 'u2',
                  'float': 'f4', 'double': 'f8',
                  'character': object, 'string': object}
 
+# Careful with duplicate keys here
 _NUMPY_DTYPES_INV = {np.dtype(np.int16): 'short', np.dtype(np.uint16): 'ushort',
-                     np.dtype(np.int32): 'long', np.dtype(np.int32): 'ulong',
-                     np.dtype(np.int64): 'long64', np.dtype(np.int64): 'ulong64',
+                     np.dtype(np.int32): 'long', np.dtype('<u4'): 'ulong',
+                     np.dtype(np.int64): 'long64', np.dtype('<u8'): 'ulong64',
                      np.dtype(np.float64): 'double', np.dtype(np.float32): 'float',
                      object: 'string', np.dtype('O'): 'string'}
 

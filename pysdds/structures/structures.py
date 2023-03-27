@@ -859,6 +859,7 @@ class SDDSFile:
             else:
                 val = df.iloc[:, i].values
             sdds_type = constants._NUMPY_DTYPES_INV[df.dtypes[i]]
+            #print(df.dtypes[i], sdds_type)
             namelist = {'name': c, 'type': sdds_type}
             col = Column(namelist, sdds)
             sdds.columns.append(col)
@@ -881,9 +882,9 @@ class SDDSFile:
         for page_idx in range(1, len(df_list)):
             for i, c in enumerate(columns):
                 if df.dtypes[i] == np.dtype(np.int64):
-                    val = df.iloc[:, i].values.astype(np.int32)
+                    val = df.iloc[:, i].to_numpy(np.int32)
                 else:
-                    val = df.iloc[:, i].values
+                    val = df.iloc[:, i].to_numpy()
                 assert sdds.columns[i].data[0].dtype == val.dtype
                 sdds.columns[i].data.append(val)
 
@@ -987,4 +988,12 @@ class SDDSFile:
             data = el.data
             assert len(data) == n_pages
             assert all(isinstance(v, np.ndarray) for v in data)
-            assert all(v.dtype == _NUMPY_DTYPE_FINAL[el.type] for v in data), f'dtypes: {[v.dtype for v in data]} {el.type}'
+            for v in data:
+                expected_dtype = _NUMPY_DTYPE_FINAL[el.type]
+                if not v.dtype == _NUMPY_DTYPE_FINAL[el.type]:
+                    if (np.issubdtype(v.dtype, np.integer) and
+                        np.issubdtype(_NUMPY_DTYPE_FINAL[el.type], np.integer)):
+                        # If both integer-like, probably ok since converts up to max values
+                        pass
+                    else:
+                        raise Exception(f'dtype {v.dtype} does not match expected {expected_dtype}')
