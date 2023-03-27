@@ -101,7 +101,7 @@ def _open_file(filepath: Path, compression: str, use_magic_values: bool = False,
                 compression = extension
             else:
                 compression = None
-            logger.info(f'Auto compression resolved as ({compression}) from file extension')
+            logger.debug(f'Auto compression resolved as ({compression}) from file extension')
 
     # By default, Python reads in small blocks of io.DEFAULT_BUFFER_SIZE = 8192
     # To encourage large reads and fully consuming small files, a large buffer is specified
@@ -263,8 +263,8 @@ def read(filepath: Union[Path, str, IO[bytes]],
     sdds = SDDSFile()
     sdds.__source_file = str(filepath)
 
-    logger.info(f'Opening file "%s"', str(filepath))
-    logger.info(f'Mode (%s), compression (%s), endianness (%s)', mode, compression, endianness)
+    logger.debug(f'Opening file "%s"', str(filepath))
+    #logger.debug(f'Mode (%s), compression (%s), endianness (%s)', mode, compression, endianness)
     if header_only:
         # Header needs a small read amount - use python default (typically 1 block, 8192)
         buffer_size = None
@@ -299,7 +299,7 @@ def read(filepath: Union[Path, str, IO[bytes]],
             _read_header_v2(file, sdds, mode, endianness)
         else:
             _read_header_fullstream(file, sdds, mode, endianness)
-        logger.info(f'Header parsed: {len(sdds.parameters)} parameters, {len(sdds.arrays)} arrays,'
+        logger.debug(f'Header parsed: {len(sdds.parameters)} parameters, {len(sdds.arrays)} arrays,'
                     f' {len(sdds.columns)} columns')
         if TRACE:
             logger.debug(f'Params: {sdds.parameters}')
@@ -423,9 +423,13 @@ def read(filepath: Union[Path, str, IO[bytes]],
         n_rows = sum(len(v) for v in cols_enabled[0].data)
     else:
         n_rows = 0
-    logger.info(f'Finished in {(time.perf_counter() - t_start) * 1e3:.3f} ms')
-    logger.info(f'Totals: {sdds.n_pages} pages, {n_rows} rows, {len(sdds.parameters)} parameters,'
-                f' {arrays_enabled}/{len(sdds.arrays)} arrays, {n_cols_enabled}/{len(sdds.columns)} columns\n')
+    #logger.info(f'Read finished in {(time.perf_counter() - t_start) * 1e3:.3f} ms')
+    t_read = (time.perf_counter() - t_start) * 1e3
+    logger.debug(f'Read in {t_read:.3f} ms, '
+                f'{sdds.n_pages} pages, {n_rows} rows,'
+                f' {len(sdds.parameters)} parameters,'
+                f' {arrays_enabled}/{len(sdds.arrays)} arrays,'
+                f' {n_cols_enabled}/{len(sdds.columns)} columns\n')
     logger.debug(f'File description:')
     logger.debug(f'{sdds.describe()}')
     return sdds

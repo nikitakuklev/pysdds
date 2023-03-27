@@ -76,8 +76,8 @@ def write(sdds: SDDSFile,
     if sdds.data.no_row_counts != 0:
         raise NotImplementedError("no_row_counts != 0 is not yet supported")
 
-    logger.info(f'Writing file to "%s"', str(filepath))
-    logger.info(f'Mode (%s), compression (%s), endianness (%s)', mode, compression, endianness)
+    logger.debug(f'Writing file to "%s"', str(filepath))
+    #logger.info(f'Mode (%s), compression (%s), endianness (%s)', mode, compression, endianness)
     t_start = time.perf_counter()
 
     if isinstance(filepath, Path):
@@ -87,14 +87,14 @@ def write(sdds: SDDSFile,
         file = _open_write_stream(filepath, compression=compression)
 
     _dump_header(sdds, file)
-    logger.info(f'Header write OK')
+    #logger.info(f'Header write OK')
 
     if mode == 'ascii':
         _dump_data_ascii(sdds, file)
     else:
         _dump_data_binary(sdds, file, endianness)
 
-    logger.info(f'Finished in {(time.perf_counter() - t_start) * 1e3:.3f} ms')
+    #logger.info(f'Finished in {(time.perf_counter() - t_start) * 1e3:.3f} ms')
     # is_columns_numeric = not any(el.type == 'string' for el in sdds.columns)
     # logger.debug(f'Columns numeric: {is_columns_numeric}')
 
