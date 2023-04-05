@@ -11,12 +11,16 @@ INSTALL_REQUIRES = [
 EXTRAS_REQUIRES = {
     "develop": [
         "pytest>=6.0",
+        "coverage",
+        "pytest-cov"
     ]
 }
 LICENSE = 'MIT'
 DESCRIPTION = 'Package to read and write SDDS files'
 CLASSIFIERS = [
     "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Topic :: Scientific/Engineering",
