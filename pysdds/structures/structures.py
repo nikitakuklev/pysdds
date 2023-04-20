@@ -634,6 +634,16 @@ class SDDSFile:
                 raise KeyError(f'Column {column} is not found (have {self.column_names})')
 
             return self.col(column).data[page]
+        elif isinstance(keys, str):
+            if keys in self.column_names:
+                return self.columns_dict[keys]
+            elif keys in self.array_dict:
+                return self.array_dict[keys]
+            elif keys in self.parameter_dict:
+                return self.parameter_dict[keys]
+            else:
+                raise KeyError(f'Key {keys} is not found, have {self.column_names}|'
+                               f'{self.array_names}|{self.parameter_names}')
         else:
             raise Exception
 
