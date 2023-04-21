@@ -877,7 +877,8 @@ class SDDSFile:
 
         if parameter_dict is not None:
             for i, (k, v) in enumerate(parameter_dict.items()):
-                assert len(v) == n_pages, f'Length {len(v)} of parameter {k} not equal to df list length {n_pages}'
+                assert len(v) == n_pages, f'Length {len(v)} of parameter {k} different from page ' \
+                                          f'count {n_pages}'
                 namelist = {'name': k, 'type': constants._PYTHON_TYPE_INV[type(v[0])]}
                 par = Parameter(namelist, sdds)
                 sdds.parameters.append(par)
@@ -889,7 +890,11 @@ class SDDSFile:
                         arr = arr.astype(np.int32)
                     par.data = list(arr)
 
+        # fill other pages
         for page_idx in range(1, len(df_list)):
+            df = df_list[page_idx]
+            if not np.array_equal(columns, df.columns):
+                raise ValueError(f'Dataframe columns not same - {columns} vs {df.columns}')
             for i, c in enumerate(columns):
                 if df.dtypes[i] == np.dtype(np.int64):
                     val = df.iloc[:, i].to_numpy(np.int32)
