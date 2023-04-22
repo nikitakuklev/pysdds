@@ -3,7 +3,6 @@ import io
 import sys
 import logging
 import time
-from shlex import shlex, split
 
 from .tokenizers import tokenize_namelist
 from ..util.errors import SDDSReadException
@@ -988,7 +987,7 @@ def _read_pages_binary(file: IO[bytes],
         pass
     elif columns_all_numeric and sdds._meta_fixed_rowcount:
         # Numeric types but fixed rows - have to parse row by row
-        logger.debug('All columns are numeric and data is row order -> reading whole rows')
+        logger.debug('All columns numeric and data is row order -> reading whole rows')
     elif columns_all_numeric and not sdds._meta_fixed_rowcount and sdds._source_file_size is not None and sdds._source_file_size > 500e6:
         # Row by row parsing with single struct - memory efficient and fast
         logger.debug('All columns numeric, no fixed rows, data is row order, large size -> using row-wide struct')
