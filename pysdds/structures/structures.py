@@ -43,7 +43,7 @@ def _compare_arrays(one, two, eps=None) -> bool:
                 return False
         return True
     else:
-        raise Exception(f'Comparison of two different types - {type(one)} vs {type(two)}')
+        raise ValueError(f'Comparison of two different types - {type(one)} vs {type(two)}')
 
 
 def _find_different_indices(one, two):
@@ -97,7 +97,7 @@ class Description:
 
         def err(stage, *args):
             if raise_error:
-                raise Exception(fail_str + stage + ' ' + '|'.join([str(a) for a in args]))
+                raise ValueError(fail_str + stage + ' ' + '|'.join([str(a) for a in args]))
 
         if other is None:
             err('None comparison')
@@ -181,7 +181,7 @@ class Parameter:
 
         def err(stage, *args):
             if raise_error:
-                raise Exception(fail_str + stage + ' ' + '|'.join([repr(a) for a in args]))
+                raise ValueError(fail_str + stage + ' ' + '|'.join([repr(a) for a in args]))
 
         if type(self) != type(other):
             err('type', type(self), type(other))
@@ -334,7 +334,7 @@ class Array:
 
         def err(stage, *args):
             if raise_error:
-                raise Exception(fail_str + stage + ' ' + '|'.join([str(a) for a in args]))
+                raise ValueError(fail_str + stage + ' ' + '|'.join([str(a) for a in args]))
 
         """ Compare to another Array """
         if type(self) != type(other):
@@ -645,7 +645,7 @@ class SDDSFile:
                 raise KeyError(f'Key {keys} is not found, have {self.column_names}|'
                                f'{self.array_names}|{self.parameter_names}')
         else:
-            raise Exception
+            raise ValueError(f'Unrecognized key object (should be tuple or str): {keys}')
 
     def __eq__(self, other):
         """
