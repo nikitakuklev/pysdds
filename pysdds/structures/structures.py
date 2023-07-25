@@ -1,4 +1,4 @@
-__all__ = ['Description', 'Parameter', 'Array', 'Column', 'Data', 'SDDSFile']
+__all__ = ['Description', 'Parameter', 'Array', 'Column', 'Data', 'Associate', 'SDDSFile']
 
 import logging
 import math
@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 
 from ..util import constants
-
+from pysdds.util.constants import _NUMPY_DTYPES, _PYTHON_TYPE_NO_NUMPY
 logger = logging.getLogger(__name__)
 
 
@@ -263,7 +263,10 @@ class Parameter:
         """
         if self.fixed_value is not None:
             if self.__cached_page_count != self.sdds.n_pages:
-                self.__cached_data = [self.fixed_value for _ in range(self.sdds.n_pages)]
+                v = self.fixed_value
+                if self.type != 'string':
+                    v = np.fromstring(v, dtype=_NUMPY_DTYPES[self.type], sep=' ', count=1)[0]
+                self.__cached_data = [v for _ in range(self.sdds.n_pages)]
                 self.__cached_page_count = self.sdds.n_pages
             return self.__cached_data
         else:
@@ -583,6 +586,60 @@ class Data:
         the occurence of an empty line. A comment line does not qualify as an empty line in this sense. """
         return self.nm.get('no_row_counts', 0)
 
+class Associate:
+    """
+    &associate
+        STRING filename = NULL
+        STRING path = NULL
+        STRING description = NULL
+        STRING contents = NULL
+        long sdds = 0
+    &end
+
+    This optional command defines a file that is associated with the current data set. This allows
+    the user to define a hierarchy of related files with nonhomgeneous data.
+    """
+
+    def __init__(self, namelist=None):
+        self.nm = namelist or {}
+
+    def __eq__(self, other):
+        return self.compare(other)
+
+    def compare(self, other, raise_error: bool = False) -> bool:
+        fail_str = f'Data mismatch: '
+
+        def err(stage, *args):
+            if raise_error:
+                raise Exception(fail_str + stage + ' ' + '|'.join([str(a) for a in args]))
+
+        if type(self) != type(other):
+            err('type')
+            return False
+        if self.nm != other.nm:
+            err('nm')
+            return False
+        return True
+
+    @property
+    def filename(self):
+        return self.nm.get('filename', None)
+
+    @property
+    def path(self):
+        return self.nm.get('path', None)
+
+    @property
+    def description(self):
+        return self.nm.get('description', None)
+
+    @property
+    def contents(self):
+        return self.nm.get('contents', None)
+
+    @property
+    def sdds(self):
+        return self.nm.get('sdds', 0)
 
 class SDDSFile:
     """
@@ -600,6 +657,7 @@ class SDDSFile:
         self.arrays: List[Array] = []
         self.columns: List[Column] = []
         self.data: Optional[Data] = None
+        self.associates: List[Associate] = []
 
         self.mode: Literal["binary", "ascii"] = 'binary'
         self.endianness: Literal["big", "little"] = 'little'
@@ -987,7 +1045,7 @@ class SDDSFile:
 
         for el in self.parameters:
             data = el.data
-            assert len(data) == n_pages
+            assert len(data) == n_pages, f'Expected {n_pages} points but have {len(data)} for {el}'
             assert isinstance(data, list)
             for v in data:
                 if type(v) != _PYTHON_TYPE_FINAL[el.type]:
@@ -995,13 +1053,13 @@ class SDDSFile:
 
         for el in self.arrays:
             data = el.data
-            assert len(data) == n_pages
+            assert len(data) == n_pages, f'Expected {n_pages} points but have {len(data)} for {el}'
             assert all(isinstance(v, np.ndarray) for v in data)
             assert all(v.dtype == _NUMPY_DTYPE_FINAL[el.type] for v in data)
 
         for el in self.columns:
             data = el.data
-            assert len(data) == n_pages
+            assert len(data) == n_pages, f'Expected {n_pages} points but have {len(data)} for {el}'
             assert all(isinstance(v, np.ndarray) for v in data)
             for v in data:
                 expected_dtype = _NUMPY_DTYPE_FINAL[el.type]
