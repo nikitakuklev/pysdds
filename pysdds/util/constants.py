@@ -53,7 +53,7 @@ _PYTHON_TYPE_FINAL = {'short': np.dtype('i2'), 'ushort': np.dtype('u2'),
                       'float': np.dtype('f4'), 'double': np.dtype('f8'),
                       'longdouble': np.dtype('g'),
                       'character': str, 'string': str}
-
+_PYTHON_TYPE_NO_NUMPY = {'long': int, 'double': float}
 _PYTHON_TYPE_INV = {int: 'long', float: 'double', str: 'string'}
 _STRUCT_STRINGS_LE = {'short': '<h', 'ushort': '<H',
                       'long': '<l', 'ulong': '<L',
