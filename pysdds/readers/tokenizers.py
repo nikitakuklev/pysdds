@@ -15,6 +15,7 @@ def tokenize_namelist(line):
     value_quote_mode = False
     value_escape_next = False
     value_parse_started = False
+    value_parse_space_seen = False
 
     while True:
         if mode_gap:
@@ -88,23 +89,52 @@ def tokenize_namelist(line):
                             j += 1
                         elif currentchar == '"':
                             # end of quoted segment
-                            if nextchar != ',':
-                                raise Exception(f'Missing delimiter "," at end of buffer {buffer}')
                             values.append(buffer)
                             buffer = ''
                             j += 2
+                            i = j
                             value_quote_mode = False
                             value_parse_started = False
                             mode_kv = False
-                            mode_gap = True
                             kv_key_section = True
-                            parsing_tag_or_kv = False
+
+                            if nextchar != ',':
+                                # might not have comma if only a single item or at the end
+                                # so scan ahead to find next state
+                                found_next_item_or_end = False
+                                for jmp in range(0, 20):
+                                    c = line[j+jmp]
+                                    if c == ' ':
+                                        continue
+                                    elif c == ',':
+                                        mode_gap = True
+                                        parsing_tag_or_kv = False
+                                        found_next_item_or_end = True
+                                        j += jmp
+                                        break
+                                    elif c == '&':
+                                        mode_tag = True
+                                        parsing_tag_or_kv = True
+                                        found_next_item_or_end = True
+                                        j += jmp
+                                        break
+                                    else:
+                                        raise ValueError(f'Invalid char [{c}] after quoted string')
+                                if not found_next_item_or_end:
+                                    raise ValueError(f'Too many spaces after quoted string?')
+                            else:
+                                parsing_tag_or_kv = False
+                                mode_gap = True
                         else:
                             # accept char
                             buffer += currentchar
                             j += 1
                 else:
                     nextchar = line[j + 1]
+                    # if currentchar == ' ':
+                    #     value_parse_space_seen = True
+                    #     j += 1
+                    #     continue
                     if currentchar == '\\':
                         if nextchar == '"' or nextchar == '\\':
                             buffer += nextchar
@@ -112,7 +142,7 @@ def tokenize_namelist(line):
                         else:
                             buffer += currentchar
                             j += 1
-                    elif currentchar == ',':
+                    elif currentchar == ',' or currentchar == ' ':
                         value_parse_started = False
                         mode_kv = False
                         mode_gap = True
@@ -122,10 +152,22 @@ def tokenize_namelist(line):
                         buffer = ''
                         j += 1
                         i = j
+                    elif currentchar == '&':
+                        value_parse_started = False
+                        mode_kv = mode_gap = False
+                        mode_tag = True
+                        parsing_tag_or_kv = True
+                        values.append(buffer)
+                        buffer = ''
+                        i = j
                     else:
+                        #if value_parse_space_seen:
+                        #    #assume that actually next namelist starts here after space separator
+#
+                        #    raise ValueError(f'Got character after unquoted space')
                         buffer += currentchar
                         j += 1
         else:
-            raise Exception('State machine internal error')
+            raise ValueError('State machine internal error')
 
     return tags, keys, values
