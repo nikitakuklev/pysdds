@@ -23,7 +23,7 @@ from ..util.constants import _NUMPY_DTYPES, _NUMPY_DTYPE_LE, _NUMPY_DTYPE_BE, _N
 # but this creates too much overhead in hot loops. So, old school global vars it is.
 logger = logging.getLogger(__name__)
 DEBUG2 = False  # one more level from debug
-TRACE = False  # two more levels from debug
+TRACE = True  # two more levels from debug
 
 # Expected keys for various SDDS namelists
 _KEYS_DESCRIPTION = {'text', 'contents'}
@@ -441,6 +441,7 @@ def read(filepath: Union[Path, str, IO[bytes]],
 def __get_next_line(stream: IO[bytes],
                     accept_meta_commands: bool = True,
                     cut_midline_comments: bool = True,
+                    cut_midline_without_quotes: bool = True,
                     strip: bool = False,
                     replace_tabs: bool = False) -> Optional[str]:
     """ Find next line that has valid SDDS data """
@@ -472,14 +473,21 @@ def __get_next_line(stream: IO[bytes],
                     continue
             else:
                 if cut_midline_comments:
-                    # Partial comment line
-                    idx = line.find('!')
+                    # Partial comment line, look for last !
+                    idx = line.rfind('!')
                     # Only remove if not escaped
                     # TODO: recursively continue looking for more comments?
                     if line[idx - 1] != '\\':
-                        line_cut = line[:idx]
-                        if TRACE:
-                            logger.debug(f'>>NXL {stream.tell()} | CUT LINE {repr(line)} -> {repr(line_cut)}')
+                        if cut_midline_without_quotes and '"' in line[idx+1:]:
+                            line_cut = line
+                            if TRACE:
+                                logger.debug(
+                                    f'>>NXL {stream.tell()} | NO CUT QUOTES {repr(line)} ->'
+                                    f' {repr(line_cut)}')
+                        else:
+                            line_cut = line[:idx]
+                            if TRACE:
+                                logger.debug(f'>>NXL {stream.tell()} | CUT LINE {repr(line)} -> {repr(line_cut)}')
                     else:
                         line_cut = line
                         if TRACE:
@@ -1664,7 +1672,8 @@ def _read_pages_ascii_mixed_lines(file: IO[bytes],
                         columns_list_data.append([])
             row_cnt = 0
             while True:
-                line = __get_next_line(file, accept_meta_commands=False, strip=False)
+                line = __get_next_line(file, accept_meta_commands=False, strip=False,
+                                       cut_midline_comments = False)
                 #if line == '\n':
                     # empty lines at the end of file?
                 #    continue

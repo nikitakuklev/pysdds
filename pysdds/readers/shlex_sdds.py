@@ -1,4 +1,7 @@
-"""A lexical analyzer class for simple shell-like syntaxes, modified to work with SDDS. Based on CPython 3.11."""
+"""
+A lexical analyzer class for simple shell-like syntaxes, modified to work with SDDS.
+Based on CPython 3.11.
+"""
 
 import os
 import re
@@ -51,6 +54,7 @@ class shlex_sdds:
         elif punctuation_chars is True:
             punctuation_chars = '();<>|&'
         self._punctuation_chars = punctuation_chars
+        self.wordchars += '~+$@.:;/[]{}<>|%^-?!'
         if punctuation_chars:
             # _pushback_chars is a push back queue used by lookahead logic
             self._pushback_chars = deque()
