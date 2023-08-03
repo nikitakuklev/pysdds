@@ -29,6 +29,10 @@ jobs:
         python -m pip install pytest
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
                 
-    - name: Run pytest
+    - name: Run pytest file read
       run: |
-        pytest -rxs
+        pytest -rxs tests/test_readers
+        
+    - name: Run pytest file write
+      run: |
+        pytest -rxs tests/test_writers

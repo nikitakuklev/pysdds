@@ -1,6 +1,5 @@
 import pytest
 import pysdds
-import glob
 from pathlib import Path
 import itertools
 
@@ -100,7 +99,7 @@ def test_read_large(file_root):
     sdds.validate_data()
 
 
-file_ts = [str(Path(__file__).parent / 'files/sources/timeSeries.sdds')]
+file_ts = [str(root_sources / 'sources_compressed/timeSeries.sdds.xz')]
 
 
 @pytest.mark.parametrize("file_root", file_ts)

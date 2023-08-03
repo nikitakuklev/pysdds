@@ -1051,6 +1051,9 @@ def _read_pages_binary(file: IO[bytes],
 
         # Read page size
         byte_array = file.read(4)
+        if len(byte_array) == 0:
+            # we have a blank file, abort
+            break
         assert len(byte_array) == 4
         page_size = int.from_bytes(byte_array, endianness)
         if not 0 <= page_size <= 1e9:
