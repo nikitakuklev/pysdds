@@ -516,7 +516,8 @@ def _read_header_fullstream(file: IO[bytes], sdds: SDDSFile, mode: str, endianne
     approach of ingesting a stream of bytes and checking tokens, meaning it works on more input types but is slower
     than using native python split/find/etc. functions
     """
-    logger.debug('Parsing header with streaming reader')
+    if DEBUG2:
+        logger.debug('Parsing header with streaming reader')
     version_line = file.readline(10).decode('ascii').rstrip()
     line_num = 1
     if version_line[:4] != 'SDDS' or len(version_line) != 5:
@@ -530,7 +531,8 @@ def _read_header_fullstream(file: IO[bytes], sdds: SDDSFile, mode: str, endianne
     if sdds_version > 5 or sdds_version < 1:
         raise ValueError(f'This package only supports SDDS version 5 or lower, file is version {sdds_version}')
 
-    logger.debug(f'File version: {version_line}')
+    if DEBUG2:
+        logger.debug(f'File version: {version_line}')
 
     namelists = []
 
