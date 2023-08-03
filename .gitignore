@@ -1,5 +1,7 @@
 # Don't add large files
-tests/files/
+tests/files/**
+!tests/files/sources
+!tests/files/sources/**
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

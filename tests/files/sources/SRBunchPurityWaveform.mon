@@ -1,0 +1,7 @@
+SDDS1
+&column name=WaveformPV, type=string,  &end
+&column name=WaveformName, type=string,  &end
+&data mode=ascii, &end
+! page number 1
+                   1
+SR:bpure:MCAstatisticsGS.VALG bucketCounts 

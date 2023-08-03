@@ -1,0 +1,101 @@
+SDDS1
+&parameter name=InstallLocation, type=string, &end
+&column name=ReadbackName, type=string,  &end
+&column name=ReadbackUnits, type=string,  &end
+&column name=ControlName, type=string,  &end
+&column name=Provider, type=string,  &end
+&column name=ExpectNumeric, type=character,  &end
+&column name=ExpectFieldType, type=string,  &end
+&column name=ExpectElements, type=long,  &end
+&data mode=ascii, &end
+! page number 1
+/home/helios/oagData/logging/PRF1/PRF1.mon
+                  88
+PARSpaceTemp degF G:IAHU:PAR:SpaceP080Ai ca y scalar 1 
+G:PW:Par:FundCavFlowIn gpm G:PW:Par:FundCavFlowIn ca y scalar 1 
+G:PW:Par:FundCavFlowM gpm G:PW:Par:FundCavFlowM ca y scalar 1 
+G:PW:Par:FundCavTempIn C G:PW:Par:FundCavTempIn ca y scalar 1 
+G:PW:Par:FundCavTempM C G:PW:Par:FundCavTempM ca y scalar 1 
+P:bpmSum:Charge nC P:bpmSum:ChargeM ca y scalar 1 
+PAR:F:CavityAirPres1AI in PAR:F:CavityAirPres1AI ca y scalar 1 
+PAR:F:CavityAirPres2AI in PAR:F:CavityAirPres2AI ca y scalar 1 
+PAR:F:CavityAirPres3AI in PAR:F:CavityAirPres3AI ca y scalar 1 
+PAR:F:CavityAirPres4AI in PAR:F:CavityAirPres4AI ca y scalar 1 
+P:RF1AGCCtlVoltage V PAR:Fnd:AGC_CtlVoltageAI ca y scalar 1 
+P:RF1AGCEnvDetOutput V PAR:Fnd:AGC_EnvDetOutputAI ca y scalar 1 
+PAR:Fnd:ArcDetector1M "" PAR:Fnd:ArcDetector1M ca y scalar 1 
+PAR:Fnd:ArcDetector2M "" PAR:Fnd:ArcDetector2M ca y scalar 1 
+P:RF1CavPhsCtlVoltage V PAR:Fnd:CavPhsCtlVoltageAI ca y scalar 1 
+P:RF1CavPhsDetOutput V PAR:Fnd:CavPhsDetOutputAI ca y scalar 1 
+P:RF1DriverForwardPower W PAR:Fnd:DrvFwdPwrCalc ca y scalar 1 
+P:RF1DriverReflectedPower W PAR:Fnd:DrvReflPwrCalc ca y scalar 1 
+P:RF1EnvDet1-0Out V PAR:Fnd:EnvDet1-0OutAI ca y scalar 1 
+PAR:Fnd:FilOn "" PAR:Fnd:FilOn ca y scalar 1 
+P:RF1GridCurrent "" PAR:Fnd:GridCurrent ca y scalar 1 
+PAR:Fnd:InterlockOK "" PAR:Fnd:InterlockOK ca y scalar 1 
+P:RF1PlateCurrent "" PAR:Fnd:PlateCurrent ca y scalar 1 
+PAR:Fnd:PlateOn "" PAR:Fnd:PlateOn ca y scalar 1 
+P:RF1PlateVoltage "" PAR:Fnd:PlateVoltage ca y scalar 1 
+P:RF1ForwardPower W PAR:Fnd:RfPowerFwd ca y scalar 1 
+P:RF1PowerOutput W PAR:Fnd:RfPowerOut ca y scalar 1 
+P:RF1ReflectedPower W PAR:Fnd:RfPowerRefl ca y scalar 1 
+PAR:Fnd:SW:SystemSelCC "" PAR:Fnd:SW:SystemSelCC ca y scalar 1 
+PAR:Fnd:SystemSelect "" PAR:Fnd:SystemSelect ca y scalar 1 
+P:RF1TubeAmpFwdPwr V PAR:Fnd:TubeAmpFwdPwrAI ca y scalar 1 
+P:RF1TunerCtlVoltage V PAR:Fnd:TunerCtlVoltageAI ca y scalar 1 
+P:RF1TunerPhsDetOut V PAR:Fnd:TunerPhsDetOutAI ca y scalar 1 
+PAR:Har:TestPoint1 "" PAR:Har:TestPoint1 ca y scalar 1 
+PAR:Har:TestPoint2 "" PAR:Har:TestPoint2 ca y scalar 1 
+PAR:Har:TestPoint3 "" PAR:Har:TestPoint3 ca y scalar 1 
+PAR:Har:TestPoint4 "" PAR:Har:TestPoint4 ca y scalar 1 
+P:RelativeHumidity % PAR:HumRead:AI ca y scalar 1 
+P:RF1:DrivePhaseShifter deg PAR:LIST:PhsShft1Ch0_1 ca y scalar 1 
+P:RF1:BucketPhaseShifter deg PAR:LIST:PhsShft1Ch2_3 ca y scalar 1 
+PAR:RF1:WaveformCh0 "" PAR:RF1:WaveformCh0 ca y scalarArray 320 
+PAR:RF1:WaveformCh1 "" PAR:RF1:WaveformCh1 ca y scalarArray 320 
+PAR:RF1:WaveformCh2 "" PAR:RF1:WaveformCh2 ca y scalarArray 320 
+PAR:RF1:WaveformCh3 "" PAR:RF1:WaveformCh3 ca y scalarArray 320 
+PAR:RF1:WaveformCh4 "" PAR:RF1:WaveformCh4 ca y scalarArray 320 
+PAR:RF1:WaveformCh5 "" PAR:RF1:WaveformCh5 ca y scalarArray 320 
+P:RF1On "" PAR:RF1:abBoA0C7S0 ca y scalar 1 
+P:RF1AGCEnvDetector V PAR:RF1:envDet1Ch1V ca y scalar 1 
+PAR:RF1:envDet1Ch2V "" PAR:RF1:envDet1Ch2V ca y scalar 1 
+P:RF1VoltageFieldProbe kV PAR:RF1:gapVoltage ca y scalar 1 
+PAR:RF1:gapVoltage:uncal kV PAR:RF1:gapVoltage:uncal ca y scalar 1 
+P:RF1InnerConductorTemp C PAR:RF1:innerConductor ca y scalar 1 
+P:RF1OuterConductorTemp C PAR:RF1:outerConductor ca y scalar 1 
+P:RF1PhaseLoopPhaseDetector V PAR:RF1:phaseDet1Ch0V ca y scalar 1 
+P:RF1TunerLoopPhaseDetector V PAR:RF1:phaseDet1Ch1V ca y scalar 1 
+P:RF1PhaseShifter1Ch2 deg PAR:RF1:phaseShifter1Ch2 ca y scalar 1 
+PAR:RF1:phaseShifter1Ch2V "" PAR:RF1:phaseShifter1Ch2V ca y scalar 1 
+P:RF1PhaseShifter1Ch3 deg PAR:RF1:phaseShifter1Ch3 ca y scalar 1 
+PAR:RF1:phaseShifter2Ch2 deg PAR:RF1:phaseShifter2Ch2 ca y scalar 1 
+PAR:RF1:phaseShifter2Ch3 deg PAR:RF1:phaseShifter2Ch3 ca y scalar 1 
+P:RF1TunerCurrent A PAR:RF1:tunerCurrentRb ca y scalar 1 
+P:RF1WaterReturnTemp C PAR:RF1:waterRetTmp ca y scalar 1 
+P:RF1WaterSupplyTemp C PAR:RF1:waterSupTmp ca y scalar 1 
+P:AirTemp degF PAR:TempRead:AI ca y scalar 1 
+PRF:F:FBM1:Ch1_DvalueAI "" PRF:F:FBM1:Ch1_DvalueAI ca y scalar 1 
+PRF:F:FBM1:Ch1_IvalueAI "" PRF:F:FBM1:Ch1_IvalueAI ca y scalar 1 
+PRF:F:FBM1:Ch1_PvalueAI "" PRF:F:FBM1:Ch1_PvalueAI ca y scalar 1 
+P:RF1AGCError V PRF:F:FBM1:pidErrCh0CC ca y scalar 1 
+P:RF1CavityPhaseError V PRF:F:FBM1:pidErrCh1CC ca y scalar 1 
+PRF:F:FBM1:pidSpCh0AI "" PRF:F:FBM1:pidSpCh0AI ca y scalar 1 
+P:RF1AGCSetpoint V PRF:F:FBM1:pidSpCh0AO ca y scalar 1 
+PRF:F:FBM1:pidSpCh1AI "" PRF:F:FBM1:pidSpCh1AI ca y scalar 1 
+P:RF1CavityPhaseSetpoint V PRF:F:FBM1:pidSpCh1AO ca y scalar 1 
+P:RF1TunerError V PRF:F:FBM2:pidErrCh1CC ca y scalar 1 
+PRF:F:FBM2:pidSpCh1AI "" PRF:F:FBM2:pidSpCh1AI ca y scalar 1 
+P:RF1TunerSetpoint V PRF:F:FBM2:pidSpCh1AO ca y scalar 1 
+PRF:F:FreqOffsetCC "" PRF:F:FreqOffsetCC ca y scalar 1 
+PRF:F:FreqResonantCC "" PRF:F:FreqResonantCC ca y scalar 1 
+PRF:H:FreqOffsetCC "" PRF:H:FreqOffsetCC ca y scalar 1 
+PRF:H:FreqResonantCC "" PRF:H:FreqResonantCC ca y scalar 1 
+P:RF1Hp8508Phase deg PRF:Hp8508Phase ca y scalar 1 
+PTB:qTotal nC PTB:CM:qTotalAI ca y scalar 1 
+PAR:RF1:WfDataPtCh0 "" PAR:RF1:WfDataPtCh0 ca y scalarArray 1
+PAR:RF1:WfDataPtCh1 "" PAR:RF1:WfDataPtCh1 ca y scalarArray 1
+PAR:RF1:WfDataPtCh2 "" PAR:RF1:WfDataPtCh2 ca y scalarArray 1
+PAR:RF1:WfDataPtCh3 "" PAR:RF1:WfDataPtCh3 ca y scalarArray 1
+PAR:RF1:WfDataPtCh4 "" PAR:RF1:WfDataPtCh4 ca y scalarArray 1
+PAR:RF1:WfDataPtCh5 "" PAR:RF1:WfDataPtCh5 ca y scalarArray 1

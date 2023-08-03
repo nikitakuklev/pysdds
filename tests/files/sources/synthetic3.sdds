@@ -1,0 +1,49 @@
+SDDS5
+&parameter name=p1, type=long64, &end
+&parameter name=p2, type=ulong64, &end
+&parameter name=p3, type=long, &end
+&parameter name=p4, type=ulong, &end
+&parameter name=p5, type=short, &end
+&parameter name=p6, type=ushort, &end
+&parameter name=p7, type=float, &end
+&parameter name=p8, type=double, &end
+&parameter name=p10, type=character, &end
+&parameter name=p11, type=string, &end
+&column name=a, type=long64,  &end
+&column name=b, type=ulong64,  &end
+&column name=c, type=long,  &end
+&column name=d, type=ulong,  &end
+&column name=e, type=short,  &end
+&column name=f, type=ushort,  &end
+&column name=g, type=float,  &end
+&column name=h, type=double,  &end
+&column name=j, type=character,  &end
+&column name=k, type=string,  &end
+&data mode=ascii, &end
+! page number 1
+1
+2
+4
+8
+16
+32
+ 6.40000000e+01
+ 1.280000000000000e+02
+\005
+standard_string
+                   2
+3 6 9 12 15 18  2.10000000e+01  2.400000000000000e+01 a abc 
+0 0 0 0 0 0  0.00000000e+00  0.000000000000000e+00 \025 ""
+! page number 2
+12345
+12345
+12345
+12345
+12345
+12345
+ 1.23450000e+04
+ 1.234500000000000e+04
+\\
+" \!\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~"
+                   1
+2 2 2 2 2 2  2.00000000e+00  2.000000000000000e+00 b " \!\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~" 

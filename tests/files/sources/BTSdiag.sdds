@@ -1,0 +1,32 @@
+SDDS1
+&parameter name=InstallLocation, type=string, &end
+&column name=ControlName, type=string,  &end
+&column name=ReadbackName, type=string,  &end
+&column name=Provider, type=string,  &end
+&column name=ExpectNumeric, type=character,  &end
+&column name=ExpectFieldType, type=string,  &end
+&column name=ExpectElements, type=long,  &end
+&data mode=ascii, &end
+! page number 1
+/home/helios/oagData/logging/BTSdiag/BTSdiag.mon
+                  20
+BTS:BPD:APH1:A:Vm:Smoo BTS:BPD:APH1:A:Vm:Smoo ca y scalar 1 
+BTS:BPD:APH1:A:Vm:Smoo.B BTS:BPD:APH1:A:Vm:Smoo.B ca y scalar 1 
+BTS:BPD:APH1:A:wfAnl.BGRI BTS:BPD:APH1:A:wfAnl.BGRI ca y scalar 1 
+BTS:BPD:APH1:A:wfAnl.ENRI BTS:BPD:APH1:A:wfAnl.ENRI ca y scalar 1 
+BTS:BPD:APH1:AdjustedCC BTS:BPD:APH1:AdjustedCC ca y scalar 1 
+BTS:BPD:APH1:ErrorCC BTS:BPD:APH1:ErrorCC ca y scalar 1 
+BTS:BPD:APH1:OffsetAO BTS:BPD:APH1:OffsetAO ca y scalar 1 
+BTS:BPD:APH1:P:Dm BTS:BPD:APH1:P:Dm ca y scalar 1 
+BTS:BPD:APH1:P:Dm.B BTS:BPD:APH1:P:Dm.B ca y scalar 1 
+BTS:BPD:APH1:P:Dm:Smoo BTS:BPD:APH1:P:Dm:Smoo ca y scalar 1 
+BTS:BPD:APH1:P:Dm:Smoo.B BTS:BPD:APH1:P:Dm:Smoo.B ca y scalar 1 
+BTS:BPD:APH1:P:GainC BTS:BPD:APH1:P:GainC ca y scalar 1 
+BTS:BPD:APH1:P:TestC BTS:BPD:APH1:P:TestC ca y scalar 1 
+BTS:BPD:APH1:P:Vm BTS:BPD:APH1:P:Vm ca y scalar 1 
+BTS:BPD:APH1:P:wfAnl.BGRI BTS:BPD:APH1:P:wfAnl.BGRI ca y scalar 1 
+BTS:BPD:APH1:P:wfAnl.ENRI BTS:BPD:APH1:P:wfAnl.ENRI ca y scalar 1 
+BTS:BPD:APH1:P:wfAnl.MEAN BTS:BPD:APH1:P:wfAnl.MEAN ca y scalar 1 
+BTS:BPD:APH1:SetpointAO BTS:BPD:APH1:SetpointAO ca y scalar 1 
+BTS:BPM:HoldPrevValue BTS:BPM:HoldPrevValue ca y scalar 1 
+PTB:BPM:HoldPrevValue PTB:BPM:HoldPrevValue ca y scalar 1 

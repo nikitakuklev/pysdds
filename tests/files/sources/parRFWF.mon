@@ -1,0 +1,23 @@
+SDDS2
+&parameter name=WaveformLength, type=ushort, &end
+&parameter name=InstallLocation, type=string, &end
+&column name=WaveformPV, type=string,  &end
+&column name=WaveformName, type=string,  &end
+&column name=DataType, type=string,  &end
+&data mode=ascii, &end
+! page number 1
+0
+/home/helios/oagData/logging/parRFWF/parRFWF.mon
+                   12
+PAR:RF1:WaveformCh0 PAR:RF1:WaveformCh0 float
+PAR:RF1:WaveformCh1 PAR:RF1:WaveformCh1 float
+PAR:RF1:WaveformCh2 PAR:RF1:WaveformCh2 float
+PAR:RF1:WaveformCh3 PAR:RF1:WaveformCh3 float
+PAR:RF1:WaveformCh4 PAR:RF1:WaveformCh4 float
+PAR:RF1:WaveformCh5 PAR:RF1:WaveformCh5 float
+PRF:WaveformCh0 PRF:WaveformCh0 float
+PRF:WaveformCh1 PRF:WaveformCh1 float
+PRF:WaveformCh2 PRF:WaveformCh2 float
+PRF:WaveformCh3 PRF:WaveformCh3 float
+PRF:WaveformCh4 PRF:WaveformCh4 float
+PRF:WaveformCh5 PRF:WaveformCh5 float

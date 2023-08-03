@@ -1,0 +1,10 @@
+SDDS1
+&column name=x, units=m, type=double &end
+&column name=y, units=m, type=double &end
+&parameter name=MplTitle, type=string, fixed_value="Aperture search boundary for run run.ele", &end
+&data mode=ascii, no_row_counts=1 &end
+-5.000000e-02	0.000000e+00
+-5.000000e-02	2.000000e-02
+5.000000e-02	2.000000e-02
+5.000000e-02	0.000000e+00
+-5.000000e-02	0.000000e+00

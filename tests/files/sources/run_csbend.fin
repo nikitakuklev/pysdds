@@ -1,0 +1,147 @@
+SDDS1
+!# little-endian
+&description text="final properties--input: run.ele  lattice: lattice.lte", contents="final properties", &end
+&parameter name=Sx, symbol="$gs$r$bx$n", units=m, description=sqrt(<(x-<x>)^2>), type=double, &end
+&parameter name=Sxp, symbol="$gs$r$bx'$n", description=sqrt(<(x'-<x'>)^2>), type=double, &end
+&parameter name=Sy, symbol="$gs$r$by$n", units=m, description=sqrt(<(y-<y>)^2>), type=double, &end
+&parameter name=Syp, symbol="$gs$r$by'$n", description=sqrt(<(y'-<y'>)^2>), type=double, &end
+&parameter name=Ss, symbol="$gs$r$bs$n", units=m, description=sqrt(<(s-<s>)^2>), type=double, &end
+&parameter name=Sdelta, symbol="$gs$bd$n$r", description=sqrt(<(delta-<delta>)^2>), type=double, &end
+&parameter name=St, symbol="$gs$r$bt$n", units=s, description=sqrt(<(t-<t>)^2>), type=double, &end
+&parameter name=Cx, symbol=<x>, units=m, description="x centroid", type=double, &end
+&parameter name=Cxp, symbol=<x'>, description="x' centroid", type=double, &end
+&parameter name=Cy, symbol=<y>, units=m, description="y centroid", type=double, &end
+&parameter name=Cyp, symbol=<y'>, description="y' centroid", type=double, &end
+&parameter name=Cs, symbol=<s>, units=m, description="mean distance traveled", type=double, &end
+&parameter name=Cdelta, symbol="<$gd$r>", description="delta centroid", type=double, &end
+&parameter name=Ct, symbol=<t>, units=s, description="mean time of flight", type=double, &end
+&parameter name=s12, symbol="$gs$r$b12$n", units=m, description="<x*xp'>", type=double, &end
+&parameter name=s13, symbol="$gs$r$b13$n", units="m$a2$n", description="<x*y>", type=double, &end
+&parameter name=s14, symbol="$gs$r$b14$n", units=m, description="<x*y'>", type=double, &end
+&parameter name=s15, symbol="$gs$r$b15$n", units="m^a2$n", description="<x*s>", type=double, &end
+&parameter name=s16, symbol="$gs$r$b16$n", units=m, description="<x*delta>", type=double, &end
+&parameter name=s17, symbol="$gs$r$b17$n", units="m*s", description="<x*t>", type=double, &end
+&parameter name=s23, symbol="$gs$r$b23$n", units=m, description="<x'*y>", type=double, &end
+&parameter name=s24, symbol="$gs$r$b24$n", description="<x'*y'>", type=double, &end
+&parameter name=s25, symbol="$gs$r$b25$n", units=m, description="<x'*s>", type=double, &end
+&parameter name=s26, symbol="$gs$r$b26$n", description="<x'*delta>", type=double, &end
+&parameter name=s27, symbol="$gs$r$b27$n", units=s, description="<x'*t>", type=double, &end
+&parameter name=s34, symbol="$gs$r$b34$n", units=m, description="<y*y'>", type=double, &end
+&parameter name=s35, symbol="$gs$r$b35$n", units="m^a2$n", description="<y*s>", type=double, &end
+&parameter name=s36, symbol="$gs$r$b36$n", units=m, description="<y*delta>", type=double, &end
+&parameter name=s37, symbol="$gs$r$b37$n", units="m*s", description="<y*t>", type=double, &end
+&parameter name=s45, symbol="$gs$r$b45$n", units=m, description="<y'*s>", type=double, &end
+&parameter name=s46, symbol="$gs$r$b46$n", description="<s'*delta>", type=double, &end
+&parameter name=s47, symbol="$gs$r$b47$n", units=s, description="<y'*t>", type=double, &end
+&parameter name=s56, symbol="$gs$r$b56$n", units=m, description="<s*delta>", type=double, &end
+&parameter name=s57, symbol="$gs$r$b57$n", units="m*s", description="<s*t>", type=double, &end
+&parameter name=s67, symbol="$gs$r$b67$n", units=s, description="<delta*t>", type=double, &end
+&parameter name=s7, symbol="$gs$r$b7$n", description="sqrt(<t*t>)", type=double, &end
+&parameter name=Transmission, description=Transmission, type=double, &end
+&parameter name=pCentral, symbol="p$bcen$n", units="m$be$nc", description="Reference beta*gamma", type=double, &end
+&parameter name=pAverage, symbol="p$bave$n", units="m$be$nc", description="Mean beta*gamma", type=double, &end
+&parameter name=KAverage, symbol="K$bave$n", units=MeV, description="Mean kinetic energy", type=double, &end
+&parameter name=Charge, units=C, description="Beam charge", type=double, &end
+&parameter name=ex, symbol="$ge$r$bx$n", units=m, description="geometric horizontal emittance", type=double, &end
+&parameter name=ey, symbol="$ge$r$by$n", units=m, description="geometric vertical emittance", type=double, &end
+&parameter name=ecx, symbol="$ge$r$bx,c$n", units=m, description="geometric horizontal emittance less dispersive contributions", type=double, &end
+&parameter name=ecy, symbol="$ge$r$by,c$n", units=m, description="geometric vertical emittance less dispersive contributions", type=double, &end
+&parameter name=el, symbol="$ge$r$bl$n", units=s, type=double, &end
+&parameter name=enx, symbol="$ge$r$bx,n$n", units=m, description="normalized horizontal emittance", type=double, &end
+&parameter name=eny, symbol="$ge$r$by,n$n", units=m, description="normalized vertical emittance", type=double, &end
+&parameter name=ecnx, symbol="$ge$r$bx,cn$n", units=m, description="normalized horizontal emittance less dispersive contributions", type=double, &end
+&parameter name=ecny, symbol="$ge$r$by,cn$n", units=m, description="normalized vertical emittance less dispersive contributions", type=double, &end
+&parameter name=xMinimum, units=m, description="minimum value of x", type=double, &end
+&parameter name=xpMinimum, description="minimum value of x'", type=double, &end
+&parameter name=yMinimum, units=m, description="minimum value of y", type=double, &end
+&parameter name=ypMinimum, description="minimum value of y'", type=double, &end
+&parameter name=dsMinimum, units=m, description="minimum value of ds", type=double, &end
+&parameter name=deltaMinimum, description="minimum value of delta", type=double, &end
+&parameter name=dtMinimum, units=s, description="minimum value of dt", type=double, &end
+&parameter name=xMaximum, units=m, description="maximum value of x", type=double, &end
+&parameter name=xpMaximum, description="maximum value of x'", type=double, &end
+&parameter name=yMaximum, units=m, description="maximum value of y", type=double, &end
+&parameter name=ypMaximum, description="maximum value of y'", type=double, &end
+&parameter name=sMaximum, units=m, description="maximum value of ds", type=double, &end
+&parameter name=deltaMaximum, description="maximum value of delta", type=double, &end
+&parameter name=dtMaximum, units=s, description="maximum value of dt", type=double, &end
+&parameter name=ma1, units=m, description="maximum absolute value of x", type=double, &end
+&parameter name=ma2, description="maximum absolute value of x'", type=double, &end
+&parameter name=ma3, units=m, description="maximum absolute value of y", type=double, &end
+&parameter name=ma4, description="maximum absolute value of y'", type=double, &end
+&parameter name=ma5, units=m, description="maximum absolute value of ds", type=double, &end
+&parameter name=ma6, description="maximum absolute value of delta", type=double, &end
+&parameter name=ma7, units=s, description="maximum absolute value of dt", type=double, &end
+&parameter name=Wx, symbol="W$bx$n", units=m, description="68.26% width in x", type=double, &end
+&parameter name=Wy, symbol="W$by$n", units=m, description="68.26% width in y", type=double, &end
+&parameter name=Dt, symbol="$gD$rt", units=s, description="Total time-of-flight span", type=double, &end
+&parameter name=Ddelta, symbol="$gDd$r", description="Total delta span", type=double, &end
+&parameter name=Dt50, symbol="$gD$rt$b50$n", units=s, description="50% time-of-flight span", type=double, &end
+&parameter name=Dt60, symbol="$gD$rt$b60$n", units=s, description="60% time-of-flight span", type=double, &end
+&parameter name=Dt70, symbol="$gD$rt$b70$n", units=s, description="70% time-of-flight span", type=double, &end
+&parameter name=Dt80, symbol="$gD$rt$b80$n", units=s, description="80% time-of-flight span", type=double, &end
+&parameter name=Dt90, symbol="$gD$rt$b90$n", units=s, description="90% time-of-flight span", type=double, &end
+&parameter name=Dt95, symbol="$gD$rt$b95$n", units=s, description="95% time-of-flight span", type=double, &end
+&parameter name=Ddelta50, symbol="$gDd$r$b50$n", description="50% delta span", type=double, &end
+&parameter name=Ddelta60, symbol="$gDd$r$b60$n", description="60% delta span", type=double, &end
+&parameter name=Ddelta70, symbol="$gDd$r$b70$n", description="70% delta span", type=double, &end
+&parameter name=Ddelta80, symbol="$gDd$r$b80$n", description="80% delta span", type=double, &end
+&parameter name=Ddelta90, symbol="$gDd$r$b90$n", description="90% delta span", type=double, &end
+&parameter name=Ddelta95, symbol="$gDd$r$b95$n", description="95% delta span", type=double, &end
+&parameter name=DtPerc10, units=s, description="Time offset to 10% point", type=double, &end
+&parameter name=DtPerc20, units=s, description="Time offset to 20% point", type=double, &end
+&parameter name=DtPerc30, units=s, description="Time offset to 30% point", type=double, &end
+&parameter name=DtPerc40, units=s, description="Time offset to 40% point", type=double, &end
+&parameter name=DtPerc50, units=s, description="Time offset to 50% point", type=double, &end
+&parameter name=DtPerc60, units=s, description="Time offset to 60% point", type=double, &end
+&parameter name=DtPerc70, units=s, description="Time offset to 70% point", type=double, &end
+&parameter name=DtPerc80, units=s, description="Time offset to 80% point", type=double, &end
+&parameter name=DtPerc90, units=s, description="Time offset to 90% point", type=double, &end
+&parameter name=R11, symbol="R$b11$n", description="Transport matrix element from start of system", type=double, &end
+&parameter name=R12, symbol="R$b12$n", units=m, description="Transport matrix element from start of system", type=double, &end
+&parameter name=R13, symbol="R$b13$n", description="Transport matrix element from start of system", type=double, &end
+&parameter name=R14, symbol="R$b14$n", units=m, description="Transport matrix element from start of system", type=double, &end
+&parameter name=R15, symbol="R$b15$n", units=m, description="Transport matrix element from start of system", type=double, &end
+&parameter name=R16, symbol="R$b16$n", units=m, description="Transport matrix element from start of system", type=double, &end
+&parameter name=R21, symbol="R$b21$n", units=1/m, description="Transport matrix element from start of system", type=double, &end
+&parameter name=R22, symbol="R$b22$n", description="Transport matrix element from start of system", type=double, &end
+&parameter name=R23, symbol="R$b23$n", units=1/m, description="Transport matrix element from start of system", type=double, &end
+&parameter name=R24, symbol="R$b24$n", description="Transport matrix element from start of system", type=double, &end
+&parameter name=R25, symbol="R$b25$n", description="Transport matrix element from start of system", type=double, &end
+&parameter name=R26, symbol="R$b26$n", description="Transport matrix element from start of system", type=double, &end
+&parameter name=R31, symbol="R$b31$n", description="Transport matrix element from start of system", type=double, &end
+&parameter name=R32, symbol="R$b32$n", units=m, description="Transport matrix element from start of system", type=double, &end
+&parameter name=R33, symbol="R$b33$n", description="Transport matrix element from start of system", type=double, &end
+&parameter name=R34, symbol="R$b34$n", units=m, description="Transport matrix element from start of system", type=double, &end
+&parameter name=R35, symbol="R$b35$n", units=m, description="Transport matrix element from start of system", type=double, &end
+&parameter name=R36, symbol="R$b36$n", units=m, description="Transport matrix element from start of system", type=double, &end
+&parameter name=R41, symbol="R$b41$n", units=1/m, description="Transport matrix element from start of system", type=double, &end
+&parameter name=R42, symbol="R$b42$n", description="Transport matrix element from start of system", type=double, &end
+&parameter name=R43, symbol="R$b43$n", units=1/m, description="Transport matrix element from start of system", type=double, &end
+&parameter name=R44, symbol="R$b44$n", description="Transport matrix element from start of system", type=double, &end
+&parameter name=R45, symbol="R$b45$n", description="Transport matrix element from start of system", type=double, &end
+&parameter name=R46, symbol="R$b46$n", description="Transport matrix element from start of system", type=double, &end
+&parameter name=R51, symbol="R$b51$n", description="Transport matrix element from start of system", type=double, &end
+&parameter name=R52, symbol="R$b52$n", units=m, description="Transport matrix element from start of system", type=double, &end
+&parameter name=R53, symbol="R$b53$n", description="Transport matrix element from start of system", type=double, &end
+&parameter name=R54, symbol="R$b54$n", units=m, description="Transport matrix element from start of system", type=double, &end
+&parameter name=R55, symbol="R$b55$n", description="Transport matrix element from start of system", type=double, &end
+&parameter name=R56, symbol="R$b56$n", units=m, description="Transport matrix element from start of system", type=double, &end
+&parameter name=R61, symbol="R$b61$n", units=1/m, description="Transport matrix element from start of system", type=double, &end
+&parameter name=R62, symbol="R$b62$n", description="Transport matrix element from start of system", type=double, &end
+&parameter name=R63, symbol="R$b63$n", units=1/m, description="Transport matrix element from start of system", type=double, &end
+&parameter name=R64, symbol="R$b64$n", description="Transport matrix element from start of system", type=double, &end
+&parameter name=R65, symbol="R$b65$n", units=1/m, description="Transport matrix element from start of system", type=double, &end
+&parameter name=R66, symbol="R$b66$n", description="Transport matrix element from start of system", type=double, &end
+&parameter name=detR, symbol="det R", description="Determinant of transport matrix from start of system", type=double, &end
+&parameter name=CPU, units=s, type=double, &end
+&parameter name=ElapsedTime, units=s, type=double, &end
+&parameter name=ElapsedCoreTime, units=s, type=double, &end
+&parameter name=MEM, units=pages, type=long, &end
+&parameter name=PF, units=pages, type=long, &end
+&parameter name=Step, type=long, &end
+&parameter name=Steps, type=long, &end
+&parameter name=Particles, description="Number of particles", type=long, &end
+&parameter name=SVNVersion, description="SVN version number", type=string, fixed_value=unknown, &end
+&data mode=binary, &end
+                                                            lÊêf¾V?GKÀòs¶U?ðV»™ó…T?yKŸDGF?¥}øFBÓ?        üþX´l>>                                                                                                                                                                                      ð?xâSÁÊ@xâSÁÊ@MPc0}W»@                                                                                lÊêf¾V?GKÀòs¶U?ðV»™ó…T?yKŸDGF?                        lÊêf¾V?GKÀòs¶U?ðV»™ó…T?yKŸDGF?                        lÊêf¾V?GKÀòs¶U?ðV»™ó…T?yKŸDGF?                                                                                                                                                                                                                                U_ÊÀã¬ð?õ<Ç)xÓ?                        s÷’äKˆ¿ç~$Õ"Ò?U_ÊÀã¬ð?                        ã *Kgc´¿                º	/Ô’î?3ºº•ÍéÒ?                                3ºº•ÍéÒ¿º	/Ô’î?                ã *Kgc´¿s÷’äKˆ¿                      ð?ôâs?L4?                                              ð?þÿÿÿÿÿï?        C»,Þ€?-å>Þ€?K               

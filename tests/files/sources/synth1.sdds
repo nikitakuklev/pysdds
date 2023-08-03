@@ -1,0 +1,14 @@
+SDDS1
+&column name=a, type=string &end
+&column name=b, type=string &end
+&column name=c, type=double &end
+&data mode=ascii, no_row_counts=1 &end
+"baaaaad!!!!!name1" MARK 0.000000e+00
+"baaaaad!!!!!name2" DRIF 2.000000e+00 !hmmmmmmmmmmmmm
+!
+!
+!
+! skippyyyy
+!
+!
+"baaaaad!!!!!name3" DRIF 2.000000e+00
