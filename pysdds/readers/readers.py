@@ -15,15 +15,15 @@ import struct
 import numpy as np
 import pandas as pd
 
-from ..structures import *
-from ..util.constants import _NUMPY_DTYPES, _NUMPY_DTYPE_LE, _NUMPY_DTYPE_BE, _NUMPY_DTYPE_FINAL, \
+from pysdds.structures import *
+from pysdds.util.constants import _NUMPY_DTYPES, _NUMPY_DTYPE_LE, _NUMPY_DTYPE_BE, _NUMPY_DTYPE_FINAL, \
     _STRUCT_STRINGS_LE, _STRUCT_STRINGS_BE, _NUMPY_DTYPE_SIZES
 
 # The proper way to implement conditional logging is to check current level,
 # but this creates too much overhead in hot loops. So, old school global vars it is.
 logger = logging.getLogger(__name__)
 DEBUG2 = False  # one more level from debug
-TRACE = True  # two more levels from debug
+TRACE = False  # two more levels from debug
 
 # Expected keys for various SDDS namelists
 _KEYS_DESCRIPTION = {'text', 'contents'}
@@ -40,6 +40,7 @@ _HEADER_PARSE_METHOD = 'v2'
 _ASCII_TEXT_PARSE_METHOD = 'shlex'
 _ASCII_NUMERIC_PARSE_METHOD = 'read_table'  # 'fromtxt'
 
+OCTAL_NUMBERS = '01234567'
 
 def _open_file(filepath: Path, compression: str, use_magic_values: bool = False, buffer_size: int = None) \
         -> (IO[bytes], int, bool):
@@ -275,7 +276,8 @@ def read(filepath: Union[Path, str, IO[bytes]],
         buffer_size = 0
     else:
         # Use a middle-ground option
-        buffer_size = 1048576
+        #buffer_size = 1048576
+        buffer_size = 262144  # 4 NFSV4 packets at max size
 
     t_start = time.perf_counter()
     if isinstance(filepath, Path):
@@ -288,7 +290,10 @@ def read(filepath: Union[Path, str, IO[bytes]],
                      (time.perf_counter() - t_start) * 1e3, file_size)
     else:
         file = filepath
-        file_size = len(filepath)
+        try:
+            file_size = len(filepath)
+        except TypeError:
+            file_size = None
         peek_available = True
         sdds._source_file_size = 0
         logger.debug(f'Path opened as byte stream in %.3f ms, size (%s)',
@@ -743,7 +748,8 @@ def _read_header_v2(file: IO[bytes], sdds: SDDSFile, mode: str, endianness: str)
     approach of ingesting a stream of bytes and checking tokens, meaning it works on more input types but is slower
     than using native python split/find/etc. functions
     """
-    logger.debug('Parsing header with streaming reader')
+    if DEBUG2:
+        logger.debug('Parsing header with streaming reader')
     version_line = file.readline(10).decode('ascii').rstrip()
     line_num = 1
     if version_line[:4] != 'SDDS' or len(version_line) != 5:
@@ -819,7 +825,8 @@ def _read_header_v2(file: IO[bytes], sdds: SDDSFile, mode: str, endianness: str)
         assert len(keys) == len(values)
         command = tags[0]
         nm_dict = {k: v for k, v in zip(keys, values)}
-        logger.debug(f'>Parse result %s | %s', command, nm_dict)
+        if DEBUG2:
+            logger.debug(f'>Parse result %s | %s', command, nm_dict)
 
         # hack around newlines in escaped strings
         if command == '&parameter':
@@ -1475,18 +1482,55 @@ def _read_pages_ascii_mixed_lines(file: IO[bytes],
             if not page_skip:
                 if parameters_type[par_idx] == object:
                     value = b_array.strip()
+
                     # Indicates a variable length string
                     if value.startswith('"') and value.endswith('"'):
                         value = value[1:-1]
+                        if '\\' in value:
+                            # escapes in quoted string
+                            v2 = []
+                            i = 0
+                            while True:
+                                c = value[i]
+                                if c != '\\':
+                                    v2 += c
+                                    i += 1
+                                else:
+                                    v2 += value[i+1]
+                                    i += 2
+
+                                if i >= len(value):
+                                    break
+                            value = ''.join(v2)
+
+                    if parameters[par_idx].type == 'character':
+                        # Convert octal value
+                        if value.startswith('\\'):
+                            if len(value) == 4:
+                                for i in range(1,4):
+                                    assert value[i] in OCTAL_NUMBERS, f'Bad octal character num'
+                                value = chr(int(value[1:], 8))
+                            elif len(value) == 2:
+                                #single escaped character
+                                value = value[1:]
+                            elif len(value) == 1:
+                                pass
+                            else:
+                                raise SDDSReadException(f'Unrecognized character {value=}')
+                        else:
+                            raise SDDSReadException(f'Unrecognized character {value=}')
+
                     if TRACE:
                         logger.debug(
-                            f'>>PARS | pos {file.tell()} | {par_idx=} | {parameters_type[par_idx]} | {repr(b_array)} | {value}')
+                            f'>>PARS | p {file.tell()} | {par_idx=} | {parameters_type[par_idx]} '
+                            f'| {repr(b_array)} | {value} | {parameters[par_idx].type}')
                 else:
                     # Primitive types
                     value = np.fromstring(b_array, dtype=parameters_type[par_idx], sep=' ', count=1)[0]
                     if TRACE:
                         logger.debug(
-                            f'>>PARV | pos {file.tell()} | {par_idx=} | {parameters_type[par_idx]} | {repr(b_array)} | {value}')
+                            f'>>PARV | p {file.tell()} | {par_idx=} | {parameters_type[par_idx]} '
+                            f'| {repr(b_array)} | {value} | {parameters[par_idx].type}')
                 parameters[par_idx].data.append(value)
             par_idx += 1
 
