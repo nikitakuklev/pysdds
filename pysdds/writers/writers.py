@@ -1,22 +1,19 @@
 import _io
 import csv
 import io
-import struct
+import logging
 import tempfile
 import time
 from io import BytesIO
-import logging
-import sys
-import shlex
 from pathlib import Path
-from typing import Union, Iterable, List, IO, BinaryIO, Optional, Literal
+from typing import IO, List, Optional, Union
 
-import numpy as np
 import pandas as pd
 
-from ..structures import *
-from ..util.constants import _NUMPY_DTYPES, _NUMPY_DTYPE_LE, _NUMPY_DTYPE_BE, _NUMPY_DTYPE_FINAL, \
-    _STRUCT_STRINGS_LE, _STRUCT_STRINGS_BE, _NUMPY_DTYPE_SIZES
+from pysdds.structures import *
+from pysdds.util.constants import _NUMPY_DTYPE_BE, _NUMPY_DTYPE_LE, _NUMPY_DTYPE_SIZES, \
+    _STRUCT_STRINGS_BE, _STRUCT_STRINGS_LE
+from pysdds.util.errors import SDDSWriteException
 
 # The proper way to implement conditional logging is to check current level,
 # but this creates too much overhead in hot loops. So, old school global vars it is.
@@ -74,7 +71,7 @@ def write(sdds: SDDSFile,
         raise NotImplementedError("lines_per_row != 1 is not yet supported")
 
     if sdds.data.no_row_counts != 0:
-        raise NotImplementedError("no_row_counts != 0 is not yet supported")
+        assert mode == 'ascii', SDDSWriteException(f'Row count does not apply to binary files')
 
     logger.debug(f'Writing file to "%s"', str(filepath))
     #logger.info(f'Mode (%s), compression (%s), endianness (%s)', mode, compression, endianness)
@@ -321,7 +318,8 @@ def _dump_data_ascii(sdds: SDDSFile, file: IO[bytes]):
 
             if len(sdds.columns) > 0:
                 page_size = len(sdds.columns[0].data[page_idx])
-                append(str(page_size))
+                if sdds.data.no_row_counts != 0:
+                    append(str(page_size))
                 for i in range(page_size):
                     sl = []
                     for j, c in enumerate(sdds.columns):

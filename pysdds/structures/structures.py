@@ -10,6 +10,7 @@ import pandas as pd
 
 from ..util import constants
 from pysdds.util.constants import _NUMPY_DTYPES, _PYTHON_TYPE_NO_NUMPY
+
 logger = logging.getLogger(__name__)
 
 
@@ -48,7 +49,7 @@ def _compare_arrays(one, two, eps=None) -> bool:
 
 def _find_different_indices(one, two):
     idxs = []
-    for i,(x,y) in enumerate(zip(one, two)):
+    for i, (x, y) in enumerate(zip(one, two)):
         if x != y:
             idxs.append(i)
     return idxs
@@ -175,7 +176,8 @@ class Parameter:
         return f'&parameter {_namelist_to_str(self.nm)},  &end'
 
     def compare(self, other, eps: Optional[float] = None, raise_error: bool = False,
-                fixed_equivalent: bool = True) -> bool:
+                fixed_equivalent: bool = True
+                ) -> bool:
         """ Compare to another object based solely on data and not layout """
         fail_str = f'Parameter {self.name} mismatch: '
 
@@ -276,7 +278,7 @@ class Parameter:
     def data(self, value):
         if self.fixed_value is not None:
             raise ValueError(
-                f'Attempted to set data for parameter ({self.name}), but it already has fixed value ({self.fixed_value})')
+                    f'Attempted to set data for parameter ({self.name}), but it already has fixed value ({self.fixed_value})')
         else:
             assert isinstance(value, list)
             self._data = value
@@ -332,7 +334,8 @@ class Array:
     def to_sdds(self):
         return f'&array {_namelist_to_str(self.nm)},  &end'
 
-    def compare(self, other: "Array", eps: Optional[float] = None, raise_error: bool = False) -> bool:
+    def compare(self, other: "Array", eps: Optional[float] = None, raise_error: bool = False
+                ) -> bool:
         fail_str = f'Array {self.name} mismatch: '
 
         def err(stage, *args):
@@ -436,7 +439,8 @@ class Column:
             return self.data[key]
         elif isinstance(key, tuple):
             assert len(key) == 2, f'Tuple {key} index length != 2'
-            assert all(isinstance(k, int) for k in key), f'Not all indices in tuple {key} are integers'
+            assert all(
+                    isinstance(k, int) for k in key), f'Not all indices in tuple {key} are integers'
             page_data = self.data[key[0]]
             if key[1] >= len(page_data) or key[1] < 0:
                 raise KeyError(f'Index {key} invalid - page {key[0]} length is {len(page_data)}')
@@ -447,13 +451,14 @@ class Column:
     def to_sdds(self):
         return f'&column {_namelist_to_str(self.nm)},  &end'
 
-    def compare(self, other: "Column", eps: Optional[float] = None, raise_error: bool = False) -> bool:
+    def compare(self, other: "Column", eps: Optional[float] = None, raise_error: bool = False
+                ) -> bool:
         """ Compare to another Column, optionally with tolerance and other options """
         fail_str = f'Column {self.name} mismatch: '
 
         def err(stage, *args):
             if raise_error:
-                raise Exception(fail_str + stage + ' ' + '|'.join([str(a) for a in args]))
+                raise Exception(f"{fail_str} {stage=} {'|'.join([str(a) for a in args])}")
 
         if type(self) != type(other):
             err('type')
@@ -477,9 +482,12 @@ class Column:
             if eps is not None:
                 if not _compare_arrays(self.data[i], other.data[i], eps):
                     different_idxs = _find_different_indices(self.data[i], other.data[i])
-                    logger.error(f'Comparison at page {i} had diffences at indices {different_idxs}')
-                    logger.error(f'Value tuples: {[(self.data[i][j], other.data[i][j]) for j in different_idxs]}')
-                    err('values eps', i, self.data[i].dtype, other.data[i].dtype, self.data[i], other.data[i])
+                    logger.error(
+                        f'Comparison at page {i} had diffences at indices {different_idxs}')
+                    logger.error(
+                        f'Value tuples: {[(self.data[i][j], other.data[i][j]) for j in different_idxs]}')
+                    err('values eps', i, self.data[i].dtype, other.data[i].dtype, self.data[i],
+                        other.data[i])
                     return False
             else:
                 if not _compare_arrays(self.data[i], other.data[i]):
@@ -586,6 +594,7 @@ class Data:
         the occurence of an empty line. A comment line does not qualify as an empty line in this sense. """
         return self.nm.get('no_row_counts', 0)
 
+
 class Associate:
     """
     &associate
@@ -641,6 +650,7 @@ class Associate:
     def sdds(self):
         return self.nm.get('sdds', 0)
 
+
 class SDDSFile:
     """
     A Python storage class representing a self-describing data set (SDDS) file
@@ -680,7 +690,8 @@ class SDDSFile:
             page = keys[0]
             column = keys[1]
             if not isinstance(page, int):
-                raise ValueError(f'First index is expected to be an integer corresponding to page number')
+                raise ValueError(
+                    f'First index is expected to be an integer corresponding to page number')
 
             if not 0 <= page <= self.n_pages - 1:
                 raise KeyError(f'Page {page} is not within acceptable bounds (0 - {self.n_pages})')
@@ -731,7 +742,8 @@ class SDDSFile:
                 eps: Optional[float] = None,
                 ignore_data_mode: bool = True,
                 fixed_value_equivalent: bool = False,
-                raise_error: bool = False) -> bool:
+                raise_error: bool = False
+                ) -> bool:
         """
         Compares this SDDS file with another, allowing small discrepancies.
 
@@ -887,7 +899,8 @@ class SDDSFile:
     def from_df(df_list: List[pd.DataFrame],
                 parameter_dict: Optional[Dict[str, list]] = None,
                 mode: Literal["binary", "ascii"] = 'binary',
-                endianness: Literal["big", "little"] = None) -> "SDDSFile":
+                endianness: Literal["big", "little"] = None
+                ) -> "SDDSFile":
 
         """
         Create SDDS object from lists of dataframes
@@ -927,7 +940,7 @@ class SDDSFile:
             else:
                 val = df.iloc[:, i].values
             sdds_type = constants._NUMPY_DTYPES_INV[df.dtypes[i]]
-            #print(df.dtypes[i], sdds_type)
+            # print(df.dtypes[i], sdds_type)
             namelist = {'name': c, 'type': sdds_type}
             col = Column(namelist, sdds)
             sdds.columns.append(col)
@@ -1049,7 +1062,8 @@ class SDDSFile:
             assert isinstance(data, list)
             for v in data:
                 if type(v) != _PYTHON_TYPE_FINAL[el.type]:
-                    raise Exception(f'Parameter type {type(v)} ({v}) does not match {_PYTHON_TYPE_FINAL[el.type]}')
+                    raise Exception(
+                        f'Parameter type {type(v)} ({v}) does not match {_PYTHON_TYPE_FINAL[el.type]}')
 
         for el in self.arrays:
             data = el.data
@@ -1065,7 +1079,7 @@ class SDDSFile:
                 expected_dtype = _NUMPY_DTYPE_FINAL[el.type]
                 if not v.dtype == _NUMPY_DTYPE_FINAL[el.type]:
                     if (np.issubdtype(v.dtype, np.integer) and
-                        np.issubdtype(_NUMPY_DTYPE_FINAL[el.type], np.integer)):
+                            np.issubdtype(_NUMPY_DTYPE_FINAL[el.type], np.integer)):
                         # If both integer-like, probably ok since converts up to max values
                         pass
                     else:
