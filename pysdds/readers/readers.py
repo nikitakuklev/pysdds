@@ -765,7 +765,8 @@ def _read_header_v2(file: IO[bytes], sdds: SDDSFile, mode: str, endianness: str)
     if sdds_version > 5 or sdds_version < 1:
         raise ValueError(f'This package only supports SDDS version 5 or lower, file is version {sdds_version}')
 
-    logger.debug(f'File version: {version_line}')
+    if DEBUG2:
+        logger.debug(f'File version: {version_line}')
 
     namelists = []
 
