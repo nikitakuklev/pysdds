@@ -1,4 +1,4 @@
-name: pysdds tests
+name: pysdds tests fast
 
 on:
   push:
@@ -10,7 +10,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        python-version: ["3.9", "3.10"]
+        python-version: ["3.9"]
         os : [ubuntu-latest]
         
     runs-on: ${{ matrix.os }}
@@ -31,4 +31,4 @@ jobs:
                 
     - name: Run pytest
       run: |
-        pytest tests
+        pytest -v -rxs
