@@ -1,24 +1,25 @@
-import io, os
+import io
 
 import pytest
 import pysdds
-import glob
 from pathlib import Path
 import itertools
 import pandas as pd
 import numpy as np
 
-root_sources = 'files/sources/'
-root_binary_rowmajor = 'files/binary_rowmajor/'
-root_binary_colmajor = 'files/binary_colmajor/'
-root_ascii = 'files/ascii/'
+cwd = Path(__file__).parent
+root_sources = cwd / 'files'
+root_binary_rowmajor = root_sources / 'sources_binary_rowmajor'
+root_binary_colmajor = root_sources / 'sources_binary_colmajor'
+root_ascii = root_sources / 'ascii'
 
-files_sources = glob.glob(root_sources + '*')
-files_ascii = glob.glob(root_ascii + '*')
-files_binary_colmajor = glob.glob(root_binary_colmajor + '*')
-files_binary_rowmajor = glob.glob(root_binary_rowmajor + '*')
-files_compressed = glob.glob('files/sources_compressed/*')
-files_large = glob.glob('files/sources_large/*')
+to_str = lambda l: [str(s) for s in l]
+files_sources = to_str((root_sources / 'sources').glob('*'))
+files_ascii = to_str((root_sources / 'sources_ascii').glob('*'))
+files_binary_colmajor = to_str((root_sources / 'sources_binary_colmajor').glob('*'))
+files_binary_rowmajor = to_str((root_sources / 'sources_binary_rowmajor').glob('*'))
+files_compressed = to_str((root_sources / 'sources_compressed').glob('*'))
+files_large = to_str((root_sources / 'sources_large').glob('*'))
 
 all_files = files_sources + files_ascii + files_binary_colmajor + files_binary_rowmajor + files_large
 
@@ -31,12 +32,12 @@ set_ascii_rowmajor = set(get_names(files_ascii))
 set_binary_rowmajor = set(get_names(files_binary_rowmajor))
 set_binary_colmajor = set(get_names(files_binary_colmajor))
 
-set_union = set_sources.intersection(set_ascii_rowmajor).intersection(set_binary_rowmajor).intersection(
-    set_binary_colmajor)
+set_union = set_sources.intersection(set_ascii_rowmajor, set_binary_rowmajor, set_binary_colmajor)
 sets_list = []
 for f in set_sources:
     if f in set_union:
-        sets_list.append([root_sources + f, root_binary_colmajor + f, root_binary_rowmajor + f, root_ascii + f])
+        sets_list.append([str(root_sources) + f, str(root_binary_colmajor) + f,
+                          str(root_binary_rowmajor) + f, str(root_ascii) + f])
     else:
         continue
 

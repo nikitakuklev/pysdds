@@ -4,7 +4,9 @@ import glob
 from pathlib import Path
 import itertools
 
-root_sources = Path('files')
+cwd = Path(__file__).parent
+root_sources = cwd / 'files'
+print(f'Executing readers in {cwd=} {root_sources=}')
 subroots = ['sources', 'sources_binary_rowmajor', 'sources_binary_colmajor', 'sources_ascii']
 folders = {sub: root_sources / sub for sub in subroots}
 files = {sub: list(d.glob('*')) for sub, d in folders.items()}
@@ -15,14 +17,15 @@ files_sources = to_str((root_sources / 'sources').glob('*'))
 files_ascii = to_str((root_sources / 'sources_ascii').glob('*'))
 files_binary_colmajor = to_str((root_sources / 'sources_binary_colmajor').glob('*'))
 files_binary_rowmajor = to_str((root_sources / 'sources_binary_rowmajor').glob('*'))
-files_compressed = glob.glob('files/sources_compressed/*')
-files_large = glob.glob('files/sources_large/*')
+files_compressed = to_str((root_sources / 'sources_compressed').glob('*'))
+files_large = to_str((root_sources / 'sources_large').glob('*'))
 
 all_files_sources = files_sources + files_ascii + files_binary_colmajor + files_binary_rowmajor
-all_files_sources_large = list(glob.glob('files/sources_large*/*'))
-all_files_compressed = list(glob.glob('files/sources_compressed*/*'))
+all_files_sources_large = to_str(root_sources.glob('sources_large*/*'))
+all_files_compressed = to_str(root_sources.glob('sources_compressed*/*'))
 
-all_files = files_sources + files_ascii + files_binary_colmajor + files_binary_rowmajor + all_files_sources_large + all_files_compressed
+all_files = (files_sources + files_ascii + files_binary_colmajor + files_binary_rowmajor +
+             all_files_sources_large + all_files_compressed)
 
 get_names = lambda xa: [Path(x).name for x in xa]
 get_name = lambda x: Path(x).name
@@ -97,7 +100,10 @@ def test_read_large(file_root):
     sdds.validate_data()
 
 
-@pytest.mark.parametrize("file_root", ['files/sources/timeSeries.sdds'])
+file_ts = [str(Path(__file__).parent / 'files/sources/timeSeries.sdds')]
+
+
+@pytest.mark.parametrize("file_root", file_ts)
 def test_page_mask(file_root):
     sdds = pysdds.read(file_root)
     assert sdds.n_pages == 157
