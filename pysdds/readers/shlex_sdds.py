@@ -7,7 +7,7 @@ import os
 import re
 import sys
 from collections import deque
-
+import warnings
 from io import StringIO
 
 __all__ = ["shlex_sdds", "split_sdds", "quote", "join"]
@@ -332,7 +332,6 @@ class shlex_sdds:
 def split_sdds(s, comments=False, posix=True):
     """Split the string *s* using shell-like syntax."""
     if s is None:
-        import warnings
         warnings.warn("Passing None for 's' to shlex.split() is deprecated.",
                       DeprecationWarning, stacklevel=2)
     lex = shlex_sdds(s, posix=posix)

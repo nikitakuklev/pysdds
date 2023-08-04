@@ -1,4 +1,4 @@
-class SDDSReadException(Exception):
+class SDDSReadError(Exception):
     pass
 
 
