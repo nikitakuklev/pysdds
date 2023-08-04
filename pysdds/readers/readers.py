@@ -2142,9 +2142,11 @@ def _read_pages_ascii_numeric_lines(file: IO[bytes],
                             c._page_numbers.append(page_idx)
                             col_idx_active += 1
             elif _ASCII_NUMERIC_PARSE_METHOD == 'read_table' and page_size is None:
+                # no_row_count mode
                 # TODO: exponential growth buffer
                 pd_column_dict = {i: columns_type[i] for i in range(len(columns_type))}
                 cnt = 0
+                line_cnt = 0
                 def gen():
                     nonlocal cnt
                     l = __get_next_line(file, accept_meta_commands=False, strip=False,
@@ -2153,11 +2155,24 @@ def _read_pages_ascii_numeric_lines(file: IO[bytes],
                         return
                     cnt += len(l)
                     yield l
+                    nonlocal cnt, line_cnt
+                    while True:
+                        l = __get_next_line(file, accept_meta_commands=False, strip=False,
+                                            replace_tabs=True)
+                        if l == '\n' or l is None:
+                            return
+                        l.strip()
+                        cnt += len(l)
+                        line_cnt += 1
+                        yield l
                 buf = io.StringIO('\n'.join((l for l in gen())))
                 logger.debug(f'>>C {file.tell()} | Feeding buffer of len {cnt} to parse_table')
+                logger.debug(f'>>C {file.tell()} | Feeding buffer {cnt=} {line_cnt=} to '
+                             f'parse_table')
                 opts = dict(delim_whitespace=True, comment='!',
                             header=None, escapechar='\\',
                             nrows=page_size, skip_blank_lines=True,
+                            nrows=line_cnt, skip_blank_lines=True,
                             skipinitialspace=True,
                             doublequote=False,
                             dtype=pd_column_dict,
