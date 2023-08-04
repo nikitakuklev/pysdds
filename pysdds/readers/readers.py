@@ -4,9 +4,10 @@ import sys
 import logging
 import time
 import warnings
+from collections import deque
 
 from .tokenizers import tokenize_namelist
-from ..util.errors import SDDSReadException
+from ..util.errors import SDDSReadError
 from .shlex_sdds import shlex_sdds, split_sdds
 from pathlib import Path
 from typing import Union, Iterable, List, IO, Optional
@@ -24,7 +25,8 @@ from pysdds.util.constants import _NUMPY_DTYPES, _NUMPY_DTYPE_LE, _NUMPY_DTYPE_B
 logger = logging.getLogger(__name__)
 DEBUG2 = False  # one more level from debug
 TRACE = False  # two more levels from debug
-
+if TRACE:
+    DEBUG2 = True
 # Expected keys for various SDDS namelists
 _KEYS_DESCRIPTION = {'text', 'contents'}
 _KEYS_PARAMETER = {'name', 'symbol', 'units', 'description', 'format_string', 'type', 'fixed_value'}
@@ -103,7 +105,8 @@ def _open_file(filepath: Path, compression: str, use_magic_values: bool = False,
                 compression = extension
             else:
                 compression = None
-            logger.debug(f'Auto compression resolved as ({compression}) from file extension')
+            if compression is not None:
+                logger.debug(f'Auto compression resolved as ({compression}) from file extension')
 
     # By default, Python reads in small blocks of io.DEFAULT_BUFFER_SIZE = 8192
     # To encourage large reads and fully consuming small files, a large buffer is specified
@@ -410,7 +413,8 @@ def read(filepath: Union[Path, str, IO[bytes]],
                 logger.debug('no_row_counts mode support is experimental, be careful')
 
             if is_columns_numeric:
-                logger.debug(f'Calling ASCII numeric column parser')
+                logger.debug(f'Calling ASCII numeric column parser with '
+                             f'{_ASCII_NUMERIC_PARSE_METHOD=}')
                 _read_pages_ascii_numeric_lines(file, sdds, arrays_mask=array_mask, columns_mask=column_mask,
                                                 pages_mask=pages_mask)
             else:
@@ -443,6 +447,7 @@ def read(filepath: Union[Path, str, IO[bytes]],
     return sdds
 
 
+pushback_line_buf = deque()
 def __get_next_line(stream: IO[bytes],
                     accept_meta_commands: bool = True,
                     cut_midline_comments: bool = True,
@@ -450,14 +455,19 @@ def __get_next_line(stream: IO[bytes],
                     strip: bool = False,
                     replace_tabs: bool = False) -> Optional[str]:
     """ Find next line that has valid SDDS data """
+
+    def detab(s):
+        return s.replace('\t', ' ') if replace_tabs else s
+
+    line = None
     while True:
-        line = stream.readline().decode('ascii')
+        if len(pushback_line_buf) > 0:
+            line = pushback_line_buf.pop()
+        if line is None:
+            line = stream.readline().decode('ascii')
         if len(line) == 0:
             # EOF
             return None
-
-        def detab(s):
-            return s.replace('\t',' ') if replace_tabs else s
 
         if '!' in line:
             # Even though both 'in' and 'find' operations are aliased to C code, using 'in' as initial check is
@@ -475,6 +485,7 @@ def __get_next_line(stream: IO[bytes],
                     # Regular comment
                     if TRACE:
                         logger.debug(f'>>NXL | pos {stream.tell()} | SKIP FULL {repr(line)}')
+                    line = None
                     continue
             else:
                 if cut_midline_comments:
@@ -548,7 +559,7 @@ def _read_header_fullstream(file: IO[bytes], sdds: SDDSFile, mode: str, endianne
                                        cut_midline_comments=False)  # stream.readline().decode('ascii')
                 logger.debug(f'Adding line {line} to multi-line namelist')
                 if line is None:
-                    raise SDDSReadException('Unexpected EOF during header parsing')
+                    raise SDDSReadError('Unexpected EOF during header parsing')
                 buffer += line
             buffer2 = buffer.strip()
         return buffer2
@@ -782,7 +793,7 @@ def _read_header_v2(file: IO[bytes], sdds: SDDSFile, mode: str, endianness: str)
                                        cut_midline_comments=False)  # stream.readline().decode('ascii')
                 logger.debug(f'Adding line {line} to multi-line namelist')
                 if line is None:
-                    raise SDDSReadException('Unexpected EOF during header parsing')
+                    raise SDDSReadError('Unexpected EOF during header parsing')
                 buffer += line
             buffer2 = buffer.strip()
         return buffer2
@@ -821,7 +832,7 @@ def _read_header_v2(file: IO[bytes], sdds: SDDSFile, mode: str, endianness: str)
         try:
             tags, keys, values = tokenize_namelist(line)
         except Exception as ex:
-            raise SDDSReadException(f'Failed to parse namelist from "{line}" ({ex=})')
+            raise SDDSReadError(f'Failed to parse namelist from "{line}" ({ex=})')
 
         assert len(tags) == 2
         assert tags[1] == '&end'
@@ -988,9 +999,10 @@ def _read_pages_binary(file: IO[bytes],
         arrays_store_type.append(_NUMPY_DTYPE_FINAL[t])
         arrays_size.append(_NUMPY_DTYPE_SIZES[t])
     n_arrays = len(arrays_type)
-    logger.debug(f'Arrays to parse: {len(arrays_type)}')
-    logger.debug(f'Array types: {arrays_type}')
-    logger.debug(f'Array lengths: {arrays_size}')
+    if n_arrays > 0:
+        logger.debug(f'Arrays to parse: {len(arrays_type)}')
+        logger.debug(f'Array types: {arrays_type}')
+        logger.debug(f'Array lengths: {arrays_size}')
 
     # Columns follow arrays
     columns_type = []
@@ -1014,10 +1026,11 @@ def _read_pages_binary(file: IO[bytes],
         for v in columns_type_struct[1:]:
             combined_struct += v[1]
         combined_size = sum(columns_len)
-    logger.debug(f'Columns to parse: {n_columns}')
-    logger.debug(f'Column types: {columns_type}')
-    logger.debug(f'Column lengths: {columns_len}')
-    logger.debug(f'All numeric: {columns_all_numeric}')
+    if n_columns > 0:
+        logger.debug(f'Columns to parse: {n_columns}')
+        logger.debug(f'Column types: {columns_type}')
+        logger.debug(f'Column lengths: {columns_len}')
+        logger.debug(f'All numeric: {columns_all_numeric}')
 
     if sdds.data.column_major_order != 0:
         pass
@@ -1154,11 +1167,9 @@ def _read_pages_binary(file: IO[bytes],
         # Column reading loop
         fixed_rowcount_eof = False
         if n_columns == 0:
-            page_idx += 1
             page_stored_idx += 1
-            break
-
-        if sdds.data.column_major_order != 0:
+            pass
+        elif sdds.data.column_major_order != 0:
             # Column major order
             for i in range(n_columns):
                 type_len = columns_len[i]
@@ -1522,9 +1533,9 @@ def _read_pages_ascii_mixed_lines(file: IO[bytes],
                             elif len(value) == 1:
                                 pass
                             else:
-                                raise SDDSReadException(f'Unrecognized character {value=}')
+                                raise SDDSReadError(f'Unrecognized character {value=}')
                         else:
-                            raise SDDSReadException(f'Unrecognized character {value=}')
+                            raise SDDSReadError(f'Unrecognized character {value=}')
 
                     if TRACE:
                         logger.debug(
@@ -1712,8 +1723,6 @@ def _read_pages_ascii_mixed_lines(file: IO[bytes],
                 page_stored_idx += 1
             page_idx += 1
         elif _ASCII_TEXT_PARSE_METHOD == 'shlex' and page_size is None:
-            #if page_idx > 0:
-            #    logger.warning(f'no_row_counts mode with multiple pages is NOT TESTED')
             # no_row_counts parsing
             columns_list_data = []
             if not page_skip:
@@ -1723,7 +1732,7 @@ def _read_pages_ascii_mixed_lines(file: IO[bytes],
             row_cnt = 0
             while True:
                 line = __get_next_line(file, accept_meta_commands=False, strip=False,
-                                       cut_midline_comments = False)
+                                       cut_midline_comments=False)
                 #if line == '\n':
                     # empty lines at the end of file?
                 #    continue
@@ -1735,7 +1744,7 @@ def _read_pages_ascii_mixed_lines(file: IO[bytes],
                     if line_len == 0:
                         raise ValueError(f'Unexpected empty string at position {file.tell()}')
                     if row_cnt > 1e7:
-                        raise ValueError(f'Read more than {row_cnt} rows - something is wrong')
+                        raise SDDSReadError(f'Read more than {row_cnt} rows - something is wrong')
                     col_idx_active = 0
                     col_idx = 0
                     values = split_sdds(line.strip(), posix=True)
@@ -1931,6 +1940,15 @@ def _read_pages_ascii_numeric_lines(file: IO[bytes],
 
     page_idx = 0
     page_stored_idx = 0
+
+    b_array = __get_next_line(file)
+    if b_array is None:
+        # Empty file
+        sdds.n_pages = 0
+        return
+    else:
+        pushback_line_buf.appendleft(b_array)
+
     # Flag for eof since can't break out of two loops
     while True:
         if pages_mask is not None:
@@ -1955,7 +1973,7 @@ def _read_pages_ascii_numeric_lines(file: IO[bytes],
         if n_params_unfixed > 0:
             # TODO: mixed fixed/unfixed parameters
             while par_idx < len(parameter_types):
-                b_array = __get_next_line(file)
+                b_array = __get_next_line(file, accept_meta_commands=False)
                 if b_array is None:
                     raise Exception(f'>>PARS | pos {file.tell()} | unexpected EOF at page {page_idx}')
                 par_line_num += 1
@@ -1991,7 +2009,7 @@ def _read_pages_ascii_numeric_lines(file: IO[bytes],
             mapped_t = arrays_type[array_idx]
 
             # Array dimensions
-            b_array = __get_next_line(file)
+            b_array = __get_next_line(file, accept_meta_commands=False)
             if b_array is None:
                 raise Exception(f'>>ARRS | pos {file.tell()} | unexpected EOF at page {page_idx}')
 
@@ -2076,7 +2094,7 @@ def _read_pages_ascii_numeric_lines(file: IO[bytes],
 
             # line = file.readline().decode('ascii')
             # list instead of generator to hopefully preallocate space
-            if _ASCII_NUMERIC_PARSE_METHOD == 'loadtxt'  and page_size is not None:
+            if _ASCII_NUMERIC_PARSE_METHOD == 'loadtxt' and page_size is not None:
                 gen = (__get_next_line(file, accept_meta_commands=False, strip=True,
                                        replace_tabs=True) for _ in range(page_size))
                 if not page_skip:
@@ -2148,13 +2166,6 @@ def _read_pages_ascii_numeric_lines(file: IO[bytes],
                 cnt = 0
                 line_cnt = 0
                 def gen():
-                    nonlocal cnt
-                    l = __get_next_line(file, accept_meta_commands=False, strip=False,
-                                        replace_tabs=True)
-                    if l == '\n' or l is None:
-                        return
-                    cnt += len(l)
-                    yield l
                     nonlocal cnt, line_cnt
                     while True:
                         l = __get_next_line(file, accept_meta_commands=False, strip=False,
@@ -2166,12 +2177,10 @@ def _read_pages_ascii_numeric_lines(file: IO[bytes],
                         line_cnt += 1
                         yield l
                 buf = io.StringIO('\n'.join((l for l in gen())))
-                logger.debug(f'>>C {file.tell()} | Feeding buffer of len {cnt} to parse_table')
                 logger.debug(f'>>C {file.tell()} | Feeding buffer {cnt=} {line_cnt=} to '
                              f'parse_table')
                 opts = dict(delim_whitespace=True, comment='!',
                             header=None, escapechar='\\',
-                            nrows=page_size, skip_blank_lines=True,
                             nrows=line_cnt, skip_blank_lines=True,
                             skipinitialspace=True,
                             doublequote=False,
