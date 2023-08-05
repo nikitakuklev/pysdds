@@ -55,10 +55,12 @@ def _find_different_indices(one, two):
     return idxs
 
 
-def _namelist_to_str(nm_dict):
+def _namelist_to_str(nm_dict, omit_defaults=None):
     kv_strings = []
     for k, v in nm_dict.items():
-        if isinstance(v, str) and (' ' in v or '"' in v or "," in v or "$" in v):
+        if omit_defaults is not None and k in omit_defaults and omit_defaults[k] == v:
+            continue
+        if isinstance(v, str) and (' ' in v or '"' in v or "," in v or "$" in v or "!" in v):
             kv_strings.append(f'{k}="{v}"')
         else:
             kv_strings.append(f'{k}={v}')
