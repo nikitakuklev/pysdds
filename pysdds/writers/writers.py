@@ -1,4 +1,5 @@
 import _io
+import copy
 import csv
 import io
 import logging
@@ -32,7 +33,8 @@ def write(sdds: SDDSFile,
           filepath: Union[Path, str, BytesIO],
           #          endianness: Optional[str] = 'auto',
           compression: Optional[str] = None,
-          overwrite: Optional[bool] = False):
+          overwrite: Optional[bool] = False,
+          use_best_settings: bool = False):
     """
     Parameters
     ----------
@@ -45,7 +47,11 @@ def write(sdds: SDDSFile,
     compression : str
         Compression to use when writing file. One of None, 'auto', 'xz', 'gz', 'bz2'. Defaults to None.
     overwrite : bool
-        If true, existing file at filepath will be overwritten
+        If true, existing file at filepath will be overwritten if exists.
+    use_best_settings : bool
+        If true, override SDDS object settings like no_row_counts/row_major/etc. to
+        optimize performance. ASCII/binary preference will be respected. It is recommended to
+        keep this enabled.
     """
     assert isinstance(sdds, SDDSFile), "Data structure is not an SDDSFile!"
 
@@ -82,6 +88,14 @@ def write(sdds: SDDSFile,
     else:
         # IO is already a stream
         file = _open_write_stream(filepath, compression=compression)
+
+    if use_best_settings:
+        sdds = copy.copy(sdds)
+        sdds.data = copy.deepcopy(sdds.data)
+        sdds.data.no_row_counts = 0
+        sdds.data.lines_per_row = 1
+        sdds.data.column_major_order = 1
+        sdds.data.__use_best_settings = True
 
     _dump_header(sdds, file)
     #logger.info(f'Header write OK')
@@ -208,7 +222,7 @@ def _dump_header(sdds: SDDSFile, file: IO[bytes], ignore_fixed_rowcount: bool = 
     # return final_string
 
 
-def _dump_data_ascii(sdds: SDDSFile, file: IO[bytes]):
+def _dump_data_ascii(sdds: SDDSFile, file: IO[bytes], best_settings):
     def append(s):
         file.write((s + NEWLINE_CHAR).encode('ascii'))
 
