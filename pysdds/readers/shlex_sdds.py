@@ -232,6 +232,10 @@ class shlex_sdds:
                 elif nextchar in self.octal_numbers:
                     escaped_octal_mode = True
                     octal_buffer += nextchar
+                elif nextchar == '!':
+                    # sdds escape
+                    token += nextchar
+                    state = escapedstate
                 elif (escapedstate in self.quotes and nextchar != state and nextchar != escapedstate):
                     # In posix shells, only the quote itself or the escape
                     # character may be escaped within quotes.
