@@ -100,6 +100,7 @@ def test_round_trip_sources_ascii(file_root):
     # sdds2.compare(sdds3)
     # os.remove(os.path.abspath(file_root+'_writeback'))
 
+
 @pytest.mark.parametrize("file_root", files_sources)
 def test_round_trip_sources_bincol_le(file_root):
     sdds = pysdds.read(file_root)
@@ -130,14 +131,56 @@ def test_round_trip_sources_bincol_be(file_root):
 
 
 def test_write_from_df():
-    meas_df = {'ControlName': ['foo-_~|aaaa', 'bar\n\r\005'], 'LowerLimit': [-2, -2], 'UpperLimit': [-2.0, -2.0]}
+    meas_df = {'ControlName': ['foo-_~|aaaa', 'bar\n\r\005'],
+               'LowerLimit': [-2, -2],
+               'UpperLimit': [-2.0, -2.0],
+               'UnsignedVal': [+3, +4],
+               'Description': ['foo-_~|aaaa', 'bar\n\r\005'],
+
+               }
     df_meas = pd.DataFrame.from_dict(meas_df)
+    df_meas['ReallyUnsigned'] = np.array([4, 4], dtype=np.uint64)
     parameters = {'par1': [1], 'par2': [1.0], 'par3': ['foo']}
+
     sdds = pysdds.SDDSFile.from_df([df_meas], parameter_dict=parameters, mode='ascii')
-    sdds.validate_data()
-    buf = io.BytesIO()
-    pysdds.write(sdds, buf)
+    assert sdds.n_pages == 1
+    assert sdds.n_columns == 5
+    assert sdds.n_parameters == 3
+    assert sdds.columns[0].type == 'string'
+    assert sdds.columns[1].type == 'long64'
+    assert sdds.columns[2].type == 'double'
+    assert sdds.columns[3].type == 'long64'
+    assert sdds.columns[4].type == 'ulong64'
+    assert sdds.columns[0].data[0].dtype == object
+    assert sdds.columns[1].data[0].dtype == np.int64
+    assert sdds.columns[2].data[0].dtype == np.float64
+    assert sdds.columns[3].data[0].dtype == np.int64
+    assert sdds.columns[4].data[0].dtype == np.uint64
+
+    def run_compare(sdds):
+        sdds.validate_data()
+        buf = io.BytesIO()
+        pysdds.write(sdds, buf)
+        buf.seek(0)
+        sdds2 = pysdds.read(io.BufferedReader(buf))
+        sdds.compare(sdds2)
+        assert np.array_equal(sdds2.columns[0].data[0], df_meas.iloc[:, 0])
+        assert np.array_equal(sdds2.columns[1].data[0], df_meas.iloc[:, 1])
+        assert np.array_equal(sdds2.columns[2].data[0], df_meas.iloc[:, 2])
+        assert np.array_equal(sdds2.columns[3].data[0], df_meas.iloc[:, 3])
+        assert np.array_equal(sdds2.columns[4].data[0], df_meas.iloc[:, 4])
+
+    sdds = pysdds.SDDSFile.from_df([df_meas], parameter_dict=parameters, mode='ascii')
+    run_compare(sdds)
+
+    sdds = pysdds.SDDSFile.from_df([df_meas], mode='ascii')
+    run_compare(sdds)
+
     sdds = pysdds.SDDSFile.from_df([df_meas], parameter_dict=parameters, mode='binary')
-    sdds.validate_data()
-    buf = io.BytesIO()
-    pysdds.write(sdds, buf)
+    run_compare(sdds)
+
+    sdds = pysdds.SDDSFile.from_df([df_meas], mode='binary')
+    run_compare(sdds)
+
+    sdds = pysdds.SDDSFile.from_df([df_meas], mode='binary', endianness='big')
+    run_compare(sdds)

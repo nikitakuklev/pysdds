@@ -23,7 +23,10 @@ def test_read_ascii(file_root):
             assert np.array_equal(a, b)
 
 
-@pytest.mark.parametrize("file_root", ['files/sources/timeSeries.sdds'])
+file_ts = [str(root_sources / 'sources_compressed/timeSeries.sdds.xz')]
+
+
+@pytest.mark.parametrize("file_root", file_ts)
 def test_page_mask(file_root):
     sdds = pysdds.read(file_root)
     assert sdds.n_pages == 157
