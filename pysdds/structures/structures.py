@@ -539,12 +539,16 @@ class Data:
 
     def __init__(self, namelist=None):
         self.nm = namelist or {}
+        self.__use_best_settings = False
 
     def __eq__(self, other):
         return self.compare(other)
 
     def to_sdds(self):
-        return f'&data {_namelist_to_str(self.nm)}, &end'
+        nm = self.nm.copy()
+        if self.mode == 'ascii':
+            nm.pop('endian')
+        return f"&data {_namelist_to_str(nm, omit_defaults={'lines_per_row':1})}, &end"
 
     def compare(self, other, raise_error: bool = False) -> bool:
         fail_str = f'Data mismatch: '
@@ -560,6 +564,11 @@ class Data:
             err('nm')
             return False
         return True
+
+    @property
+    def use_best_settings(self):
+        """ Internal use. If True, SDDS file will be written with optimal data options. """
+        return self.__use_best_settings
 
     @property
     def mode(self):
@@ -938,11 +947,10 @@ class SDDSFile:
 
         for i, c in enumerate(columns):
             if df.dtypes[i] == np.dtype(np.int64):
-                val = df.iloc[:, i].values.astype(np.int32)
+                val = df.iloc[:, i].values#.astype(np.int32)
             else:
                 val = df.iloc[:, i].values
             sdds_type = constants._NUMPY_DTYPES_INV[df.dtypes[i]]
-            # print(df.dtypes[i], sdds_type)
             namelist = {'name': c, 'type': sdds_type}
             col = Column(namelist, sdds)
             sdds.columns.append(col)
