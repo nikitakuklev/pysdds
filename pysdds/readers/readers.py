@@ -379,13 +379,15 @@ def read(filepath: Union[Path, str, IO[bytes]],
         else:
             raise ValueError
 
-        logger.debug('Masks are valid for current header')
-        logger.debug(f'Array mask: {array_mask}')
-        logger.debug(f'Column mask: {column_mask}')
-        logger.debug(f'Page mask: {pages_mask} (actual page count TBD)')
+        if DEBUG2:
+            logger.debug('Masks are valid for current header')
+            logger.debug(f'Array mask: {array_mask}')
+            logger.debug(f'Column mask: {column_mask}')
+            logger.debug(f'Page mask: {pages_mask} (actual page count TBD)')
 
         is_columns_numeric = not any(el.type == 'string' for el in sdds.columns)
-        logger.debug(f'Columns numeric: {is_columns_numeric}')
+        if DEBUG2:
+            logger.debug(f'Columns numeric: {is_columns_numeric}')
 
         # Skip lines if necessary
         if sdds.data.additional_header_lines != 0:
@@ -1102,7 +1104,8 @@ def _read_pages_binary(file: IO[bytes],
             else:
                 # All primitive types
                 byte_array = file.read(type_len)
-                assert len(byte_array) == type_len
+                assert len(byte_array) == type_len, (f'Invalid {len(byte_array)=} for type '
+                                                     f'{parameter_types[i]}')
                 val = np.frombuffer(byte_array, dtype=parameter_types[i], count=1)[0]
 
             if TRACE:
@@ -1453,23 +1456,26 @@ def _read_pages_ascii_mixed_lines(file: IO[bytes],
     parameters = [p for p in all_parameters if p.fixed_value is None]
     parameters_type = [_NUMPY_DTYPES[el.type] for el in parameters]
     n_parameters = len(parameters)
-    logger.debug(f'Parameter types: {parameters_type}')
+    if n_parameters > 0:
+        logger.debug(f'Parameter types: {parameters_type}')
 
     arrays = sdds.arrays
     arrays_type = [_NUMPY_DTYPES[el.type] for el in arrays]
     n_arrays = len(arrays)
-    logger.debug(f'Array types: {arrays_type}')
+    if n_arrays > 0:
+        logger.debug(f'Array types: {arrays_type}')
 
     columns = sdds.columns
+    n_columns = len(columns)
     columns_type = [_NUMPY_DTYPES[el.type] for el in columns]
     columns_store_type = [_NUMPY_DTYPE_FINAL[el.type] for el in columns]
     pd_column_dict = {i: columns_store_type[i] if columns_store_type[i] != object else str for i in
                       range(len(columns_type))}
     assert object in columns_type
     struct_type = None
-
-    logger.debug(f'Column types: {columns_type}')
-    logger.debug(f'struct_type: {struct_type}')
+    if n_columns > 0:
+        logger.debug(f'Column types: {columns_type}')
+        logger.debug(f'struct_type: {struct_type}')
 
     page_idx = 0
     page_stored_idx = 0
@@ -1916,7 +1922,8 @@ def _read_pages_ascii_numeric_lines(file: IO[bytes],
                                     pages_mask: List[bool]) -> None:
     """ Line by line numeric data parser for lines_per_row == 1 """
 
-    parameters = sdds.parameters
+    all_parameters = sdds.parameters
+    parameters = [p for p in all_parameters if p.fixed_value is None]
     n_params_unfixed = sum(p.fixed_value is None for p in sdds.parameters)
     parameter_types = [_NUMPY_DTYPES[el.type] for el in parameters]
     logger.debug(f'Parameter types: {parameter_types}')
