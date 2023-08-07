@@ -77,7 +77,9 @@ def write(sdds: SDDSFile,
         raise NotImplementedError("lines_per_row != 1 is not yet supported")
 
     if sdds.data.no_row_counts != 0:
-        assert mode == 'ascii', SDDSWriteException(f'Row count does not apply to binary files')
+        if mode == 'binary':
+            logger.debug(f'Ignoring {sdds.data.no_row_counts=} in binary mode')
+        #assert mode == 'ascii', SDDSWriteException(f'Row count does not apply to binary files')
 
     logger.debug(f'Writing file to "%s"', str(filepath))
     #logger.info(f'Mode (%s), compression (%s), endianness (%s)', mode, compression, endianness)
@@ -100,12 +102,13 @@ def write(sdds: SDDSFile,
     _dump_header(sdds, file)
     #logger.info(f'Header write OK')
 
-    if mode == 'ascii':
-        _dump_data_ascii(sdds, file)
-    else:
-        _dump_data_binary(sdds, file, endianness)
+    if sdds.n_pages > 0:
+        if mode == 'ascii':
+            _dump_data_ascii(sdds, file, best_settings=use_best_settings)
+        else:
+            _dump_data_binary(sdds, file, endianness)
 
-    #logger.info(f'Finished in {(time.perf_counter() - t_start) * 1e3:.3f} ms')
+    logger.debug(f'Written in {(time.perf_counter() - t_start) * 1e3:.3f} ms')
     # is_columns_numeric = not any(el.type == 'string' for el in sdds.columns)
     # logger.debug(f'Columns numeric: {is_columns_numeric}')
 
@@ -189,8 +192,8 @@ def _dump_header(sdds: SDDSFile, file: IO[bytes], ignore_fixed_rowcount: bool = 
         file.write((s + NEWLINE_CHAR).encode('ascii'))
         # line_buf.append(s)
 
-    # Write version 3 by default to be safe
-    append('SDDS3')
+    # Write version 5 by default to be safe
+    append('SDDS5')
 
     # Write endianness meta-command if ascii
     if sdds.mode == 'binary':
@@ -236,7 +239,7 @@ def _dump_data_ascii(sdds: SDDSFile, file: IO[bytes], best_settings):
                 if ch == ' ':
                     flag = True
                     result += ch
-                elif ch in ('\\', '"'):
+                elif ch in ('\\', '"', '!'):
                     flag = True
                     result += '\\' + ch
                 else:
@@ -251,6 +254,13 @@ def _dump_data_ascii(sdds: SDDSFile, file: IO[bytes], best_settings):
             return '"' + result + '"'
         else:
             return result
+
+    def encode_char_if_needed(s):
+        assert len(s) == 1
+        if 32 <= ord(s) < 127:
+            return s
+        else:
+            return f'\\{ord(s):03o}'
 
     # if _ASCII_TEXT_WRITE_METHOD == 'sequential':
     #     # Quoting needs to be handled carefully....
@@ -309,15 +319,21 @@ def _dump_data_ascii(sdds: SDDSFile, file: IO[bytes], best_settings):
         )
 
         for page_idx in range(sdds.n_pages):
+            if page_idx > 0:
+                append('')
+                
             append(f'! page number {page_idx}')
             for j, p in enumerate(sdds.parameters):
-                v = p.data[page_idx]
-                if p.type == 'string':
-                    append(encode_if_needed(v))
-                elif p.type == 'double':
-                    append(f'{v:.15e}')
-                else:
-                    append(str(v))
+                if p.fixed_value is None:
+                    v = p.data[page_idx]
+                    if p.type == 'string':
+                        append(encode_if_needed(v))
+                    elif p.type == 'double':
+                        append(f'{v:.15e}')
+                    elif p.type == 'character':
+                        append(encode_char_if_needed(v))
+                    else:
+                        append(str(v))
 
             for i, el in enumerate(sdds.arrays):
                 data = el.data[page_idx]
@@ -332,7 +348,7 @@ def _dump_data_ascii(sdds: SDDSFile, file: IO[bytes], best_settings):
 
             if len(sdds.columns) > 0:
                 page_size = len(sdds.columns[0].data[page_idx])
-                if sdds.data.no_row_counts != 0:
+                if sdds.data.no_row_counts == 0:
                     append(str(page_size))
                 for i in range(page_size):
                     sl = []
@@ -427,7 +443,7 @@ def _dump_data_binary(sdds: SDDSFile, file: IO[bytes], endianness):
     p_types = []
     p_lengths: List[Optional[int]] = []
     for p in sdds.parameters:
-        if not p.fixed_value:
+        if p.fixed_value is None:
             parameters.append(p)
             t = p.type
             if t == 'string':
@@ -437,10 +453,11 @@ def _dump_data_binary(sdds: SDDSFile, file: IO[bytes], endianness):
                 p_types.append(NUMPY_DTYPE[t])
                 p_lengths.append(_NUMPY_DTYPE_SIZES[t])
 
+    n_parameters = len(parameters)
     logger.debug(f'Parameters: {len(parameters)} of {len(sdds.parameters)}')
     logger.debug(f'Parameter types: {p_types}')
     logger.debug(f'Parameter lengths: {p_lengths}')
-    n_parameters = len(parameters)
+
 
     arrays = sdds.arrays
     arrays_type = []
@@ -454,16 +471,34 @@ def _dump_data_binary(sdds: SDDSFile, file: IO[bytes], endianness):
         arrays_type.append(mapped_t)
         arrays_size.append(_NUMPY_DTYPE_SIZES[t])
     n_arrays = len(arrays_type)
-    logger.debug(f'Arrays to parse: {len(arrays_type)}')
-    logger.debug(f'Array types: {arrays_type}')
-    logger.debug(f'Array lengths: {arrays_size}')
+    if n_arrays > 0:
+        logger.debug(f'Arrays to parse: {len(arrays_type)}')
+        logger.debug(f'Array types: {arrays_type}')
+        logger.debug(f'Array lengths: {arrays_size}')
+
+    columns = sdds.columns
+    n_columns = len(columns)
+    column_types = []
+    column_lengths = []
+    for i, c in enumerate(columns):
+        t = c.type
+        if t == 'string':
+            column_types.append(None)
+            column_lengths.append(None)
+        else:
+            column_types.append(NUMPY_DTYPE[t])
+            column_lengths.append(_NUMPY_DTYPE_SIZES[t])
+    if n_columns > 0:
+        logger.debug(f'Columns: {n_columns}')
+        logger.debug(f'C types: {column_types}')
+        logger.debug(f'C lengths: {column_lengths}')
 
     for page_idx in range(sdds.n_pages):
         page_size = 0
         if len(sdds.columns) > 0:
             page_size = len(sdds.columns[0].data[page_idx])
-            page_bytes = page_size.to_bytes(4, endianness)
-            file.write(page_bytes)
+        page_bytes = page_size.to_bytes(4, endianness)
+        file.write(page_bytes)
 
         for i, el in enumerate(parameters):
             type_len = p_lengths[i]
@@ -488,14 +523,15 @@ def _dump_data_binary(sdds: SDDSFile, file: IO[bytes], endianness):
                 file.write(el.data[page_idx].view(NUMPY_DTYPE[t]))
 
         page_data = []
-        for el in sdds.columns:
+        for i, el in enumerate(sdds.columns):
             t = el.type
             if t == 'string':
                 page_data.append(el.data[page_idx])
             elif t == 'character':
-                page_data.append(el.data[page_idx].astype('S1').view(NUMPY_DTYPE['character']))
+                page_data.append(el.data[page_idx].astype('S1').view(dtype=NUMPY_DTYPE['character']))
             else:
-                page_data.append(el.data[page_idx].view(NUMPY_DTYPE[t]))
+                page_data.append(el.data[page_idx].view(dtype=column_types[i]))
+            #print(t, el.data[page_idx], el.data[page_idx].dtype, page_data[-1])
         for row in range(page_size):
             for i, el in enumerate(sdds.columns):
                 t = el.type
