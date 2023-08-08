@@ -374,15 +374,18 @@ def read(filepath: Union[Path, str, IO[bytes]],
                 sdds.columns_dict[c]._enabled = False
         elif column_mask_mode == 2:
             column_mask = [False for _ in range(len(sdds.columns))]
+            for cidx in set(range(len(sdds.columns))) - set(cols):
+                sdds.columns[cidx]._enabled = False
             for column_index in cols:
                 column_mask[column_index] = True
         else:
             raise ValueError
 
         if DEBUG2:
-            logger.debug('Masks are valid for current header')
             logger.debug(f'Array mask: {array_mask}')
+        if DEBUG2 or column_mask_mode != 0:
             logger.debug(f'Column mask: {column_mask}')
+        if DEBUG2:
             logger.debug(f'Page mask: {pages_mask} (actual page count TBD)')
 
         is_columns_numeric = not any(el.type == 'string' for el in sdds.columns)

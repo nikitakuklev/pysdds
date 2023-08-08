@@ -1090,6 +1090,10 @@ class SDDSFile:
 
         for el in self.columns:
             data = el.data
+            if not el._enabled:
+                assert len(data) == 0
+                continue
+
             assert len(data) == n_pages, f'Expected {n_pages} points but have {len(data)} for {el}'
             assert all(isinstance(v, np.ndarray) for v in data)
             for v in data:
