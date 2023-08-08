@@ -32,7 +32,12 @@
 </details>
 
 ## About
-Self Describing Data Set (SDDS) [file format](https://ops.aps.anl.gov/manuals/sdds/SDDS.html) is a common format used in accelerator physics, notably by `elegant` simulation code and other [tools](https://www.aps.anl.gov/Accelerator-Operations-Physics/Software) developed at Argonne National Laboratory. _pysdds_ is a pure-Python SDDS parser and writer with several nifty features that help with integration into standard Python ML and data analysis workflows.
+Self Describing Data Set (SDDS) [file format](https://ops.aps.anl.gov/manuals/sdds/SDDS.html) is 
+a common format used in accelerator physics, notably by `elegant` simulation code and other 
+[tools](https://www.aps.anl.gov/Accelerator-Operations-Physics/Software) developed at the 
+Advanced Photon Source/ANL. 
+_pysdds_ is a pure-Python SDDS reader and writer with several nifty features that help with 
+integration into standard Python ML and data analysis workflows.
 
 ## Getting started
 ### Prerequisites
@@ -45,15 +50,16 @@ Clone this repository:
 ```bash
 git clone https://github.com/nikitakuklev/pysdds.git
 ```
-and add to path during runtime:
+and add to path during runtime or install in pip development mode:
 ```python
 sys.path.append(<location where repo was cloned>/pysdds)
 ```
-or install in pip development mode. If you have access to ANL APS network, you can install latest development version with:
+
+
+If you have access to ANL APS network, you can install latest development version with:
 ```bash
 pip install -e /home/oxygen/NKUKLEV/software/pysdds
 ```
-Public PyPI/conda packages will be added once the codebase matures
 
 ## Usage
 Reading a file:
@@ -87,11 +93,27 @@ column.data[0]
 # Single value for parameter 'betax' on page 3
 parameter.data[3]
 
-# Convert page to a dataframe with appropriate column labels
+# Convert page 1 to a dataframe with appropriate column labels
 sdds.columns_to_df(page=1)
 
 # Convert all parameters to a dataframe, indexed by page number
 sdds.parameters_to_df()
+```
+
+Writing data:
+
+```python
+# Easiest way to write SDDS is to create sdds object from dataframes
+sdds = pysdds.SDDSFile.from_df([df_page1, df_page2], parameter_dict={'param1': ['v0', 'v1']})
+pysdds.write(sdds, 'filepath.sdds')
+
+# If necessary, SDDS objects can be manually assembled (but you really shouldn't)
+sdds = pysdds.SDDSFile()
+col = pysdds.Column(namelist,sdds)
+col.data = [...]
+sdds.columns = [col]
+...
+
 ```
 
 See `demos` directory for more examples.
@@ -103,7 +125,7 @@ Major differences are:
 - Pure Python, and platform agnostic (official package is a thin wrapper for core C library)
 - Comparable read performance for numerical data, but **slower** for text data. You should do your own benchmarks if performance is critical.
 - Intelligent file buffering - helps with network file systems
-- Large file streaming without full memory pre-allocation
+- Large file reads without full memory pre-allocation
 - Serializable data structures (for example allowing data passing during batch computations through Dask)
 - Easier debugging and partial parsing of corrupted/abnormal data
 
@@ -118,20 +140,13 @@ Package architecture is straightforward - file header is first parsed to determi
   - [x] Streaming
   - [x] Binary block via numpy
   - [x] Binary block via struct
-- [ ] Writers
-  - [ ] ASCII
-  - [ ] Binary
+- [x] Writers
+  - [x] ASCII
+  - [x] Binary
 - [x] Tests
   - [x] Read tests
   - [x] Compressed file tests
   - [x] Automated file gen for various format permutations
-
-## Version history
-
-* 0.1.1
-  * Implemented fast zero-copy path for numeric-only data
-* 0.1.0
-  * Initial release, read support for most ASCII/binary cases
 
 ## Contributing
 
