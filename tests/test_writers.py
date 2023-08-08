@@ -135,27 +135,32 @@ def test_write_from_df():
                'LowerLimit': [-2, -2],
                'UpperLimit': [-2.0, -2.0],
                'UnsignedVal': [+3, +4],
-               'Description': ['foo-_~|aaaa', 'bar\n\r\005'],
-
+               'Description': ['foo-_~|aaaa', '!"#$%&\'()*+,'
+                                              '-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~'],
                }
     df_meas = pd.DataFrame.from_dict(meas_df)
     df_meas['ReallyUnsigned'] = np.array([4, 4], dtype=np.uint64)
+    df_meas['Horror!@#$)(*&^%#@&$#&$^@}{":?<'] = np.array([5.0, 5.1], dtype=np.float32)
     parameters = {'par1': [1], 'par2': [1.0], 'par3': ['foo']}
 
     sdds = pysdds.SDDSFile.from_df([df_meas], parameter_dict=parameters, mode='ascii')
     assert sdds.n_pages == 1
-    assert sdds.n_columns == 5
+    assert sdds.n_columns == 7
     assert sdds.n_parameters == 3
     assert sdds.columns[0].type == 'string'
     assert sdds.columns[1].type == 'long64'
     assert sdds.columns[2].type == 'double'
     assert sdds.columns[3].type == 'long64'
-    assert sdds.columns[4].type == 'ulong64'
+    assert sdds.columns[4].type == 'string'
+    assert sdds.columns[5].type == 'ulong64'
+    assert sdds.columns[6].type == 'float'
     assert sdds.columns[0].data[0].dtype == object
     assert sdds.columns[1].data[0].dtype == np.int64
     assert sdds.columns[2].data[0].dtype == np.float64
     assert sdds.columns[3].data[0].dtype == np.int64
-    assert sdds.columns[4].data[0].dtype == np.uint64
+    assert sdds.columns[4].data[0].dtype == object
+    assert sdds.columns[5].data[0].dtype == np.uint64
+    assert sdds.columns[6].data[0].dtype == np.float32
 
     def run_compare(sdds):
         sdds.validate_data()
