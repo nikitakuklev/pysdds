@@ -55,13 +55,20 @@ def _find_different_indices(one, two):
     return idxs
 
 
+sdds_translation = str.maketrans({"\"": r"\"", "!": r"\!"})
+
+
+def escape_string_sdds(s):
+    return s.translate(sdds_translation)
+
+
 def _namelist_to_str(nm_dict, omit_defaults=None):
     kv_strings = []
     for k, v in nm_dict.items():
         if omit_defaults is not None and k in omit_defaults and omit_defaults[k] == v:
             continue
         if isinstance(v, str) and (' ' in v or '"' in v or "," in v or "$" in v or "!" in v):
-            kv_strings.append(f'{k}="{v}"')
+            kv_strings.append(f'{k}="{escape_string_sdds(v)}"')
         else:
             kv_strings.append(f'{k}={v}')
     return ", ".join(kv_strings)
@@ -485,9 +492,9 @@ class Column:
                 if not _compare_arrays(self.data[i], other.data[i], eps):
                     different_idxs = _find_different_indices(self.data[i], other.data[i])
                     logger.error(
-                        f'Comparison at page {i} had diffences at indices {different_idxs}')
+                            f'Comparison at page {i} had diffences at indices {different_idxs}')
                     logger.error(
-                        f'Value tuples: {[(self.data[i][j], other.data[i][j]) for j in different_idxs]}')
+                            f'Value tuples: {[(self.data[i][j], other.data[i][j]) for j in different_idxs]}')
                     err('values eps', i, self.data[i].dtype, other.data[i].dtype, self.data[i],
                         other.data[i])
                     return False
@@ -547,8 +554,8 @@ class Data:
     def to_sdds(self):
         nm = self.nm.copy()
         if self.mode == 'ascii':
-            nm.pop('endian')
-        return f"&data {_namelist_to_str(nm, omit_defaults={'lines_per_row':1})}, &end"
+            nm.pop('endian', None)
+        return f"&data {_namelist_to_str(nm, omit_defaults={'lines_per_row': 1})}, &end"
 
     def compare(self, other, raise_error: bool = False) -> bool:
         fail_str = f'Data mismatch: '
@@ -702,7 +709,7 @@ class SDDSFile:
             column = keys[1]
             if not isinstance(page, int):
                 raise ValueError(
-                    f'First index is expected to be an integer corresponding to page number')
+                        f'First index is expected to be an integer corresponding to page number')
 
             if not 0 <= page <= self.n_pages - 1:
                 raise KeyError(f'Page {page} is not within acceptable bounds (0 - {self.n_pages})')
@@ -947,7 +954,7 @@ class SDDSFile:
 
         for i, c in enumerate(columns):
             if df.dtypes[i] == np.dtype(np.int64):
-                val = df.iloc[:, i].values#.astype(np.int32)
+                val = df.iloc[:, i].values  # .astype(np.int32)
             else:
                 val = df.iloc[:, i].values
             sdds_type = constants._NUMPY_DTYPES_INV[df.dtypes[i]]
@@ -1073,7 +1080,7 @@ class SDDSFile:
             for v in data:
                 if type(v) != _PYTHON_TYPE_FINAL[el.type]:
                     raise Exception(
-                        f'Parameter type {type(v)} ({v}) does not match {_PYTHON_TYPE_FINAL[el.type]}')
+                            f'Parameter type {type(v)} ({v}) does not match {_PYTHON_TYPE_FINAL[el.type]}')
 
         for el in self.arrays:
             data = el.data
