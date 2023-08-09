@@ -14,11 +14,12 @@ env:
 jobs:
   build:
     strategy:
+      max-parallel: 1
       fail-fast: true
       matrix:
-        python-version: ["3.8"]
+        python-version: ["3.7", "3.8"]
         os : [ubuntu-latest]
-        
+
     runs-on: ${{ matrix.os }}
 
     steps:
