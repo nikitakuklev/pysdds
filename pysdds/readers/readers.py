@@ -452,7 +452,7 @@ def read(filepath: Union[Path, str, IO[bytes]],
                 f' {len(sdds.parameters)} parameters,'
                 f' {arrays_enabled}/{len(sdds.arrays)} arrays,'
                 f' {n_cols_enabled}/{len(sdds.columns)} columns\n')
-    logger.debug(f'File description:')
+    #logger.debug(f'File description:')
     logger.debug(f'{sdds.describe()}')
     return sdds
 
@@ -1780,11 +1780,14 @@ def _read_pages_ascii_mixed_lines(file: IO[bytes],
 
             # Assign data to the columns
             if not page_skip:
-                assert len(set(len(x) for x in columns_list_data)) == 1
+                if not any(columns_mask):
+                    break
+                column_lengths = [len(x) for x in columns_list_data]
+                assert len(set(column_lengths)) == 1, f'Column mismatch {column_lengths}'
                 col_idx_active = 0
                 for i, c in enumerate(sdds.columns):
                     if columns_mask[i]:
-                        c.data.append(np.array(columns_list_data[i],
+                        c.data.append(np.array(columns_list_data[col_idx_active],
                                              dtype=columns_store_type[i]))
                         c._page_numbers.append(page_idx)
                         col_idx_active += 1
@@ -1948,7 +1951,7 @@ def _read_pages_ascii_numeric_lines(file: IO[bytes],
         struct_type = np.dtype(', '.join(columns_type))
 
         logger.debug(f'Column types: {columns_type}')
-        logger.debug(f'struct_type: {struct_type}')
+        logger.debug(f'Column struct_type: {struct_type}')
     else:
         columns_type = []
         columns_store_type = []
@@ -2211,12 +2214,10 @@ def _read_pages_ascii_numeric_lines(file: IO[bytes],
                 df = pd.read_table(buf, encoding='ascii', **opts)
                 # Assign data to the columns
                 if not page_skip:
-                    col_idx_active = 0
                     for i, c in enumerate(sdds.columns):
                         if columns_mask[i]:
-                            c.data.append(df.loc[:, col_idx_active].values)
+                            c.data.append(df.iloc[:, i].values)
                             c._page_numbers.append(page_idx)
-                            col_idx_active += 1
         page_idx += 1
         if not page_skip:
             page_stored_idx += 1
