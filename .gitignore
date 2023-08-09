@@ -2,6 +2,8 @@
 tests/files/**
 !tests/files/sources
 !tests/files/sources/**
+!tests/files/sources_compressed
+!tests/files/sources_compressed/**
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
