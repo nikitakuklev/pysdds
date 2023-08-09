@@ -286,7 +286,8 @@ def read(filepath: Union[Path, str, IO[bytes]],
     if isinstance(filepath, Path):
         # File is opened in binary mode because it is necessary for data parsing,
         # reopening after header parsing would interfere with IO buffering
-        file, file_size, peek_available = _open_file(filepath, compression, use_magic_values=False,
+        file, file_size, peek_available = _open_file(filepath, compression,
+                                                     use_magic_values=False,
                                                      buffer_size=buffer_size)
         sdds._source_file_size = file_size
         logger.debug(f'Path opened as file in %.3f ms, size (%s)',
@@ -297,7 +298,11 @@ def read(filepath: Union[Path, str, IO[bytes]],
             file_size = len(filepath)
         except TypeError:
             file_size = None
-        peek_available = True
+        try:
+            filepath.peek(1)
+            peek_available = True
+        except TypeError:
+            peek_available = False
         sdds._source_file_size = 0
         logger.debug(f'Path opened as byte stream in %.3f ms, size (%s)',
                      (time.perf_counter() - t_start) * 1e3, file_size)
@@ -404,7 +409,7 @@ def read(filepath: Union[Path, str, IO[bytes]],
             _read_pages_binary(file, sdds, file_size=file_size, arrays_mask=array_mask,
                                columns_mask=column_mask, pages_mask=pages_mask)
         else:
-            # Need to use BufferedReader since file end is detected by peak()
+            # Need to use BufferedReader since file end is detected by peek()
             if not peek_available:
                 logger.debug('Wrapping stream in buffered reader since peek() was not available')
                 file = io.BufferedReader(file)
