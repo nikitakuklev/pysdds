@@ -5,6 +5,7 @@
     Efficient Python SDDS reader and writer
   </p>
   <img alt="GitHub" src="https://img.shields.io/github/license/nikitakuklev/pysdds">
+  [![CI](https://github.com/nikitakuklev/pysdds/actions/workflows/test.yaml/badge.svg)](https://github.com/nikitakuklev/pysdds/actions/workflows/test.yaml)
   <img alt="GitHub release (latest by date)" src="https://img.shields.io/github/v/release/nikitakuklev/pysdds">
   <img alt="GitHub release (latest by date including pre-releases)" src="https://img.shields.io/github/v/release/nikitakuklev/pysdds?include_prereleases&label=dev%20release">
 </div>
