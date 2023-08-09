@@ -154,9 +154,7 @@ class Parameter:
     def __init__(self, namelist, sdds: "SDDSFile" = None):
         self.nm = namelist
         # Data list is a list of values, 1 per page
-        # It will generated dynamically for fixed value parameters
-        # if self.fixed_value is None:
-        #    self.data = []
+        # It will be generated dynamically for fixed value parameters
         self._data = []
         self.__cached_data = None
         self.__cached_page_count = None
@@ -265,6 +263,19 @@ class Parameter:
 
     @property
     def fixed_value(self):
+        v_raw = self.nm.get('fixed_value', None)
+        if v_raw is None:
+            return None
+
+        if self.type not in ['string', 'character']:
+            v = np.fromstring(v_raw, dtype=_NUMPY_DTYPES[self.type], sep=' ', count=1)[0]
+            return v
+        else:
+            assert isinstance(v_raw, str)
+            return v_raw
+
+    @property
+    def _fixed_value_raw(self):
         return self.nm.get('fixed_value', None)
 
     @property
@@ -272,9 +283,9 @@ class Parameter:
         """
         Data property requires additional logic to return lists for fixed value parameters
         """
-        if self.fixed_value is not None:
+        if self._fixed_value_raw is not None:
             if self.__cached_page_count != self.sdds.n_pages:
-                v = self.fixed_value
+                v = self._fixed_value_raw
                 if self.type != 'string':
                     v = np.fromstring(v, dtype=_NUMPY_DTYPES[self.type], sep=' ', count=1)[0]
                 self.__cached_data = [v for _ in range(self.sdds.n_pages)]
