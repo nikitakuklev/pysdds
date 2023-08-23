@@ -81,13 +81,13 @@ def test_round_trip_sources_ascii(file_root):
     pysdds.write(sdds, buf)
     buf.seek(0)
     #
-    print()
-    print("=====================================")
-    lines = buf.getvalue().decode('ascii').split('\n')
-    for l in lines:
-        print(repr(l))
-        pass
-    print("=====================================")
+    # print()
+    # print("=====================================")
+    # lines = buf.getvalue().decode('ascii').split('\n')
+    # for l in lines:
+    #     print(repr(l))
+    #     pass
+    # print("=====================================")
 
     # with open(file_root+'_writeback', "wb") as f:
     #     f.write(buf.getbuffer())
