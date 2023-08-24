@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools", "tomli; python_version < '3.11'"]
+build-backend = "setuptools.build_meta"
+
+
+[project]
+name = 'pysdds'
+description = 'Package to read and write SDDS files'
+authors = [
+    {name = "Nikita Kuklev"}
+]
+readme = "README.md"
+license = {text = "MIT License"}
+requires-python = '>=3.8'
+classifiers = [
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering",
+    "Intended Audience :: Science/Research",
+]
+dependencies = [
+    'numpy>=1.13.3',
+    'pandas>=1.0'
+]
+dynamic = ['version']
+
+
+[project.urls]
+"Homepage" = "https://github.com/nikitakuklev/pysdds"
+
+
+[tool.setuptools.packages.find]
+include = ['pysdds*']
+
+
+[tool.versioneer]
+VCS = "git"
+style = "pep440"
+versionfile_source = "pysdds/_version.py"
+versionfile_build = "pysdds/_version.py"
+tag_prefix = "v"
+parentdir_prefix = "pysdds-"
