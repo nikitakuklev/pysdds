@@ -964,11 +964,11 @@ class SDDSFile:
         columns = df.columns
 
         for i, c in enumerate(columns):
-            if df.dtypes[i] == np.dtype(np.int64):
+            if df.dtypes.iloc[i] == np.dtype(np.int64):
                 val = df.iloc[:, i].values  # .astype(np.int32)
             else:
                 val = df.iloc[:, i].values
-            sdds_type = constants._NUMPY_DTYPES_INV[df.dtypes[i]]
+            sdds_type = constants._NUMPY_DTYPES_INV[df.dtypes.iloc[i]]
             namelist = {'name': c, 'type': sdds_type}
             col = Column(namelist, sdds)
             sdds.columns.append(col)
@@ -995,7 +995,7 @@ class SDDSFile:
             if not np.array_equal(columns, df.columns):
                 raise ValueError(f'Dataframe columns not same - {columns} vs {df.columns}')
             for i, c in enumerate(columns):
-                if df.dtypes[i] == np.dtype(np.int64):
+                if df.dtypes.iloc[i] == np.dtype(np.int64):
                     val = df.iloc[:, i].to_numpy(np.int32)
                 else:
                     val = df.iloc[:, i].to_numpy()
