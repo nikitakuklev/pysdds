@@ -1,0 +1,72 @@
+#https://computing.docs.ligo.org/gitlab-ci-templates/
+#https://github.com/conda/conda-build/issues/4976
+include:
+  - local: '.gitlab/conda.yml'
+
+stages:
+  - test
+  - build
+
+default:
+  image: condaforge/miniforge3:latest
+  #image: continuumio/miniconda3:latest
+# cache is slow for many files
+#  cache:
+#    key:
+#      files:
+#        - environment.yml
+#    paths:
+#      - .env/
+
+.parallel-hidden-job:
+  extends:
+    - .conda:base
+  before_script:
+    - !reference [ ".conda:base", before_script ]
+    - echo "Current directory is $(pwd)"
+    - echo "HOME is $HOME"
+    - echo "PATH is $PATH"
+    - echo "User is $USER"
+    - echo "Hostname is $(hostname)"
+  parallel:
+    matrix:
+      - VERSION: [ '38', '311' ]
+
+#build-job:
+#  extends: .parallel-hidden-job
+#  stage: test
+#  when: manual
+#  script:
+#    - python3 -V
+#    - python3 -m pip install virtualenv
+#    - rm -rf venv$VERSION
+#    - virtualenv venv$VERSION
+#    - source venv$VERSION/bin/activate
+#    - echo "Building and setting up"
+#    - python3 -m pip install pytest
+#    - pip install -r requirements.txt
+
+test-job-conda:
+  extends: .parallel-hidden-job
+  stage: test
+  script:
+    - python3 -V
+    - conda -V
+    - rm -rf .env$VERSION
+    - echo "Building and setting up from environment.yml"
+    - conda env create -f .gitlab/environment$VERSION.yml -n venv$VERSION
+    - conda activate venv$VERSION
+    - pip install pytest
+    - pip install --no-dependencies .
+    - echo "Running tests"
+    - conda activate venv$VERSION
+    - pytest -rxs
+    - echo "Done"
+
+conda-build:
+  extends:
+    - .conda:build
+  variables:
+    MAMBABUILD: "true"
+
+

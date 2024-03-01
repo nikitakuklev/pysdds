@@ -1,0 +1,162 @@
+#
+# Gitlab-CI job templates for Conda jobs
+#
+
+# simple bash command to retry a stage up to 3 times
+# with a 15-second delay (mainly to survive transient
+# network issues)
+.retry: &define-retry |
+  retry() {
+    local n=1
+    local max=3
+    local delay=15
+    while true; do
+      "$@" && break || {
+        if [[ $n -lt $max ]]; then
+          ((n++))
+          echo "Command failed. Attempt $n/$max:"
+          sleep $delay;
+        else
+          echo "The command has failed after $n attempts." 1>&2
+          exit 1
+        fi
+    }
+    done
+  }
+
+# -- Conda caching ----------
+# configure conda to cache
+# packages locally and
+# gitlab-ci to cache that
+# cache
+# ---------------------------
+
+.conda:cache:
+  variables:
+    # package cache directory
+    CONDA_PKGS_DIRS: "${CI_PROJECT_DIR}/.cache/conda/pkgs"
+  cache:
+    key: "${CI_JOB_NAME}"
+    paths:
+      - .cache/conda/pkgs/*.tar.bz2
+      - .cache/conda/pkgs/*.conda
+
+# -- generic job ------------
+# default job template for
+# Conda-based jobs, including
+# basic configuration
+# ---------------------------
+
+.conda:base:
+  extends:
+    - .conda:cache
+  #image: igwn/base:conda
+  variables:
+    # path of conda configuration
+    CONDARC: "${CI_PROJECT_DIR}/.condarc"
+    # output directory for conda-build
+    CONDA_BLD_PATH_FINAL: "${CI_PROJECT_DIR}/conda-bld"
+    CONDA_BLD_PATH: "/CBLD/conda-bld"
+    # environments base directory
+    CONDA_ENVS_PATH: "${CI_PROJECT_DIR}/envs"
+    # if 'true' include conda-forge in the list of channels
+    CONDA_FORGE: "true"
+    # disable banner from mamba
+    MAMBA_NO_BANNER: "1"
+    # declare whether we need a writable base environment
+    NEED_WRITABLE_BASE: "false"
+  before_script:
+    # setup the shell to see conda
+    # (/opt/conda is the location of pre-installed (mini)conda in the
+    #  continuumio/miniconda3 container and on the IGWN Gitlab-CI macOS
+    #  runners hosted at Caltech)
+    - if [ -z "${CONDA_ROOT}" ]; then
+          if command -v conda &> /dev/null; then
+              CONDA_ROOT=$(conda info --base);
+          else
+              CONDA_ROOT="/opt/conda";
+          fi;
+      fi
+    # if conda isn't writable, and the user asked for a writable copy,
+    # install a new copy of mambaforge
+    # (unset CONDARC so that libmamba doesn't fall over when it doesn't exist)
+    - if [ ! -w ${CONDA_ROOT}/conda-meta/history ] && ${NEED_WRITABLE_BASE}; then
+          export CONDA_ROOT="${CI_PROJECT_DIR}/mambaforge";
+          echo -e "\x1B[92mConda base env not writable, installing fresh Mambaforge into ${CONDA_ROOT}...\x1B[0m";
+          curl --silent -L https://github.com/conda-forge/miniforge/releases/latest/download/Mambaforge-$(uname)-$(uname -m).sh -o mambaforge.sh;
+          env -u CONDARC bash mambaforge.sh -b -p ${CONDA_ROOT};
+      fi
+    # configure the shell
+    - . ${CONDA_ROOT}/etc/profile.d/conda.sh
+    - if [ -f ${CONDA_ROOT}/etc/profile.d/mamba.sh ]; then . ${CONDA_ROOT}/etc/profile.d/mamba.sh; fi
+    # don't ask for confirmation on conda commands
+    - conda config --file ${CONDARC} --set always_yes yes
+    # add conda-forge to the list of channels
+    - if [ "${CONDA_FORGE}" = "true" ]; then conda config --file ${CONDARC} --add channels conda-forge; fi
+    # print the conda configuration
+    - conda info --all
+    # print the conda config files
+    - conda config --show-sources
+
+# -- conda-build job --------
+# simple job to build a
+# package using conda-build
+#
+# NOTE: this job requires
+#       that the conda 'base'
+#       environment is
+#       writable by the user
+# ---------------------------
+
+.conda:build:
+  extends:
+    - .conda:base
+  variables:
+    CONDA_RECIPE_DIR: "${CI_PROJECT_DIR}/conda"
+    CONDA_BUILD_OPTIONS: ""
+    MAMBABUILD: "false"
+    NEED_WRITABLE_BASE: "true"
+  script:
+    - *define-retry
+    # detect mamba
+    - if which mamba &>/dev/null; then
+          CONDA_OR_MAMBA="mamba";
+      else
+          CONDA_OR_MAMBA="conda";
+      fi
+    # update conda (and mamba)
+    - retry ${CONDA_OR_MAMBA} update --name base --quiet --yes
+          conda
+          ${CONDA_OR_MAMBA}
+    # install feedstock pre-requisites
+    - retry ${CONDA_OR_MAMBA} install --name base --quiet
+          conda-build
+          conda-forge-pinning
+          conda-smithy
+          conda-verify
+          $(if ${MAMBABUILD}; then echo "boa!=0.15.*"; fi)
+          "setuptools<66.0.0"
+    # list packages in the base environment
+    - conda list --name base
+    # convert recipe into feedstock
+    - git config --global user.name "${GITLAB_USER_NAME}"
+    - git config --global user.email "${GITLAB_USER_EMAIL}"
+    - conda activate base
+    - echo "Current directory is $(pwd)"
+    - echo "recipedir is ${CONDA_RECIPE_DIR}"
+    - conda smithy init "${CONDA_RECIPE_DIR}" --feedstock-directory feedstock
+    - cd feedstock
+    - retry conda smithy regenerate --no-check-uptodate
+    # build the package
+    - if ${MAMBABUILD}; then BUILDER="mambabuild"; else BUILDER="build"; fi
+    - echo "Building with ${BUILDER}"
+    - xargs -t conda ${BUILDER} recipe/ <<< ${CONDA_BUILD_OPTIONS}
+    - cp -R ${CONDA_BLD_PATH} ${CONDA_BLD_PATH_FINAL}
+  artifacts:
+    paths:
+      # packages
+      - conda-bld/**/*.conda
+      - conda-bld/**/*.tar.bz2
+      # the feedstock
+      - feedstock/
+
