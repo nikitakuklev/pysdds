@@ -84,8 +84,9 @@ wheel-build:
     - virtualenv venv
     - source venv/bin/activate
     - echo "Building and setting up"
-    - pip install -r requirements.txt
-    - python setup.py bdist_wheel
+    - python3 -m pip install -r requirements.txt
+    - python3 -m pip install 'build[virtualenv]'
+    - python3 -m build
     - echo "Done wheel build"
   artifacts:
     paths:
