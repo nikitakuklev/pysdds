@@ -47,8 +47,8 @@ default:
 #    - pip install -r requirements.txt
 
 test-job-conda:
-  extends: .parallel-hidden-job
   stage: test
+  extends: .parallel-hidden-job
   script:
     - python3 -V
     - conda -V
@@ -64,9 +64,30 @@ test-job-conda:
     - echo "Done"
 
 conda-build:
+  stage: build
   extends:
     - .conda:build
   variables:
     MAMBABUILD: "true"
 
+wheel-build:
+  stage: build
+  variables:
+    PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  cache:
+    paths:
+      - .cache/pip
+  script:
+    - python3 -V
+    - python3 -m pip install virtualenv
+    - rm -rf venv
+    - virtualenv venv
+    - source venv/bin/activate
+    - echo "Building and setting up"
+    - pip install -r requirements.txt
+    - python setup.py bdist_wheel
+    - echo "Done wheel build"
+  artifacts:
+    paths:
+      - dist/*.whl
 
