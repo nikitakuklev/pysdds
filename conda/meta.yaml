@@ -1,9 +1,6 @@
-{% set name = "pysdds" %}
-{% set version = "0.3.0" %}
-
 package:
-  name: {{ name|lower }}
-  version: {{ version }}
+  name: "pysdds"
+  version: {{ GIT_DESCRIBE_TAG }}
 
 #source:
 #  git_rev: v{{ version }}
@@ -12,7 +9,8 @@ source:
     path: ../..
 
 build:
-  number: 0
+  number: {{ GIT_DESCRIBE_NUMBER }}
+  string: {{ GIT_BUILD_STR }}
   skip: true  # [py<38]
   noarch: python
   script: {{ PYTHON }} -m pip install . --no-deps --ignore-installed --no-cache-dir --no-build-isolation -vvv
