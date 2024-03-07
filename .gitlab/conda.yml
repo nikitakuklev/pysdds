@@ -113,7 +113,7 @@
     - .conda:base
   variables:
     CONDA_RECIPE_DIR: "${CI_PROJECT_DIR}/conda"
-    CONDA_BUILD_OPTIONS: ""
+    CONDA_BUILD_OPTIONS: "--output-folder ${CONDA_BLD_PATH_FINAL} --no-anaconda-upload"
     MAMBABUILD: "false"
     NEED_WRITABLE_BASE: "true"
   script:
@@ -151,12 +151,13 @@
     - if ${MAMBABUILD}; then BUILDER="mambabuild"; else BUILDER="build"; fi
     - echo "Building with ${BUILDER}"
     - xargs -t conda ${BUILDER} recipe/ <<< ${CONDA_BUILD_OPTIONS}
-    - cp -R ${CONDA_BLD_PATH} ${CONDA_BLD_PATH_FINAL}
+    #- cp -R ${CONDA_BLD_PATH} ${CONDA_BLD_PATH_FINAL}
+    #- ln -s ${CONDA_BLD_PATH} ${CONDA_BLD_PATH_FINAL}
   artifacts:
     paths:
       # packages
       - conda-bld/**/*.conda
       - conda-bld/**/*.tar.bz2
       # the feedstock
-      - feedstock/
+      #- feedstock/
 
