@@ -266,7 +266,7 @@ def read(filepath: Union[Path, str, IO[bytes]],
         pages_mask = None
 
     sdds = SDDSFile()
-    sdds.__source_file = str(filepath)
+    sdds._source_file = str(filepath)
 
     logger.debug(f'Opening file "%s"', str(filepath))
     #logger.debug(f'Mode (%s), compression (%s), endianness (%s)', mode, compression, endianness)

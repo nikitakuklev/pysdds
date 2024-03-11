@@ -969,6 +969,9 @@ class SDDSFile:
             else:
                 val = df.iloc[:, i].values
             sdds_type = constants._NUMPY_DTYPES_INV[df.dtypes.iloc[i]]
+            if sdds_type == object:
+                if not isinstance(val[0], str):
+                    raise ValueError(f'Column [{c}] is of object type but items are not strings')
             namelist = {'name': c, 'type': sdds_type}
             col = Column(namelist, sdds)
             sdds.columns.append(col)
@@ -976,6 +979,7 @@ class SDDSFile:
 
         if parameter_dict is not None:
             for i, (k, v) in enumerate(parameter_dict.items()):
+                assert isinstance(v, list), f'Data of parameter [{k}] is not a list'
                 assert len(v) == n_pages, f'Length {len(v)} of parameter {k} different from page ' \
                                           f'count {n_pages}'
                 namelist = {'name': k, 'type': constants._PYTHON_TYPE_INV[type(v[0])]}
