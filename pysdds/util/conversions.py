@@ -2,7 +2,7 @@ import math
 from typing import Literal
 
 
-def float80_to_float64(buffer: bytearray, endianness: Literal['big', 'little']):
+def float80_to_float64(buffer: bytearray, endianness: Literal["big", "little"]):
     """
     Convert longdouble stored as 16-byte buffer to a standard Python float
 
@@ -21,7 +21,7 @@ def float80_to_float64(buffer: bytearray, endianness: Literal['big', 'little']):
 
     assert len(buffer) == 16
     buffer = buffer[:10]
-    if endianness == 'little':
+    if endianness == "little":
         buffer.reverse()
 
     if (buffer[0] & 0x80) == 0x00:
@@ -37,7 +37,11 @@ def float80_to_float64(buffer: bytearray, endianness: Literal['big', 'little']):
     else:
         normalizeCorrection = 0
 
-    m2 = int.from_bytes(mantissa, 'big') & 0x7FFFFFFFFFFFFFFF
+    m2 = int.from_bytes(mantissa, "big") & 0x7FFFFFFFFFFFFFFF
 
-    value = sign * (normalizeCorrection + float(m2 / (1 << 63))) * math.pow(2, exponent - 16383)
+    value = (
+        sign
+        * (normalizeCorrection + float(m2 / (1 << 63)))
+        * math.pow(2, exponent - 16383)
+    )
     return value

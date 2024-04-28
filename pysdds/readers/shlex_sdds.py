@@ -16,8 +16,9 @@ __all__ = ["shlex_sdds", "split_sdds", "quote", "join"]
 class shlex_sdds:
     "A lexical analyzer class for simple shell-like syntaxes."
 
-    def __init__(self, instream=None, infile=None, posix=False,
-                 punctuation_chars=False):
+    def __init__(
+        self, instream=None, infile=None, posix=False, punctuation_chars=False
+    ):
         if isinstance(instream, str):
             instream = StringIO(instream)
         if instream is not None:
@@ -30,36 +31,37 @@ class shlex_sdds:
         if posix:
             self.eof = None
         else:
-            self.eof = ''
-        self.commenters = '#'
-        self.octal_numbers = '01234567'
-        self.wordchars = ('abcdfeghijklmnopqrstuvwxyz'
-                          'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_')
+            self.eof = ""
+        self.commenters = "#"
+        self.octal_numbers = "01234567"
+        self.wordchars = (
+            "abcdfeghijklmnopqrstuvwxyz" "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_"
+        )
         # if self.posix:
         #     self.wordchars += ('ßàáâãäåæçèéêëìíîïðñòóôõöøùúûüýþÿ'
         #                        'ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞ')
-        self.whitespace = ' \t\r\n'
+        self.whitespace = " \t\r\n"
         self.whitespace_split = False
         self.quotes = '"'  # Do not consider single quotes
-        self.escape = '\\'
+        self.escape = "\\"
         self.escapedquotes = '"'
-        self.state = ' '
+        self.state = " "
         self.pushback = deque()
         self.lineno = 1
         self.debug = 0
         self.filestack = deque()
         self.source = None
         if not punctuation_chars:
-            punctuation_chars = ''
+            punctuation_chars = ""
         elif punctuation_chars is True:
-            punctuation_chars = '();<>|&'
+            punctuation_chars = "();<>|&"
         self._punctuation_chars = punctuation_chars
-        self.wordchars += '~+$@.:;/[]{}<>|%^-?!'
+        self.wordchars += "~+$@.:;/[]{}<>|%^-?!"
         if punctuation_chars:
             # _pushback_chars is a push back queue used by lookahead logic
             self._pushback_chars = deque()
             # these chars added because allowed in file names, args, wildcards
-            self.wordchars += '~-./*?='
+            self.wordchars += "~-./*?="
             # remove any punctuation chars from wordchars
             t = self.wordchars.maketrans(dict.fromkeys(punctuation_chars))
             self.wordchars = self.wordchars.translate(t)
@@ -84,18 +86,17 @@ class shlex_sdds:
         self.lineno = 1
         if self.debug:
             if newfile is not None:
-                print('shlex: pushing to file %s' % (self.infile,))
+                print("shlex: pushing to file %s" % (self.infile,))
             else:
-                print('shlex: pushing to stream %s' % (self.instream,))
+                print("shlex: pushing to stream %s" % (self.instream,))
 
     def pop_source(self):
         "Pop the input source stack."
         self.instream.close()
         (self.infile, self.instream, self.lineno) = self.filestack.popleft()
         if self.debug:
-            print('shlex: popping to %s, line %d' \
-                  % (self.instream, self.lineno))
-        self.state = ' '
+            print("shlex: popping to %s, line %d" % (self.instream, self.lineno))
+        self.state = " "
 
     def get_token(self):
         "Get a token from the input stream (or from stack if it's nonempty)"
@@ -132,10 +133,10 @@ class shlex_sdds:
     def read_token(self):
         quoted = False
         escaped_octal_mode = False
-        octal_buffer = ''
-        escapedstate = ' '
-        token = ''
-        state = ' '
+        octal_buffer = ""
+        escapedstate = " "
+        token = ""
+        state = " "
         octal_pushback = deque()
         while True:
             if self.punctuation_chars and self._pushback_chars:
@@ -145,15 +146,15 @@ class shlex_sdds:
                     nextchar = octal_pushback.pop()
                 else:
                     nextchar = self.instream.read(1)
-            if nextchar == '\n':
+            if nextchar == "\n":
                 self.lineno += 1
             # if self.debug >= 3:
             #     print("shlex: in state %r I see character: %r" % (state,
             #                                                       nextchar))
             if state is None:
-                token = ''  # past end of file
+                token = ""  # past end of file
                 break
-            elif state == ' ':
+            elif state == " ":
                 if not nextchar:
                     state = None  # end of file
                     break
@@ -168,7 +169,7 @@ class shlex_sdds:
                     self.instream.readline()
                     self.lineno += 1
                 elif self.posix and nextchar in self.escape:
-                    escapedstate = 'a'
+                    escapedstate = "a"
                     state = nextchar
                 # elif nextchar in self.wordchars:
                 #     token = nextchar
@@ -182,12 +183,12 @@ class shlex_sdds:
                     state = nextchar
                 elif self.whitespace_split:
                     token = nextchar
-                    state = 'a'
+                    state = "a"
                 else:
                     # Regular character
-                    #token = nextchar
+                    # token = nextchar
                     token = nextchar
-                    state = 'a'
+                    state = "a"
                     continue
                     # if token or (self.posix and quoted):
                     #     break  # emit current token
@@ -203,12 +204,15 @@ class shlex_sdds:
                 if nextchar == state:
                     if not self.posix:
                         token += nextchar
-                        state = ' '
+                        state = " "
                         break
                     else:
-                        state = 'a'
-                elif (self.posix and nextchar in self.escape and state
-                      in self.escapedquotes):
+                        state = "a"
+                elif (
+                    self.posix
+                    and nextchar in self.escape
+                    and state in self.escapedquotes
+                ):
                     escapedstate = state
                     state = nextchar
                 else:
@@ -225,18 +229,22 @@ class shlex_sdds:
                         escaped_octal_mode = False
                         token += chr(int(octal_buffer, 8))
                         state = escapedstate
-                        octal_buffer = ''
+                        octal_buffer = ""
                         octal_pushback.append(nextchar)
                     else:
                         octal_buffer += nextchar
                 elif nextchar in self.octal_numbers:
                     escaped_octal_mode = True
                     octal_buffer += nextchar
-                elif nextchar == '!':
+                elif nextchar == "!":
                     # sdds escape
                     token += nextchar
                     state = escapedstate
-                elif (escapedstate in self.quotes and nextchar != state and nextchar != escapedstate):
+                elif (
+                    escapedstate in self.quotes
+                    and nextchar != state
+                    and nextchar != escapedstate
+                ):
                     # In posix shells, only the quote itself or the escape
                     # character may be escaped within quotes.
                     token += state
@@ -245,14 +253,14 @@ class shlex_sdds:
                 else:
                     token += nextchar
                     state = escapedstate
-            elif state in ('a', 'c'):
+            elif state in ("a", "c"):
                 if not nextchar:
                     state = None  # end of file
                     break
                 elif nextchar in self.whitespace:
                     # if self.debug >= 2:
                     #     print("shlex: I see whitespace in word state")
-                    state = ' '
+                    state = " "
                     if token or (self.posix and quoted):
                         break  # emit current token
                     else:
@@ -261,26 +269,27 @@ class shlex_sdds:
                     self.instream.readline()
                     self.lineno += 1
                     if self.posix:
-                        state = ' '
+                        state = " "
                         if token or (self.posix and quoted):
                             break  # emit current token
                         else:
                             continue
-                elif state == 'c':
+                elif state == "c":
                     if nextchar in self.punctuation_chars:
                         token += nextchar
                     else:
                         if nextchar not in self.whitespace:
                             self._pushback_chars.append(nextchar)
-                        state = ' '
+                        state = " "
                         break
                 elif self.posix and nextchar in self.quotes:
                     state = nextchar
                 elif self.posix and nextchar in self.escape:
-                    escapedstate = 'a'
+                    escapedstate = "a"
                     state = nextchar
-                elif (nextchar in self.quotes
-                      or (self.whitespace_split and nextchar not in self.punctuation_chars)):
+                elif nextchar in self.quotes or (
+                    self.whitespace_split and nextchar not in self.punctuation_chars
+                ):
                     token += nextchar
                 else:
                     token += nextchar
@@ -297,7 +306,7 @@ class shlex_sdds:
                 #         continue
         result = token
         self.state = state
-        if self.posix and not quoted and result == '':
+        if self.posix and not quoted and result == "":
             result = None
         if self.debug > 1:
             if result:
@@ -321,7 +330,7 @@ class shlex_sdds:
             infile = self.infile
         if lineno is None:
             lineno = self.lineno
-        return "\"%s\", line %d: " % (infile, lineno)
+        return '"%s", line %d: ' % (infile, lineno)
 
     def __iter__(self):
         return self
@@ -336,21 +345,24 @@ class shlex_sdds:
 def split_sdds(s, comments=False, posix=True):
     """Split the string *s* using shell-like syntax."""
     if s is None:
-        warnings.warn("Passing None for 's' to shlex.split() is deprecated.",
-                      DeprecationWarning, stacklevel=2)
+        warnings.warn(
+            "Passing None for 's' to shlex.split() is deprecated.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
     lex = shlex_sdds(s, posix=posix)
     lex.whitespace_split = True
     if not comments:
-        lex.commenters = ''
+        lex.commenters = ""
     return list(lex)
 
 
 def join(split_command):
     """Return a shell-escaped string from *split_command*."""
-    return ' '.join(quote(arg) for arg in split_command)
+    return " ".join(quote(arg) for arg in split_command)
 
 
-_find_unsafe = re.compile(r'[^\w@%+=:,./-]', re.ASCII).search
+_find_unsafe = re.compile(r"[^\w@%+=:,./-]", re.ASCII).search
 
 
 def quote(s):

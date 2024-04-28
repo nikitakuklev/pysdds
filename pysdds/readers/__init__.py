@@ -1,1 +1,1 @@
-from .readers import read
+from .readers import read  # noqa: F401

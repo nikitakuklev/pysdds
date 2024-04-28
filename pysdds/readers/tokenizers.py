@@ -1,9 +1,9 @@
 def tokenize_namelist(line):
-    assert line[0] == '&', f'Unexpected namelist start {line[0]}'
+    assert line[0] == "&", f"Unexpected namelist start {line[0]}"
     tags = []
     keys = []
     values = []
-    buffer = ''
+    buffer = ""
     i, j = 0, 0
     # TODO: state machine enums
     mode_tag = True
@@ -19,32 +19,32 @@ def tokenize_namelist(line):
 
     while True:
         if mode_gap:
-            #print('gap', j)
+            # print('gap', j)
             if j >= len(line):
-                #print('end')
+                # print('end')
                 break
-            if line[j] != ' ':
+            if line[j] != " ":
                 i = j
                 mode_gap = False
             else:
                 j += 1
         elif not parsing_tag_or_kv:
-            if line[j] == '&':
-                #print('call tag')
+            if line[j] == "&":
+                # print('call tag')
                 mode_tag = True
             else:
                 if len(tags) == 0:
                     raise Exception("Expect first element to be a tag")
-                #print('call kv')
+                # print('call kv')
                 mode_kv = True
             parsing_tag_or_kv = True
         elif mode_tag:
-            #print('tag',j)
+            # print('tag',j)
             if not saw_tag_start:
-                assert line[j] == '&'
+                assert line[j] == "&"
                 saw_tag_start = True
                 j += 1
-            if j >= len(line) or line[j] == ' ':
+            if j >= len(line) or line[j] == " ":
                 tags.append(line[i:j])
                 i = j
                 mode_gap = True
@@ -55,8 +55,8 @@ def tokenize_namelist(line):
                 j += 1
         elif mode_kv:
             if kv_key_section:
-                #print('k', j)
-                if line[j] == '=':
+                # print('k', j)
+                if line[j] == "=":
                     kv_key_section = False
                     keys.append(line[i:j])
                     j += 1
@@ -64,7 +64,7 @@ def tokenize_namelist(line):
                 else:
                     j += 1
             else:
-                #print('v', j)
+                # print('v', j)
                 currentchar = line[j]
 
                 # parse c-style string expression
@@ -72,7 +72,7 @@ def tokenize_namelist(line):
                     value_parse_started = True
                     if currentchar == '"':
                         value_quote_mode = True
-                        #print('vquoteon', j)
+                        # print('vquoteon', j)
                         j += 1
                         i = j
                     continue
@@ -83,14 +83,14 @@ def tokenize_namelist(line):
                         j += 1
                         value_escape_next = False
                     else:
-                        if currentchar == '\\':
+                        if currentchar == "\\":
                             # escape next char
                             value_escape_next = True
                             j += 1
                         elif currentchar == '"':
                             # end of quoted segment
                             values.append(buffer)
-                            buffer = ''
+                            buffer = ""
                             j += 2
                             i = j
                             value_quote_mode = False
@@ -98,30 +98,34 @@ def tokenize_namelist(line):
                             mode_kv = False
                             kv_key_section = True
 
-                            if nextchar != ',':
+                            if nextchar != ",":
                                 # might not have comma if only a single item or at the end
                                 # so scan ahead to find next state
                                 found_next_item_or_end = False
                                 for jmp in range(0, 20):
-                                    c = line[j+jmp]
-                                    if c == ' ':
+                                    c = line[j + jmp]
+                                    if c == " ":
                                         continue
-                                    elif c == ',':
+                                    elif c == ",":
                                         mode_gap = True
                                         parsing_tag_or_kv = False
                                         found_next_item_or_end = True
                                         j += jmp
                                         break
-                                    elif c == '&':
+                                    elif c == "&":
                                         mode_tag = True
                                         parsing_tag_or_kv = True
                                         found_next_item_or_end = True
                                         j += jmp
                                         break
                                     else:
-                                        raise ValueError(f'Invalid char [{c}] after quoted string')
+                                        raise ValueError(
+                                            f"Invalid char [{c}] after quoted string"
+                                        )
                                 if not found_next_item_or_end:
-                                    raise ValueError(f'Too many spaces after quoted string?')
+                                    raise ValueError(
+                                        "Too many spaces after quoted string?"
+                                    )
                             else:
                                 parsing_tag_or_kv = False
                                 mode_gap = True
@@ -135,39 +139,39 @@ def tokenize_namelist(line):
                     #     value_parse_space_seen = True
                     #     j += 1
                     #     continue
-                    if currentchar == '\\':
-                        if nextchar == '"' or nextchar == '\\':
+                    if currentchar == "\\":
+                        if nextchar == '"' or nextchar == "\\":
                             buffer += nextchar
                             j += 2
                         else:
                             buffer += currentchar
                             j += 1
-                    elif currentchar == ',' or currentchar == ' ':
+                    elif currentchar == "," or currentchar == " ":
                         value_parse_started = False
                         mode_kv = False
                         mode_gap = True
                         kv_key_section = True
                         parsing_tag_or_kv = False
                         values.append(buffer)
-                        buffer = ''
+                        buffer = ""
                         j += 1
                         i = j
-                    elif currentchar == '&':
+                    elif currentchar == "&":
                         value_parse_started = False
                         mode_kv = mode_gap = False
                         mode_tag = True
                         parsing_tag_or_kv = True
                         values.append(buffer)
-                        buffer = ''
+                        buffer = ""
                         i = j
                     else:
-                        #if value_parse_space_seen:
+                        # if value_parse_space_seen:
                         #    #assume that actually next namelist starts here after space separator
-#
+                        #
                         #    raise ValueError(f'Got character after unquoted space')
                         buffer += currentchar
                         j += 1
         else:
-            raise ValueError('State machine internal error')
+            raise ValueError("State machine internal error")
 
     return tags, keys, values
