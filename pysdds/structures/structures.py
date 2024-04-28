@@ -703,7 +703,6 @@ class SDDSFile:
 
         self._source_file: Optional[str] = None
         self._source_file_size: Optional[int] = None
-        # self.columns_dict = None
 
         self.n_pages: int = 0
         self.n_parameters: int = 0
