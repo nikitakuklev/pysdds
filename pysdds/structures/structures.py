@@ -752,7 +752,7 @@ class SDDSFile:
         "arrays",
         "columns",
         "data",
-        "mode",
+        "_mode",
         "endianness",
         "n_pages",
     )
@@ -765,7 +765,7 @@ class SDDSFile:
         self.data: Optional[Data] = None
         self.associates: List[Associate] = []
 
-        self.mode: Literal["binary", "ascii"] = "binary"
+        self._mode: Literal["binary", "ascii"] = "binary"
         self.endianness: Literal["big", "little"] = "little"
 
         self._source_file: Optional[str] = None
@@ -978,7 +978,15 @@ class SDDSFile:
     def column_names(self):
         return [c.nm["name"] for c in self.columns]
 
-    # @columns.setter
+    @property
+    def mode(self):
+        return self._mode
+
+    @mode.setter
+    def mode(self, value):
+        self.set_mode(value)
+
+        # @columns.setter
     # def columns(self, value):
     #     self._columns = value
     #     #self._columns_dict = {c.name: c for c in value} if value is not None else None
@@ -995,7 +1003,7 @@ class SDDSFile:
         """Set SDDS file mode, affecting how file will be written. Data namelist will be modified if present."""
         if mode not in ["ascii", "binary"]:
             raise Exception
-        self.mode = mode
+        self._mode = mode
         if self.data is not None:
             if mode == "binary":
                 self.data.nm.update({"mode": mode, "endian": self.endianness})
