@@ -390,6 +390,8 @@ def read(
             logger.debug(f"Params: {sdds.parameters}")
             logger.debug(f"Arrays: {sdds.arrays}")
             logger.debug(f"Columns: {sdds.columns}")
+            logger.debug(f"Data: {sdds.data}")
+            logger.debug(f"Description: {sdds.description}")
 
         if header_only:
             return sdds
@@ -427,7 +429,7 @@ def read(
         if sdds._meta_fixed_rowcount:
             if sdds.mode != "binary":
                 raise ValueError(
-                    f'Meta-command "!#fixed-rowcount" requires binary mode, not {sdds.mode}'
+                    f'Meta-command "!# fixed-rowcount" requires binary mode, not {sdds.mode}'
                 )
 
         # Verify that parameter, array, column, and page masks can be applied
@@ -732,7 +734,7 @@ def _read_header_fullstream(
             if line == "!# big-endian":
                 if endianness == "auto" or endianness == "big":
                     sdds.endianness = "big"
-                    logger.debug(f"Binary file endianness set to ({sdds.endianness})")
+                    logger.debug(f"Binary file endianness set to ({sdds.endianness}) from meta-command")
                     meta_endianness_set = True
                 else:
                     raise ValueError(
@@ -741,13 +743,14 @@ def _read_header_fullstream(
             elif line == "!# little-endian":
                 if endianness == "auto" or endianness == "little":
                     sdds.endianness = "little"
-                    logger.debug(f"Binary file endianness set to ({sdds.endianness})")
+                    logger.debug(f"Binary file endianness set to ({sdds.endianness}) from meta-command")
                     meta_endianness_set = True
                 else:
                     raise ValueError(
                         f"File endianness ({line}) does not match requested one ({endianness})"
                     )
             elif line == "!# fixed-rowcount":
+                logger.debug("Fixed rowcount meta-command found - setting flag")
                 sdds._meta_fixed_rowcount = True
             else:
                 raise Exception(f"Meta command {line} is not recognized")
@@ -997,7 +1000,7 @@ def _read_header_v2(
             if line == "!# big-endian":
                 if endianness == "auto" or endianness == "big":
                     sdds.endianness = "big"
-                    logger.debug(f"Binary file endianness set to ({sdds.endianness})")
+                    logger.debug(f"Binary file endianness set to ({sdds.endianness}) from meta-command")
                     meta_endianness_set = True
                 else:
                     raise ValueError(
@@ -1006,13 +1009,14 @@ def _read_header_v2(
             elif line == "!# little-endian":
                 if endianness == "auto" or endianness == "little":
                     sdds.endianness = "little"
-                    logger.debug(f"Binary file endianness set to ({sdds.endianness})")
+                    logger.debug(f"Binary file endianness set to ({sdds.endianness}) from meta-command")
                     meta_endianness_set = True
                 else:
                     raise ValueError(
                         f"File endianness ({line}) does not match requested one ({endianness})"
                     )
             elif line == "!# fixed-rowcount":
+                logger.debug("Fixed rowcount meta-command found - setting flag")
                 sdds._meta_fixed_rowcount = True
             else:
                 raise Exception(f"Meta command {line} is not recognized")
@@ -1087,6 +1091,8 @@ def _read_header_v2(
                 nm_dict["lines_per_row"] = int(nm_dict["lines_per_row"])
             if "no_row_counts" in nm_keys:
                 nm_dict["no_row_counts"] = int(nm_dict["no_row_counts"])
+            if 'column_major_order' in nm_keys:
+                nm_dict['column_major_order'] = int(nm_dict['column_major_order'])
             if "endian" in nm_keys:
                 data_endianness = nm_dict["endian"]
                 if meta_endianness_set:
@@ -1243,6 +1249,7 @@ def _read_pages_binary(
         logger.debug(f"All numeric: {columns_all_numeric}")
 
     if sdds.data.column_major_order != 0:
+        logger.debug("Data is in column-major order - no special handling required")
         pass
     elif columns_all_numeric and sdds._meta_fixed_rowcount:
         # Numeric types but fixed rows - have to parse row by row
