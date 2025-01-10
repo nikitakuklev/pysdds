@@ -45,7 +45,7 @@ def tokenize_namelist(line):
                 saw_tag_start = True
                 j += 1
             if j >= len(line) or line[j] == " ":
-                tags.append(line[i:j])
+                tags.append(line[i:j].strip())
                 i = j
                 mode_gap = True
                 mode_tag = False
@@ -58,7 +58,7 @@ def tokenize_namelist(line):
                 # print('k', j)
                 if line[j] == "=":
                     kv_key_section = False
-                    keys.append(line[i:j])
+                    keys.append(line[i:j].strip())
                     j += 1
                     i = j
                 else:
