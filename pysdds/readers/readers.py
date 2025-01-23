@@ -1988,7 +1988,7 @@ def _read_pages_ascii_mixed_lines(
             # lines = [file.readline() for i in range(page_size)]
             # buf = io.BytesIO(b''.join(lines))
             opts = dict(
-                delim_whitespace=True,
+                sep="\s+",
                 comment="!",
                 header=None,
                 escapechar="\\",
@@ -2559,7 +2559,7 @@ def _read_pages_ascii_numeric_lines(
                 # lines = [file.readline() for i in range(page_size)]
                 # buf = io.BytesIO(b''.join(lines))
                 opts = dict(
-                    delim_whitespace=True,
+                    sep="\s+",
                     comment="!",
                     header=None,
                     escapechar="\\",
@@ -2617,7 +2617,7 @@ def _read_pages_ascii_numeric_lines(
                     f"parse_table"
                 )
                 opts = dict(
-                    delim_whitespace=True,
+                    sep="\s+",
                     comment="!",
                     header=None,
                     escapechar="\\",
