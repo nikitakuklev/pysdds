@@ -594,6 +594,7 @@ def __get_next_line(
     """Find next line that has valid SDDS data"""
 
     def detab(s):
+        # TODO: check if faster as a str.translate
         return s.replace("\t", " ") if replace_tabs else s
 
     line = None
@@ -713,7 +714,7 @@ def _read_header_fullstream(
                 line = __get_next_line(
                     stream, accept_meta_commands=False, cut_midline_comments=False
                 )  # stream.readline().decode('ascii')
-                logger.debug(f"Adding line {line} to multi-line namelist")
+                logger.debug(f"Adding line [{repr(line)}] to multi-line namelist")
                 if line is None:
                     raise SDDSReadError("Unexpected EOF during header parsing")
                 buffer += line
@@ -932,6 +933,7 @@ def _read_header_fullstream(
     sdds.n_arrays = len(sdds.arrays)
     sdds.n_columns = len(sdds.columns)
 
+translation_remove_endings = str.maketrans({'\r':' ', '\n': ' '})
 
 def _read_header_v2(
     file: IO[bytes], sdds: SDDSFile, mode: str, endianness: str
@@ -944,10 +946,10 @@ def _read_header_v2(
     if DEBUG2:
         logger.debug("Parsing header with streaming reader")
     version_line = file.readline(10).decode("ascii").rstrip()
-    line_num = 1
+    namelist_idx = 1
     if version_line[:4] != "SDDS" or len(version_line) != 5:
         raise AttributeError(
-            f"Header parsing failed on line {line_num}: {repr(version_line)} is not a valid version"
+            f"Header parsing failed on line {namelist_idx}: {repr(version_line)} is not a valid version"
         )
 
     try:
@@ -966,34 +968,40 @@ def _read_header_v2(
     namelists = []
 
     def __find_next_namelist(stream, accept_meta_commands=False):
-        # accumulate multi-line parameters
+        # accumulate multi-line parameters to find a complete namelist
         line = buffer = __get_next_line(
             stream,
             accept_meta_commands=accept_meta_commands,
             cut_midline_comments=False,
         )  # file.readline().decode('ascii')
+        line_cnt = 0
         if accept_meta_commands and line.startswith("!#"):
             return buffer.strip()
         else:
+            #buffer = buffer.translate(translation_remove_endings)
             while not line.rstrip().endswith("&end"):
                 line = __get_next_line(
                     stream, accept_meta_commands=False, cut_midline_comments=False
                 )  # stream.readline().decode('ascii')
-                logger.debug(f"Adding line {line} to multi-line namelist")
+                logger.debug("Adding line [%s] to multi-line namelist", repr(line))
                 if line is None:
                     raise SDDSReadError("Unexpected EOF during header parsing")
+                #sline = line.translate(translation_remove_endings)
                 buffer += line
+                line_cnt += 1
             buffer2 = buffer.strip()
+        if TRACE:
+            logger.debug("Found end of multi-line namelist after [%d] lines", line_cnt)
         return buffer2
 
     meta_endianness_set = False
     while True:
         line = __find_next_namelist(file, accept_meta_commands=True)
         # line = file.readline().decode('ascii').strip('\n')
-        len_line = len(line)
-        line_num += 1
+        # len_line = len(line)
+        namelist_idx += 1
         if TRACE:
-            logger.debug("Line %d: %s", line_num, line)
+            logger.debug("Namelist %d: [%s]", namelist_idx, repr(line))
         if line.startswith("!"):
             if not line.startswith("!#"):
                 raise Exception(line)
@@ -1025,11 +1033,11 @@ def _read_header_v2(
         try:
             tags, keys, values = tokenize_namelist(line)
         except Exception as ex:
-            raise SDDSReadError(f'Failed to parse namelist from "{line}" ({ex=})')
+            raise SDDSReadError(f'Failed to parse namelist from "{repr(line)}" ({ex=})')
 
-        assert len(tags) == 2
-        assert tags[1] == "&end"
-        assert len(keys) == len(values)
+        assert len(tags) == 2, f'Invalid tags {tags}'
+        assert tags[1] == "&end", f'Invalid tags {tags}'
+        assert len(keys) == len(values), f'Keys and values do not match {keys} | {values}'
         command = tags[0]
         nm_dict = {k: v for k, v in zip(keys, values)}
         if DEBUG2:
@@ -1117,7 +1125,7 @@ def _read_header_v2(
             sdds.associates.append(Associate(nm_dict))
         else:
             raise ValueError(
-                f"Unrecognized namelist command {command} on line {line_num}"
+                f"Unrecognized namelist command {command} on line {namelist_idx}"
             )
 
     if sdds.columns or sdds.parameters or sdds.arrays:

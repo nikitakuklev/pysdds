@@ -1,3 +1,8 @@
+from pysdds.util.errors import SDDSReadError
+
+delimiters = {"\r", "\n", " "}
+delimiterscomma = {",", "\r", "\n", " "}
+
 def tokenize_namelist(line):
     assert line[0] == "&", f"Unexpected namelist start {line[0]}"
     tags = []
@@ -19,11 +24,12 @@ def tokenize_namelist(line):
 
     while True:
         if mode_gap:
+            # gap between tag/key/value, i.e. space
             # print('gap', j)
             if j >= len(line):
                 # print('end')
                 break
-            if line[j] != " ":
+            if line[j] not in delimiters:
                 i = j
                 mode_gap = False
             else:
@@ -34,18 +40,18 @@ def tokenize_namelist(line):
                 mode_tag = True
             else:
                 if len(tags) == 0:
-                    raise Exception("Expect first element to be a tag")
+                    raise SDDSReadError("Expect first element to be a tag")
                 # print('call kv')
                 mode_kv = True
             parsing_tag_or_kv = True
         elif mode_tag:
             # print('tag',j)
             if not saw_tag_start:
-                assert line[j] == "&"
+                assert line[j] == "&", f"Unexpected tag start {line[j]=} at {j}"
                 saw_tag_start = True
                 j += 1
-            if j >= len(line) or line[j] == " ":
-                tags.append(line[i:j].strip())
+            if j >= len(line) or line[j] in delimiters:
+                tags.append(line[i:j])
                 i = j
                 mode_gap = True
                 mode_tag = False
@@ -58,7 +64,7 @@ def tokenize_namelist(line):
                 # print('k', j)
                 if line[j] == "=":
                     kv_key_section = False
-                    keys.append(line[i:j].strip())
+                    keys.append(line[i:j])
                     j += 1
                     i = j
                 else:
@@ -76,6 +82,7 @@ def tokenize_namelist(line):
                         j += 1
                         i = j
                     continue
+
                 if value_quote_mode:
                     nextchar = line[j + 1]
                     if value_escape_next:
@@ -88,15 +95,14 @@ def tokenize_namelist(line):
                             value_escape_next = True
                             j += 1
                         elif currentchar == '"':
-                            # end of quoted segment
+                            # end of quoted segment and value
                             values.append(buffer)
                             buffer = ""
                             j += 2
                             i = j
-                            value_quote_mode = False
-                            value_parse_started = False
-                            mode_kv = False
+                            value_parse_started = mode_kv = value_quote_mode = False
                             kv_key_section = True
+                            #print("end of quoted segment", values[-1])
 
                             if nextchar != ",":
                                 # might not have comma if only a single item or at the end
@@ -104,19 +110,20 @@ def tokenize_namelist(line):
                                 found_next_item_or_end = False
                                 for jmp in range(0, 20):
                                     c = line[j + jmp]
-                                    if c == " ":
+                                    #print("nextscan ", jmp, c)
+                                    if c in delimiters:
                                         continue
                                     elif c == ",":
-                                        mode_gap = True
+                                        mode_gap = found_next_item_or_end = True
                                         parsing_tag_or_kv = False
-                                        found_next_item_or_end = True
                                         j += jmp
+                                        i = j
                                         break
                                     elif c == "&":
-                                        mode_tag = True
-                                        parsing_tag_or_kv = True
-                                        found_next_item_or_end = True
+                                        # found &end tag hopefully
+                                        mode_tag = parsing_tag_or_kv = found_next_item_or_end = True
                                         j += jmp
+                                        i = j
                                         break
                                     else:
                                         raise ValueError(
@@ -146,21 +153,16 @@ def tokenize_namelist(line):
                         else:
                             buffer += currentchar
                             j += 1
-                    elif currentchar == "," or currentchar == " ":
-                        value_parse_started = False
-                        mode_kv = False
-                        mode_gap = True
-                        kv_key_section = True
-                        parsing_tag_or_kv = False
+                    elif currentchar in delimiterscomma:
+                        value_parse_started = mode_kv = parsing_tag_or_kv = False
+                        mode_gap = kv_key_section = True
                         values.append(buffer)
                         buffer = ""
                         j += 1
                         i = j
                     elif currentchar == "&":
-                        value_parse_started = False
-                        mode_kv = mode_gap = False
-                        mode_tag = True
-                        parsing_tag_or_kv = True
+                        value_parse_started = mode_kv = mode_gap = False
+                        mode_tag = parsing_tag_or_kv = True
                         values.append(buffer)
                         buffer = ""
                         i = j

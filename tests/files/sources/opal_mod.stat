@@ -1,0 +1,303 @@
+SDDS1
+&description
+text="Statistics data 'opal_statfile.in' 30/12/2024 19:36:53",
+contents="stat parameters"
+&end
+&parameter
+name=processors,
+type=long,
+description="Number of Cores used"
+&end
+&parameter
+name=revision,
+type=string,
+description="git revision of opal"
+&end
+&parameter
+name=flavor,
+type=string,
+description="OPAL flavor that wrote file"
+&end
+&column
+name=t,
+type=double,
+units=ns,
+description="1 Time"
+&end
+&column
+name=s,
+type=double,
+units=m,
+description="2 Path length"
+&end
+&column
+name=numParticles,
+type=long,
+units=1,
+description="3 Number of Macro Particles
+"
+&end
+&column
+name=charge,
+type=double,
+units=1,
+description="
+4 Bunch Charge"
+&end
+&column
+name=energy,
+type=double,
+units=MeV,
+description="5 Mean Bunch
+ Energy"
+&end
+&column
+        name=rms_x,        type=double,
+        units=m,
+        description="6 RMS Beamsize in x"
+&end
+&column
+        name=rms_y,        type=double,
+        units=m,
+        description="7 RMS Beamsize in y"
+&end
+&column
+        name=rms_s,        type=double,
+        units=m,
+        description="8 RMS Beamsize in s"
+&end
+&column
+        name=rms_px,        type=double,
+        units=1,
+        description="9 RMS Normalized Momenta in x"
+&end
+&column
+        name=rms_py,        type=double,        units=1,
+        description="10 RMS Normalized Momenta in y"
+&end
+&column
+        name=rms_ps,        type=double,        units=1,        description="11 RMS Normalized Momenta in s"
+&end
+&column
+        name=emit_x,        type=double,        units=m,        description="12 Normalized Emittance x"
+&end
+&column
+        name=emit_y,
+        type=double,
+        units=m,
+
+
+        description="13 Normalized Emittance y"
+&end
+&column
+        name=emit_s,
+        type=double,
+        units=m,
+
+
+        description="14 Normalized Emittance s"
+&end
+&column
+        name=mean_x,
+
+        type=double,
+
+        units=m,
+
+        description="15 Mean Beam Position in x"
+
+&end
+&column
+
+        name=mean_y,
+        type=double,
+        units=m,
+        description="16 Mean Beam Position in y"
+&end
+&column
+        name=mean_s,
+        type=double,
+        units=m,
+        description="17 Mean Beam Position in s"
+
+&end
+&column        name=ref_x,        type=double,        units=m,        description="18 x coordinate of reference particle in lab cs" &end
+&column
+        name=ref_y,
+        type=double,
+        units=m,
+        description="19 y coordinate of reference particle in lab cs"
+
+        &end
+
+&column
+        name=ref_z,
+        type=double,
+        units=m,
+        description="20 z coordinate of reference particle in lab cs"
+&end
+&column
+        name=ref_px,
+        type=double,
+        units=1,
+        description="21 x momentum of reference particle in lab cs"
+&end
+&column
+        name=ref_py,
+        type=double,
+        units=1,
+        description="22 y momentum of reference particle in lab cs"
+&end
+&column
+        name=ref_pz,
+        type=double,
+        units=1,
+        description="23 z momentum of reference particle in lab cs"
+&end
+&column
+        name=max_x,
+        type=double,
+        units=m,
+        description="24 Max Beamsize in x"
+&end
+&column
+        name=max_y,
+        type=double,
+        units=m,
+        description="25 Max Beamsize in y"
+&end
+&column
+        name=max_s,
+        type=double,
+        units=m,
+        description="26 Max Beamsize in s"
+&end
+&column
+        name=xpx,
+        type=double,
+        units=1,
+        description="27 Correlation xpx"
+&end
+&column
+        name=ypy,
+        type=double,
+        units=1,
+        description="28 Correlation ypy"
+&end
+&column
+        name=zpz,
+        type=double,
+        units=1,
+        description="29 Correlation zpz"
+&end
+&column
+        name=Dx,
+        type=double,
+        units=m,
+        description="30 Dispersion in x"
+&end
+&column
+        name=DDx,
+        type=double,
+        units=1,
+        description="31 Derivative of dispersion in x"
+&end
+&column
+        name=Dy,
+        type=double,
+        units=m,
+        description="32 Dispersion in y"
+&end
+&column
+        name=DDy,
+        type=double,
+        units=1,
+        description="33 Derivative of dispersion in y"
+&end
+&column
+        name=Bx_ref,
+        type=double,
+        units=T,
+        description="34 Bx-Field component of ref particle"
+&end
+&column
+        name=By_ref,
+        type=double,
+        units=T,
+        description="35 By-Field component of ref particle"
+&end
+&column
+        name=Bz_ref,
+        type=double,
+        units=T,
+        description="36 Bz-Field component of ref particle"
+&end
+&column
+        name=Ex_ref,
+        type=double,
+        units=MV/m,
+        description="37 Ex-Field component of ref particle"
+&end
+&column
+        name=Ey_ref,
+        type=double,
+        units=MV/m,
+        description="38 Ey-Field component of ref particle"
+&end
+&column
+        name=Ez_ref,
+        type=double,
+        units=MV/m,
+        description="39 Ez-Field component of ref particle"
+&end
+&column
+        name=dE,
+        type=double,
+        units=MeV,
+        description="40 energy spread of the beam"
+&end
+&column
+        name=dt,
+        type=double,
+        units=ns,
+        description="41 time step size"
+&end
+&column
+name=partsOutside,
+type=double,
+units=1,
+description="42 outside n*sigma of the beam"
+&end
+&column
+name=DebyeLength,
+type=double,
+units=m,
+description="43 Debye length in the boosted frame"
+&end
+&column
+name=plasmaParameter,
+type=double,
+units=1,
+description="44 Plasma parameter that gives no. of particles in a Debye sphere"
+&end
+&column
+name=temperature,
+type=double,
+units=K,
+description="45 Temperature of the beam"
+&end
+&column
+name=rmsDensity,
+type=double,
+units=1,
+description="46 RMS number density of the beam"
+&end
+&data
+mode=ascii,
+no_row_counts=1
+&end
+20
+OPAL 2022.1.0 git rev. #unknown
+opal-t
+-4.376144846077957e-04         	0.000000000000000e+00         	86962         	-2.169482668067031e-10         	3.781610958441641e-03         	2.389540867001578e-04         	2.397513822167144e-04         	3.678389044433761e-05         	8.497123672538537e-04         	8.483366795880832e-04         	6.176220712306880e-02         	2.029980252780447e-07         	2.033505837200732e-07         	5.696263640765215e-07         	8.771623056366529e-07         	-5.475811961140681e-07         	3.911742344390707e-05         	0.000000000000000e+00         	0.000000000000000e+00         	0.000000000000000e+00         	0.000000000000000e+00         	0.000000000000000e+00         	7.335951643289267e-04         	5.006583015697878e-04         	4.995425178152106e-04         	1.445341477418393e-04         	-2.086866835056902e-02         	-1.965932849969060e-02         	9.680565623746830e-01         	4.127853015532920e-08         	-2.903335087938870e-08         	-7.017195015780920e-08         	-6.096392492903285e-08         	0.000000000000000e+00         	0.000000000000000e+00         	-2.821405785135528e-04         	0.000000000000000e+00         	0.000000000000000e+00         	-9.342045634089880e+01         	3.638406220177802e-03         	1.107884771158976e-05         	0         	0.000000000000000e+00         	0.000000000000000e+00         	0.000000000000000e+00         	0.000000000000000e+00         	
+-3.268260074918981e-04         	0.000000000000000e+00         	88886         	-2.217481617646849e-10         	4.000308355038635e-03         	2.390797648430835e-04         	2.397327639249279e-04         	3.880679299855753e-05         	8.495769754349716e-04         	8.483487706717333e-04         	6.349460509808555e-02         	2.030566436279210e-07         	2.033174266559348e-07         	6.105948414857892e-07         	7.514542786128846e-07         	-4.231579202782537e-07         	4.174026998238569e-05         	0.000000000000000e+00         	0.000000000000000e+00         	0.000000000000000e+00         	0.000000000000000e+00         	0.000000000000000e+00         	7.335951643289267e-04         	5.006926503955260e-04         	4.995796388676153e-04         	1.523505979189851e-04         	2.430847306216460e-02         	2.420149004957597e-02         	9.688101518220645e-01         	4.422226152602051e-08         	-3.246613849064526e-08         	-7.112144131919180e-08         	-5.385944806434611e-08         	0.000000000000000e+00         	0.000000000000000e+00         	-2.821405785135528e-04         	0.000000000000000e+00         	0.000000000000000e+00         	-9.372814065724161e+01         	3.834503481339451e-03         	1.107884771158976e-05         	0         	0.000000000000000e+00         	0.000000000000000e+00         	0.000000000000000e+00         	0.000000000000000e+00         	
