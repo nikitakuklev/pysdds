@@ -68,6 +68,7 @@ def test_round_trip_sources(file_root):
     buf = io.BytesIO()
     pysdds.write(sdds, buf)
     buf.seek(0)
+    #print(buf.getvalue().decode())
     sdds2 = pysdds.read(io.BufferedReader(buf))
     assert sdds2.endianness == sdds.endianness
     sdds.compare(sdds2)

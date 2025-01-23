@@ -675,6 +675,9 @@ def _dump_data_ascii(sdds: SDDSFile, file: IO[bytes], best_settings):
         )
 
         for page_idx in range(sdds.n_pages):
+            if page_idx > 0 and sdds.data.no_row_counts == 1:
+                # Must indicate new page if row count is missing
+                append("")
             append(f"! page number {page_idx}")
             for j, p in enumerate(sdds.parameters):
                 if p.fixed_value is None:

@@ -1312,7 +1312,7 @@ def _read_pages_binary(
             raise ValueError(
                 f"Page size ({page_size}) ({byte_array}) is unreasonable - is file not {endianness}-endian?"
             )
-        logger.debug(f"Page {page_idx} size is {page_size} | {byte_array=}")
+        logger.debug(f"Page %d size is %d | byte_array=%s", page_idx, page_size, byte_array)
 
         # Parameter loop
         for i, el in enumerate(parameters):
