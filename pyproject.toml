@@ -1,5 +1,8 @@
 [build-system]
-requires = ["setuptools>=60", "tomli; python_version < '3.11'"]
+requires = ["setuptools>=60",
+            "tomli; python_version < '3.11'",
+            "setuptools_scm>=8.0"
+]
 build-backend = "setuptools.build_meta"
 
 
@@ -32,6 +35,9 @@ dynamic = ['version']
 
 [project.urls]
 "Homepage" = "https://github.com/nikitakuklev/pysdds"
+
+
+[tool.setuptools_scm]
 
 
 [tool.ruff]
