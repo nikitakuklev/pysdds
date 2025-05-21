@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools", "tomli; python_version < '3.11'"]
+requires = ["setuptools>=60", "tomli; python_version < '3.11'"]
 build-backend = "setuptools.build_meta"
 
 
@@ -17,6 +17,7 @@ classifiers = [
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Topic :: Scientific/Engineering",
@@ -33,7 +34,12 @@ dynamic = ['version']
 "Homepage" = "https://github.com/nikitakuklev/pysdds"
 
 
+[tool.ruff]
+line-length = 120
+
+
 [tool.setuptools.packages.find]
+where = ["."]
 include = ['pysdds*']
 
 
