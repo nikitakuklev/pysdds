@@ -6,39 +6,40 @@ from pathlib import Path
 import itertools
 
 cwd = Path(__file__).parent
-root_sources = cwd / 'files'
-print(f'Executing readers in {cwd=} {root_sources=}')
-subroots = ['sources', 'sources_binary_rowmajor', 'sources_binary_colmajor', 'sources_ascii']
+root_sources = cwd / "files"
+print(f"Executing readers in {cwd=} {root_sources=}")
+subroots = ["sources", "sources_binary_rowmajor", "sources_binary_colmajor", "sources_ascii"]
 to_str = lambda l: [str(s) for s in l]
 
-ff = to_str((root_sources / 'sources').glob('*'))
-ff_ascii = to_str((root_sources / 'sources_ascii').glob('*'))
-ff_binary_colmajor = to_str((root_sources / 'sources_binary_colmajor').glob('*'))
-ff_binary_rowmajor = to_str((root_sources / 'sources_binary_rowmajor').glob('*'))
+ff = to_str((root_sources / "sources").glob("*"))
+ff_ascii = to_str((root_sources / "sources_ascii").glob("*"))
+ff_binary_colmajor = to_str((root_sources / "sources_binary_colmajor").glob("*"))
+ff_binary_rowmajor = to_str((root_sources / "sources_binary_rowmajor").glob("*"))
 
-fc = to_str((root_sources / 'sources_compressed').glob('*'))
-fc_ascii = to_str((root_sources / 'sources_compressed_ascii').glob('*'))
-fc_binary_colmajor = to_str((root_sources / 'sources_compressed_binary_colmajor').glob('*'))
-fc_binary_rowmajor = to_str((root_sources / 'sources_compressed_binary_rowmajor').glob('*'))
+fc = to_str((root_sources / "sources_compressed").glob("*"))
+fc_ascii = to_str((root_sources / "sources_compressed_ascii").glob("*"))
+fc_binary_colmajor = to_str((root_sources / "sources_compressed_binary_colmajor").glob("*"))
+fc_binary_rowmajor = to_str((root_sources / "sources_compressed_binary_rowmajor").glob("*"))
 
-fl = to_str((root_sources / 'sources_large').glob('*'))
-fl_ascii = to_str((root_sources / 'sources_large_ascii').glob('*'))
-fl_binary_colmajor = to_str((root_sources / 'sources_large_binary_colmajor').glob('*'))
-fl_binary_rowmajor = to_str((root_sources / 'sources_large_binary_rowmajor').glob('*'))
+fl = to_str((root_sources / "sources_large").glob("*"))
+fl_ascii = to_str((root_sources / "sources_large_ascii").glob("*"))
+fl_binary_colmajor = to_str((root_sources / "sources_large_binary_colmajor").glob("*"))
+fl_binary_rowmajor = to_str((root_sources / "sources_large_binary_rowmajor").glob("*"))
 
-files_all_nolarge = (ff + ff_ascii + ff_binary_colmajor
-                     + ff_binary_rowmajor + fc)
-files_all = (ff + ff_ascii + ff_binary_colmajor + ff_binary_rowmajor +
-             fl + fc)
+files_all_nolarge = ff + ff_ascii + ff_binary_colmajor + ff_binary_rowmajor + fc
+files_all = ff + ff_ascii + ff_binary_colmajor + ff_binary_rowmajor + fl + fc
 
 get_names = lambda xa: [Path(x).name for x in xa]
 get_name = lambda x: Path(x).name
 
 # Generate pairs [(file1, file1_ascii, ...), (file2, ...)] for equality testing
 file_name_dict = {}
-for l in [ff + fc + fl, ff_ascii + fc_ascii + fl_ascii,
-          ff_binary_rowmajor + fc_binary_rowmajor + fl_binary_rowmajor,
-          ff_binary_colmajor + fc_binary_colmajor + fl_binary_colmajor]:
+for l in [
+    ff + fc + fl,
+    ff_ascii + fc_ascii + fl_ascii,
+    ff_binary_rowmajor + fc_binary_rowmajor + fl_binary_rowmajor,
+    ff_binary_colmajor + fc_binary_colmajor + fl_binary_colmajor,
+]:
     for f in l:
         name = get_name(f)
         if name in file_name_dict:
@@ -74,7 +75,7 @@ def test_read(file_root):
 # TODO: compressed stream support
 @pytest.mark.parametrize("file_root", ff)
 def test_read_buffer(file_root):
-    with open(file_root, 'rb') as fs:
+    with open(file_root, "rb") as fs:
         buf = fs.read()
         stream = io.BytesIO(buf)
         bstream = io.BufferedReader(stream)
@@ -103,6 +104,20 @@ def test_read_binary2(file_root):
 @pytest.mark.parametrize("file_root", ff_ascii + fc_ascii)
 def test_read_ascii(file_root):
     sdds = pysdds.read(file_root)
+    sdds.validate_data()
+    stream_ascii_windows = open(file_root, "rb").read().replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
+    winstream = io.BytesIO(stream_ascii_windows)
+    bstream = io.BufferedReader(winstream)
+    sdds = pysdds.read(bstream)
+    sdds.validate_data()
+
+
+@pytest.mark.parametrize("file_root", ff_ascii)
+def test_read_ascii_win(file_root):
+    stream_ascii_windows = open(file_root, "rb").read().replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
+    winstream = io.BytesIO(stream_ascii_windows)
+    bstream = io.BufferedReader(winstream)
+    sdds = pysdds.read(bstream)
     sdds.validate_data()
 
 
