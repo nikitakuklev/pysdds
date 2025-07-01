@@ -5,12 +5,11 @@ import numpy as np
 import pytest
 import pysdds
 from pathlib import Path
-import random
 
 cwd = Path(__file__).parent
-root_sources = cwd / 'files'
+root_sources = cwd / "files"
 to_str = lambda l: [str(s) for s in l]
-ff = to_str((root_sources / 'sources').glob('*'))
+ff = to_str((root_sources / "sources").glob("*"))
 
 
 @pytest.mark.parametrize("file_root", ff)
@@ -35,7 +34,7 @@ def test_read_cols(file_root):
                 assert len(c.data) == 0
 
 
-file_ts = [str(root_sources / 'sources_compressed/timeSeries.sdds.xz')]
+file_ts = [str(root_sources / "sources_compressed/timeSeries.sdds.xz")]
 
 
 @pytest.mark.parametrize("file_root", file_ts)
@@ -62,7 +61,7 @@ def test_page_mask(file_root):
 
 @pytest.mark.parametrize("file_root", file_ts)
 def test_col_mask(file_root):
-    sdds = pysdds.read(file_root, cols=['ReadbackName'])
+    sdds = pysdds.read(file_root, cols=["ReadbackName"])
     sdds.validate_data()
     assert sdds.n_pages == 157
     assert sdds.n_columns == 2

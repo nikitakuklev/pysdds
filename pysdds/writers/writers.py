@@ -37,12 +37,12 @@ _ASCII_TEXT_WRITE_METHOD = "sequential_python"
 
 
 def write(
-        sdds: SDDSFile,
-        filepath: Union[Path, str, BytesIO],
-        #          endianness: Optional[str] = 'auto',
-        compression: Optional[str] = None,
-        overwrite: Optional[bool] = False,
-        use_best_settings: bool = False,
+    sdds: SDDSFile,
+    filepath: Union[Path, str, BytesIO],
+    #          endianness: Optional[str] = 'auto',
+    compression: Optional[str] = None,
+    overwrite: Optional[bool] = False,
+    use_best_settings: bool = False,
 ):
     """
     Parameters
@@ -71,9 +71,7 @@ def write(
     elif issubclass(filepath.__class__, _io.IOBase):
         pass
     else:
-        raise Exception(
-                f"Filepath type {type(filepath)} is not a string, Path, or BytesIO object"
-        )
+        raise Exception(f"Filepath type {type(filepath)} is not a string, Path, or BytesIO object")
 
     mode = sdds.mode
 
@@ -97,9 +95,7 @@ def write(
     t_start = time.perf_counter()
 
     if isinstance(filepath, Path):
-        file = _open_write_file(
-                filepath, compression=compression, overwrite_ok=overwrite
-        )
+        file = _open_write_file(filepath, compression=compression, overwrite_ok=overwrite)
     else:
         # IO is already a stream
         file = _open_write_stream(filepath, compression=compression)
@@ -134,15 +130,16 @@ class WriterState(Enum):
 
 
 class IncrementalWriter:
-    def __init__(self,
-                 sdds: SDDSFile,
-                 filepath: Union[Path, str, BytesIO],
-                 compression: Optional[str] = None,
-                 overwrite: Optional[bool] = False,
-                 use_best_settings: bool = False,
-                 write_method: Optional[str] = 'fixed_rowcount',
-                 binary_fixed_rowcount: int = 1000000
-                 ):
+    def __init__(
+        self,
+        sdds: SDDSFile,
+        filepath: Union[Path, str, BytesIO],
+        compression: Optional[str] = None,
+        overwrite: Optional[bool] = False,
+        use_best_settings: bool = False,
+        write_method: Optional[str] = "fixed_rowcount",
+        binary_fixed_rowcount: int = 1000000,
+    ):
         assert isinstance(sdds, SDDSFile), "Data structure is not an SDDSFile!"
 
         if isinstance(filepath, str):
@@ -152,9 +149,7 @@ class IncrementalWriter:
         elif issubclass(filepath.__class__, _io.IOBase):
             pass
         else:
-            raise Exception(
-                    f"Filepath type {type(filepath)} is not a string, Path, or BytesIO object"
-            )
+            raise Exception(f"Filepath type {type(filepath)} is not a string, Path, or BytesIO object")
 
         if compression not in [None, "auto", "xz", "gz", "bz2"]:
             raise ValueError(f"SDDS compression ({compression}) is not recognized")
@@ -182,11 +177,11 @@ class IncrementalWriter:
         sdds.data = copy.deepcopy(sdds.data)
 
         if use_best_settings:
-            sdds.data.nm['no_row_counts'] = 0
-            sdds.data.nm['lines_per_row'] = 1
+            sdds.data.nm["no_row_counts"] = 0
+            sdds.data.nm["lines_per_row"] = 1
             sdds.data.__use_best_settings = True
-        sdds.data.nm['column_major_order'] = 0
-        if write_method == 'fixed_rowcount':
+        sdds.data.nm["column_major_order"] = 0
+        if write_method == "fixed_rowcount":
             sdds._meta_fixed_rowcount = True
         else:
             sdds._meta_fixed_rowcount = False
@@ -248,14 +243,13 @@ class IncrementalWriter:
             raise Exception("Cannot begin writing again")
 
         logger.debug('Opening write stream to "%s"', str(self.filepath))
-        logger.debug(f'Mode (%s), compression (%s), endianness (%s)',
-                     self.sdds.mode, self.compression, self.sdds.endianness)
+        logger.debug(
+            "Mode (%s), compression (%s), endianness (%s)", self.sdds.mode, self.compression, self.sdds.endianness
+        )
         t_start = time.perf_counter()
 
         if isinstance(self.filepath, Path):
-            file = _open_write_file(
-                    self.filepath, compression=self.compression, overwrite_ok=self.overwrite
-            )
+            file = _open_write_file(self.filepath, compression=self.compression, overwrite_ok=self.overwrite)
         else:
             # IO is already a stream
             file = _open_write_stream(self.filepath, compression=self.compression)
@@ -270,10 +264,7 @@ class IncrementalWriter:
         self.file.write(len_bytes)
         self.file.write(s.encode("ascii"))
 
-    def _new_page_binary(self,
-                         parameter_data: List[Union[str, int, float]],
-                         array_data: List[np.ndarray]
-                         ):
+    def _new_page_binary(self, parameter_data: List[Union[str, int, float]], array_data: List[np.ndarray]):
         file = self.file
         page_size = self.binary_fixed_rowcount
         page_bytes = page_size.to_bytes(4, self.endianness)
@@ -298,16 +289,13 @@ class IncrementalWriter:
                 for s in array_data[i]:
                     self._write_str_binary(s)
             elif t == "character":
-                file.write(
-                        array_data[i].astype("S1").view(self.NUMPY_DTYPE["character"])
-                )
+                file.write(array_data[i].astype("S1").view(self.NUMPY_DTYPE["character"]))
             else:
                 file.write(array_data[i].view(self.NUMPY_DTYPE[t]))
 
-    def _new_page_binary_fixed_rowcount(self,
-                                        parameter_data: List[Union[str, int, float]],
-                                        array_data: List[np.ndarray]
-                                        ):
+    def _new_page_binary_fixed_rowcount(
+        self, parameter_data: List[Union[str, int, float]], array_data: List[np.ndarray]
+    ):
         file = self.file
         page_size = self.binary_fixed_rowcount
         page_bytes = page_size.to_bytes(4, self.endianness)
@@ -333,14 +321,12 @@ class IncrementalWriter:
                 for s in array_data[i]:
                     self._write_str_binary(s)
             elif t == "character":
-                file.write(
-                        array_data[i].astype("S1").view(self.NUMPY_DTYPE["character"])
-                )
+                file.write(array_data[i].astype("S1").view(self.NUMPY_DTYPE["character"]))
             else:
                 file.write(array_data[i].view(self.NUMPY_DTYPE[t]))
 
     def _end_page_binary(self):
-        if self.write_method == 'fixed_rowcount':
+        if self.write_method == "fixed_rowcount":
             pass
 
     def end_page(self):
@@ -348,15 +334,12 @@ class IncrementalWriter:
             raise SDDSWriteException("Cannot close page when not writing one")
         logger.debug(f"Ending page {self.current_page}")
 
-        if self.write_method == 'fixed_rowcount':
+        if self.write_method == "fixed_rowcount":
             self._end_page_binary()
 
         self.write_stage = WriterState.READY_FOR_NEXT_PAGE
 
-    def new_page(self,
-                 parameter_data: List[Union[str, int, float]] = None,
-                 array_data: List[np.ndarray] = None
-                 ):
+    def new_page(self, parameter_data: List[Union[str, int, float]] = None, array_data: List[np.ndarray] = None):
         """
         Start writing a new page. Must be called after writing the header, and before writing any data.
         Can be called again at any point afterward to close current page and start next one.
@@ -365,7 +348,7 @@ class IncrementalWriter:
             raise SDDSWriteException(f"Cannot write new page in current state {self.write_stage}")
 
         if self.write_stage == WriterState.WRITING_PAGE:
-            if self.write_method == 'fixed_rowcount':
+            if self.write_method == "fixed_rowcount":
                 raise SDDSWriteException("Cannot write more than one page when using fixed_rowcount mode")
             else:
                 logger.debug(f"Ending page {self.current_page} implicitly due to new page request")
@@ -379,11 +362,11 @@ class IncrementalWriter:
         if self.mode == "ascii":
             raise NotImplementedError("Incremental writing is not supported in ASCII mode")
 
-        if self.write_method == 'fixed_rowcount':
+        if self.write_method == "fixed_rowcount":
             self._new_page_binary_fixed_rowcount(parameter_data, array_data)
-        elif self.write_method == 'seekable_page':
+        elif self.write_method == "seekable_page":
             raise NotImplementedError("Seekable page writing is not yet supported")
-        elif self.write_method == 'page_by_page':
+        elif self.write_method == "page_by_page":
             raise NotImplementedError("Variable rowcount writing is not yet supported")
             self._new_page_binary(parameter_data, array_data)
 
@@ -396,8 +379,8 @@ class IncrementalWriter:
         if not all(isinstance(arr, np.ndarray) for arr in data_arrays):
             # assume this is a single row
             assert all(isinstance(x, (str, float, int)) for x in data_arrays), (
-                f'Invalid data types in {data_arrays} for '
-                f'single rowrite')
+                f"Invalid data types in {data_arrays} for single rowrite"
+            )
             data_arrays_np = [np.array([x], dtype=self.column_types[i]) for i, x in enumerate(data_arrays)]
             logger.debug(f"Single row {data_arrays} converted to  {data_arrays_np}")
         else:
@@ -409,7 +392,7 @@ class IncrementalWriter:
         if self.mode == "ascii":
             raise NotImplementedError("Incremental writing is not supported in ASCII mode")
         else:
-            if self.write_method == 'fixed_rowcount':
+            if self.write_method == "fixed_rowcount":
                 self._write_rows_binary(data_arrays_np)
 
     def _write_rows_binary(self, data_arrays: list[np.ndarray]):
@@ -428,9 +411,7 @@ class IncrementalWriter:
                 logger.debug(f"Writing data {arr} with {t=} as string array")
                 page_data.append(arr)
             elif t == "character":
-                page_data.append(
-                        arr.astype("S1").view(dtype=self.NUMPY_DTYPE["character"])
-                )
+                page_data.append(arr.astype("S1").view(dtype=self.NUMPY_DTYPE["character"]))
             else:
                 logger.debug(f"Writing data {arr} with {t=} as view {self.column_types[i]=}")
                 page_data.append(arr.view(dtype=self.column_types[i]))
@@ -491,9 +472,7 @@ def _open_write_stream(stream: BytesIO, compression: str = None):
         raise ex
 
 
-def _open_write_file(
-        filepath: Path, compression: str = None, overwrite_ok: bool = False
-):
+def _open_write_file(filepath: Path, compression: str = None, overwrite_ok: bool = False):
     assert isinstance(filepath, Path)
 
     if filepath.exists():
@@ -662,16 +641,16 @@ def _dump_data_ascii(sdds: SDDSFile, file: IO[bytes], best_settings):
     if _ASCII_TEXT_WRITE_METHOD == "sequential_python":
         # Quoting needs to be handled carefully....
         opts = dict(
-                header=False,
-                index=False,
-                mode="wb",
-                encoding="utf-8",
-                compression=None,
-                line_terminator=NEWLINE_CHAR,
-                quotechar='"',
-                doublequote=False,
-                escapechar="\\",
-                # float_format='%.15e'
+            header=False,
+            index=False,
+            mode="wb",
+            encoding="utf-8",
+            compression=None,
+            line_terminator=NEWLINE_CHAR,
+            quotechar='"',
+            doublequote=False,
+            escapechar="\\",
+            # float_format='%.15e'
         )
 
         for page_idx in range(sdds.n_pages):
@@ -693,10 +672,7 @@ def _dump_data_ascii(sdds: SDDSFile, file: IO[bytes], best_settings):
 
             for i, el in enumerate(sdds.arrays):
                 data = el.data[page_idx]
-                append(
-                        " ".join([str(i) for i in data.shape])
-                        + f" ! {len(data.shape)}-dimensional array {el.name}"
-                )
+                append(" ".join([str(i) for i in data.shape]) + f" ! {len(data.shape)}-dimensional array {el.name}")
                 if el.type == "string":
                     sl = [encode_if_needed(v) for v in data]
                 elif el.type == "double":
@@ -724,16 +700,16 @@ def _dump_data_ascii(sdds: SDDSFile, file: IO[bytes], best_settings):
     elif _ASCII_TEXT_WRITE_METHOD == "pandas":
         # Quoting needs to be handled carefully....
         opts = dict(
-                header=False,
-                index=False,
-                mode="wb",
-                encoding="ascii",
-                compression=None,
-                line_terminator=NEWLINE_CHAR,
-                quotechar='"',
-                doublequote=False,
-                escapechar="\\",
-                # float_format='%.15e'
+            header=False,
+            index=False,
+            mode="wb",
+            encoding="ascii",
+            compression=None,
+            line_terminator=NEWLINE_CHAR,
+            quotechar='"',
+            doublequote=False,
+            escapechar="\\",
+            # float_format='%.15e'
         )
 
         param_df = sdds.parameters_to_df()
@@ -741,16 +717,11 @@ def _dump_data_ascii(sdds: SDDSFile, file: IO[bytes], best_settings):
             append(f"! page number {page_idx}")
 
             if len(sdds.parameters) > 0:
-                param_df.iloc[page_idx, :].to_csv(
-                        file, **opts, sep="\n", quoting=csv.QUOTE_MINIMAL
-                )
+                param_df.iloc[page_idx, :].to_csv(file, **opts, sep="\n", quoting=csv.QUOTE_MINIMAL)
 
             for i, el in enumerate(sdds.arrays):
                 data = el.data[page_idx]
-                append(
-                        " ".join([str(i) for i in data.shape])
-                        + f" ! {len(data.shape)}-dimensional array {el.name}"
-                )
+                append(" ".join([str(i) for i in data.shape]) + f" ! {len(data.shape)}-dimensional array {el.name}")
                 array_df = pd.DataFrame({"data": data}).T
                 array_df.to_csv(file, **opts, sep=" ", quoting=csv.QUOTE_MINIMAL)
 
@@ -881,9 +852,7 @@ def _dump_data_binary(sdds: SDDSFile, file: IO[bytes], endianness):
                 for s in el.data[page_idx]:
                     _write_str(s)
             elif t == "character":
-                file.write(
-                        el.data[page_idx].astype("S1").view(NUMPY_DTYPE["character"])
-                )
+                file.write(el.data[page_idx].astype("S1").view(NUMPY_DTYPE["character"]))
             else:
                 file.write(el.data[page_idx].view(NUMPY_DTYPE[t]))
 
@@ -893,9 +862,7 @@ def _dump_data_binary(sdds: SDDSFile, file: IO[bytes], endianness):
             if t == "string":
                 page_data.append(el.data[page_idx])
             elif t == "character":
-                page_data.append(
-                        el.data[page_idx].astype("S1").view(dtype=NUMPY_DTYPE["character"])
-                )
+                page_data.append(el.data[page_idx].astype("S1").view(dtype=NUMPY_DTYPE["character"]))
             else:
                 page_data.append(el.data[page_idx].view(dtype=column_types[i]))
             # print(t, el.data[page_idx], el.data[page_idx].dtype, page_data[-1])

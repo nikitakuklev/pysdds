@@ -116,9 +116,7 @@ def _open_file(
     # Check file size
     filesize = filepath.stat().st_size
     if filesize > 1e9:
-        logger.warning(
-            f"File size ({filesize / 1e9:.2f})MB is quite large and will cause performance issues"
-        )
+        logger.warning(f"File size ({filesize / 1e9:.2f})MB is quite large and will cause performance issues")
 
     if compression is not None and compression not in ["auto", "xz", "gz", "bz2"]:
         raise ValueError(f"Compression format ({compression}) is not recognized")
@@ -141,9 +139,7 @@ def _open_file(
                         match = c
                         break
                 compression = match  # None->no compression
-            logger.info(
-                f"Auto compression resolved as ({compression}) from file byte signature"
-            )
+            logger.info(f"Auto compression resolved as ({compression}) from file byte signature")
         else:
             extension = filepath.suffix.strip(".")
             if extension in ["xz", "7z", "lzma"]:
@@ -153,9 +149,7 @@ def _open_file(
             else:
                 compression = None
             if compression is not None:
-                logger.debug(
-                    f"Auto compression resolved as ({compression}) from file extension"
-                )
+                logger.debug(f"Auto compression resolved as ({compression}) from file extension")
 
     # By default, Python reads in small blocks of io.DEFAULT_BUFFER_SIZE = 8192
     # To encourage large reads and fully consuming small files, a large buffer is specified
@@ -189,9 +183,7 @@ def _open_file(
             # Will avoid peaking during parsing, so ok to not buffer
             buffered_stream = stream  # io.BufferedReader(stream, buffer_size=filesize)
             if TRACE:
-                logger.debug(
-                    f"File size {filesize} and parsing settings allow for full buffering"
-                )
+                logger.debug(f"File size {filesize} and parsing settings allow for full buffering")
                 logger.debug(f"Final stream: {buffered_stream}")
             return buffered_stream, stream_size, False
         except IOError as ex:
@@ -292,9 +284,7 @@ def read(
         elif all(isinstance(el, int) for el in arrays):
             array_mask_mode = 2
         else:
-            raise ValueError(
-                f"Array selection ({arrays}) is neither all strings nor all integer indices"
-            )
+            raise ValueError(f"Array selection ({arrays}) is neither all strings nor all integer indices")
 
     # Column consistency
     column_mask_mode = 0
@@ -304,9 +294,7 @@ def read(
         elif all(isinstance(c, int) for c in cols):
             column_mask_mode = 2
         else:
-            raise ValueError(
-                f"Column selection ({cols}) is neither all strings nor all integer indices"
-            )
+            raise ValueError(f"Column selection ({cols}) is neither all strings nor all integer indices")
 
     if mode not in ["auto", "binary", "ascii"]:
         raise ValueError(f"SDDS mode ({mode}) is not recognized")
@@ -383,8 +371,7 @@ def read(
         else:
             _read_header_fullstream(file, sdds, mode, endianness)
         logger.debug(
-            f"Header parsed: {len(sdds.parameters)} parameters, {len(sdds.arrays)} arrays,"
-            f" {len(sdds.columns)} columns"
+            f"Header parsed: {len(sdds.parameters)} parameters, {len(sdds.arrays)} arrays, {len(sdds.columns)} columns"
         )
         if TRACE:
             logger.debug(f"Params: {sdds.parameters}")
@@ -414,23 +401,15 @@ def read(
                 ldlen = ctypes.sizeof(ctypes.c_longdouble)
                 if ldinfo.dtype == np.dtype(np.float64):
                     assert ldlen == 8
-                    raise Exception(
-                        "longdouble is float64 on this platform, parsing not possible"
-                    )
+                    raise Exception("longdouble is float64 on this platform, parsing not possible")
                 elif ldinfo.dtype == np.dtype(np.float128):
                     assert ldlen == 16
-                    logger.warning(
-                        "longdouble values will be treated as np.float128 (80-bit, padded to 128bit)"
-                    )
+                    logger.warning("longdouble values will be treated as np.float128 (80-bit, padded to 128bit)")
                 else:
-                    raise Exception(
-                        f"Unexpected longdouble length ({ldinfo=})({ldlen=}), aborting"
-                    )
+                    raise Exception(f"Unexpected longdouble length ({ldinfo=})({ldlen=}), aborting")
         if sdds._meta_fixed_rowcount:
             if sdds.mode != "binary":
-                raise ValueError(
-                    f'Meta-command "!# fixed-rowcount" requires binary mode, not {sdds.mode}'
-                )
+                raise ValueError(f'Meta-command "!# fixed-rowcount" requires binary mode, not {sdds.mode}')
 
         # Verify that parameter, array, column, and page masks can be applied
         if array_mask_mode == 0:
@@ -441,12 +420,8 @@ def read(
             parsed_set = set(parsed_names)
             items_dict = sdds.array_dict
             if not available_set.issubset(parsed_set):
-                raise ValueError(
-                    f"Requested arrays ({arrays}) are not a subset of available ({parsed_names})"
-                )
-            array_mask = [
-                True if el.name in available_set else False for el in sdds.arrays
-            ]
+                raise ValueError(f"Requested arrays ({arrays}) are not a subset of available ({parsed_names})")
+            array_mask = [True if el.name in available_set else False for el in sdds.arrays]
             for c in parsed_set.difference(available_set):
                 items_dict[c]._enabled = False
         elif array_mask_mode == 2:
@@ -463,12 +438,8 @@ def read(
             available_set = set(cols)
             parsed_set = set(parsed_names)
             if not available_set.issubset(parsed_set):
-                raise ValueError(
-                    f"Requested columns ({cols}) are not a subset file data ({parsed_names})"
-                )
-            column_mask = [
-                True if c.name in available_set else False for c in sdds.columns
-            ]
+                raise ValueError(f"Requested columns ({cols}) are not a subset file data ({parsed_names})")
+            column_mask = [True if c.name in available_set else False for c in sdds.columns]
             for c in parsed_set.difference(available_set):
                 sdds.columns_dict[c]._enabled = False
         elif column_mask_mode == 2:
@@ -494,9 +465,7 @@ def read(
         # Skip lines if necessary
         if sdds.data.additional_header_lines != 0:
             if sdds.mode == "binary":
-                logger.warning(
-                    'Option "additional_header_lines" will be ignored in binary mode'
-                )
+                logger.warning('Option "additional_header_lines" will be ignored in binary mode')
             else:
                 for i in range(sdds.data.additional_header_lines):
                     file.readline()
@@ -513,25 +482,18 @@ def read(
         else:
             # Need to use BufferedReader since file end is detected by peek()
             if not peek_available:
-                logger.debug(
-                    "Wrapping stream in buffered reader since peek() was not available"
-                )
+                logger.debug("Wrapping stream in buffered reader since peek() was not available")
                 file = io.BufferedReader(file)
             # Streaming ascii data is not yet supported because performance is bad
             if sdds.data.lines_per_row != 1:
-                raise NotImplementedError(
-                    f"lines_per_row = {sdds.data.lines_per_row} is not yet " "supported"
-                )
+                raise NotImplementedError(f"lines_per_row = {sdds.data.lines_per_row} is not yet supported")
 
             if sdds.data.no_row_counts != 0:
                 # suppressed warning - too annoying...yolo
                 logger.debug("no_row_counts mode support is experimental, be careful")
 
             if is_columns_numeric:
-                logger.debug(
-                    f"Calling ASCII numeric column parser with "
-                    f"{_ASCII_NUMERIC_PARSE_METHOD=}"
-                )
+                logger.debug(f"Calling ASCII numeric column parser with {_ASCII_NUMERIC_PARSE_METHOD=}")
                 _read_pages_ascii_numeric_lines(
                     file,
                     sdds,
@@ -540,9 +502,7 @@ def read(
                     pages_mask=pages_mask,
                 )
             else:
-                logger.debug(
-                    f"Calling ASCII mixed column parser with method {_ASCII_TEXT_PARSE_METHOD}"
-                )
+                logger.debug(f"Calling ASCII mixed column parser with method {_ASCII_TEXT_PARSE_METHOD}")
                 _read_pages_ascii_mixed_lines(
                     file,
                     sdds,
@@ -553,9 +513,7 @@ def read(
 
         if pages is not None:
             if sdds.n_pages != len(pages):
-                raise IOError(
-                    f"Parser failed - got {sdds.n_pages} pages while {len(pages)} were requested"
-                )
+                raise IOError(f"Parser failed - got {sdds.n_pages} pages while {len(pages)} were requested")
     finally:
         file.close()
 
@@ -618,15 +576,11 @@ def __get_next_line(
                     if accept_meta_commands:
                         return line
                     else:
-                        raise ValueError(
-                            f"Meta-command {line} encountered unexpectedly"
-                        )
+                        raise ValueError(f"Meta-command {line} encountered unexpectedly")
                 else:
                     # Regular comment
                     if TRACE:
-                        logger.debug(
-                            f">>NXL | pos {stream.tell()} | SKIP FULL {repr(line)}"
-                        )
+                        logger.debug(f">>NXL | pos {stream.tell()} | SKIP FULL {repr(line)}")
                     line = None
                     continue
             else:
@@ -639,22 +593,15 @@ def __get_next_line(
                         if cut_midline_without_quotes and '"' in line[idx + 1 :]:
                             line_cut = line
                             if TRACE:
-                                logger.debug(
-                                    f">>NXL {stream.tell()} | NO CUT QUOTES {repr(line)} ->"
-                                    f" {repr(line_cut)}"
-                                )
+                                logger.debug(f">>NXL {stream.tell()} | NO CUT QUOTES {repr(line)} -> {repr(line_cut)}")
                         else:
                             line_cut = line[:idx]
                             if TRACE:
-                                logger.debug(
-                                    f">>NXL {stream.tell()} | CUT LINE {repr(line)} -> {repr(line_cut)}"
-                                )
+                                logger.debug(f">>NXL {stream.tell()} | CUT LINE {repr(line)} -> {repr(line_cut)}")
                     else:
                         line_cut = line
                         if TRACE:
-                            logger.debug(
-                                f">>NXL {stream.tell()} | escaped comment, not cutting {repr(line)}"
-                            )
+                            logger.debug(f">>NXL {stream.tell()} | escaped comment, not cutting {repr(line)}")
                 else:
                     line_cut = line
                 if strip:
@@ -668,9 +615,7 @@ def __get_next_line(
                 return detab(line)
 
 
-def _read_header_fullstream(
-    file: IO[bytes], sdds: SDDSFile, mode: str, endianness: str
-) -> None:
+def _read_header_fullstream(file: IO[bytes], sdds: SDDSFile, mode: str, endianness: str) -> None:
     """
     Read SDDS header - the ASCII text that described the data contained in the SDDS file. This parser uses the common
     approach of ingesting a stream of bytes and checking tokens, meaning it works on more input types but is slower
@@ -681,9 +626,7 @@ def _read_header_fullstream(
     version_line = file.readline(10).decode("ascii").rstrip()
     line_num = 1
     if version_line[:4] != "SDDS" or len(version_line) != 5:
-        raise AttributeError(
-            f"Header parsing failed on line {line_num}: {repr(version_line)} is not a valid version"
-        )
+        raise AttributeError(f"Header parsing failed on line {line_num}: {repr(version_line)} is not a valid version")
 
     try:
         sdds_version = int(version_line[4])
@@ -691,9 +634,7 @@ def _read_header_fullstream(
         raise AttributeError(f"Unrecognized SDDS version: {version_line[5]}")
 
     if sdds_version > 5 or sdds_version < 1:
-        raise ValueError(
-            f"This package only supports SDDS version 5 or lower, file is version {sdds_version}"
-        )
+        raise ValueError(f"This package only supports SDDS version 5 or lower, file is version {sdds_version}")
 
     if DEBUG2:
         logger.debug(f"File version: {version_line}")
@@ -738,18 +679,14 @@ def _read_header_fullstream(
                     logger.debug(f"Binary file endianness set to ({sdds.endianness}) from meta-command")
                     meta_endianness_set = True
                 else:
-                    raise ValueError(
-                        f"File endianness ({line}) does not match requested one ({endianness})"
-                    )
+                    raise ValueError(f"File endianness ({line}) does not match requested one ({endianness})")
             elif line == "!# little-endian":
                 if endianness == "auto" or endianness == "little":
                     sdds.endianness = "little"
                     logger.debug(f"Binary file endianness set to ({sdds.endianness}) from meta-command")
                     meta_endianness_set = True
                 else:
-                    raise ValueError(
-                        f"File endianness ({line}) does not match requested one ({endianness})"
-                    )
+                    raise ValueError(f"File endianness ({line}) does not match requested one ({endianness})")
             elif line == "!# fixed-rowcount":
                 logger.debug("Fixed rowcount meta-command found - setting flag")
                 sdds._meta_fixed_rowcount = True
@@ -866,38 +803,28 @@ def _read_header_fullstream(
                 raise ValueError("Duplicate description entry found")
             expected_keys = _KEYS_DESCRIPTION
             if not nm_keys.issubset(expected_keys):
-                raise AttributeError(
-                    f"Namelist keys {nm_keys} unexpected for namelist {command}"
-                )
+                raise AttributeError(f"Namelist keys {nm_keys} unexpected for namelist {command}")
             sdds.description = Description(nm_dict)
         elif command == "&parameter":
             expected_keys = _KEYS_PARAMETER
             if not nm_keys.issubset(expected_keys):
-                raise AttributeError(
-                    f"Namelist keys {nm_keys} unexpected for namelist {command}"
-                )
+                raise AttributeError(f"Namelist keys {nm_keys} unexpected for namelist {command}")
             sdds.parameters.append(Parameter(nm_dict, sdds=sdds))
         elif command == "&array":
             expected_keys = _KEYS_ARRAY
             if not nm_keys.issubset(expected_keys):
-                raise AttributeError(
-                    f"Namelist keys {nm_keys} unexpected for namelist {command}"
-                )
+                raise AttributeError(f"Namelist keys {nm_keys} unexpected for namelist {command}")
             sdds.arrays.append(Array(nm_dict, sdds=sdds))
         elif command == "&column":
             expected_keys = _KEYS_COLUMN
             if not nm_keys.issubset(expected_keys):
-                raise AttributeError(
-                    f"Namelist keys {nm_keys} unexpected for namelist {command}"
-                )
+                raise AttributeError(f"Namelist keys {nm_keys} unexpected for namelist {command}")
             sdds.columns.append(Column(nm_dict))
         elif command == "&data":
             # This should be last command
             expected_keys = _KEYS_DATA
             if not nm_keys.issubset(expected_keys):
-                raise AttributeError(
-                    f"Namelist keys {nm_keys} unexpected for namelist {command}"
-                )
+                raise AttributeError(f"Namelist keys {nm_keys} unexpected for namelist {command}")
             file_mode = nm_dict["mode"]
             if mode != "auto":
                 assert mode == file_mode
@@ -910,34 +837,28 @@ def _read_header_fullstream(
                     if data_endianness != sdds.endianness:
                         raise Exception("Mismatch of data and meta-command endianness")
                 sdds.endianness = nm_dict["endian"]
-                logger.debug(
-                    f"Binary file endianness set to ({sdds.endianness}) from data namelist"
-                )
+                logger.debug(f"Binary file endianness set to ({sdds.endianness}) from data namelist")
             sdds.mode = file_mode
             sdds.data = Data(nm_dict)
             break
         elif command == "&include":
             raise ValueError("This package does not support &include namelist command")
         else:
-            raise ValueError(
-                f"Unrecognized namelist command {command} on line {line_num}"
-            )
+            raise ValueError(f"Unrecognized namelist command {command} on line {line_num}")
 
     if sdds.columns or sdds.parameters or sdds.arrays:
         if sdds.data is None:
-            raise AttributeError(
-                "SDDS file contains columns, arrays, or parameters - &data namelist is required"
-            )
+            raise AttributeError("SDDS file contains columns, arrays, or parameters - &data namelist is required")
 
     sdds.n_parameters = len(sdds.parameters)
     sdds.n_arrays = len(sdds.arrays)
     sdds.n_columns = len(sdds.columns)
 
-translation_remove_endings = str.maketrans({'\r':' ', '\n': ' '})
 
-def _read_header_v2(
-    file: IO[bytes], sdds: SDDSFile, mode: str, endianness: str
-) -> None:
+translation_remove_endings = str.maketrans({"\r": " ", "\n": " "})
+
+
+def _read_header_v2(file: IO[bytes], sdds: SDDSFile, mode: str, endianness: str) -> None:
     """
     Read SDDS header - the ASCII text that described the data contained in the SDDS file. This parser uses the common
     approach of ingesting a stream of bytes and checking tokens, meaning it works on more input types but is slower
@@ -958,9 +879,7 @@ def _read_header_v2(
         raise AttributeError(f"Unrecognized SDDS version: {version_line[5]}")
 
     if sdds_version > 5 or sdds_version < 1:
-        raise ValueError(
-            f"This package only supports SDDS version 5 or lower, file is version {sdds_version}"
-        )
+        raise ValueError(f"This package only supports SDDS version 5 or lower, file is version {sdds_version}")
 
     if DEBUG2:
         logger.debug(f"File version: {version_line}")
@@ -978,7 +897,7 @@ def _read_header_v2(
         if accept_meta_commands and line.startswith("!#"):
             return buffer.strip()
         else:
-            #buffer = buffer.translate(translation_remove_endings)
+            # buffer = buffer.translate(translation_remove_endings)
             while not line.rstrip().endswith("&end"):
                 line = __get_next_line(
                     stream, accept_meta_commands=False, cut_midline_comments=False
@@ -986,7 +905,7 @@ def _read_header_v2(
                 logger.debug("Adding line [%s] to multi-line namelist", repr(line))
                 if line is None:
                     raise SDDSReadError("Unexpected EOF during header parsing")
-                #sline = line.translate(translation_remove_endings)
+                # sline = line.translate(translation_remove_endings)
                 buffer += line
                 line_cnt += 1
             buffer2 = buffer.strip()
@@ -1011,18 +930,14 @@ def _read_header_v2(
                     logger.debug(f"Binary file endianness set to ({sdds.endianness}) from meta-command")
                     meta_endianness_set = True
                 else:
-                    raise ValueError(
-                        f"File endianness ({line}) does not match requested one ({endianness})"
-                    )
+                    raise ValueError(f"File endianness ({line}) does not match requested one ({endianness})")
             elif line == "!# little-endian":
                 if endianness == "auto" or endianness == "little":
                     sdds.endianness = "little"
                     logger.debug(f"Binary file endianness set to ({sdds.endianness}) from meta-command")
                     meta_endianness_set = True
                 else:
-                    raise ValueError(
-                        f"File endianness ({line}) does not match requested one ({endianness})"
-                    )
+                    raise ValueError(f"File endianness ({line}) does not match requested one ({endianness})")
             elif line == "!# fixed-rowcount":
                 logger.debug("Fixed rowcount meta-command found - setting flag")
                 sdds._meta_fixed_rowcount = True
@@ -1035,9 +950,9 @@ def _read_header_v2(
         except Exception as ex:
             raise SDDSReadError(f'Failed to parse namelist from "{repr(line)}" ({ex=})')
 
-        assert len(tags) == 2, f'Invalid tags {tags}'
-        assert tags[1] == "&end", f'Invalid tags {tags}'
-        assert len(keys) == len(values), f'Keys and values do not match {keys} | {values}'
+        assert len(tags) == 2, f"Invalid tags {tags}"
+        assert tags[1] == "&end", f"Invalid tags {tags}"
+        assert len(keys) == len(values), f"Keys and values do not match {keys} | {values}"
         command = tags[0]
         nm_dict = {k: v for k, v in zip(keys, values)}
         if DEBUG2:
@@ -1057,38 +972,28 @@ def _read_header_v2(
                 raise ValueError("Duplicate description entry found")
             expected_keys = _KEYS_DESCRIPTION
             if not nm_keys.issubset(expected_keys):
-                raise AttributeError(
-                    f"Namelist keys {nm_keys} unexpected for namelist {command}"
-                )
+                raise AttributeError(f"Namelist keys {nm_keys} unexpected for namelist {command}")
             sdds.description = Description(nm_dict)
         elif command == "&parameter":
             expected_keys = _KEYS_PARAMETER
             if not nm_keys.issubset(expected_keys):
-                raise AttributeError(
-                    f"Namelist keys {nm_keys} unexpected for namelist {command}"
-                )
+                raise AttributeError(f"Namelist keys {nm_keys} unexpected for namelist {command}")
             sdds.parameters.append(Parameter(nm_dict, sdds=sdds))
         elif command == "&array":
             expected_keys = _KEYS_ARRAY
             if not nm_keys.issubset(expected_keys):
-                raise AttributeError(
-                    f"Namelist keys {nm_keys} unexpected for namelist {command}"
-                )
+                raise AttributeError(f"Namelist keys {nm_keys} unexpected for namelist {command}")
             sdds.arrays.append(Array(nm_dict, sdds=sdds))
         elif command == "&column":
             expected_keys = _KEYS_COLUMN
             if not nm_keys.issubset(expected_keys):
-                raise AttributeError(
-                    f"Namelist keys {nm_keys} unexpected for namelist {command}"
-                )
+                raise AttributeError(f"Namelist keys {nm_keys} unexpected for namelist {command}")
             sdds.columns.append(Column(nm_dict))
         elif command == "&data":
             # This should be last command
             expected_keys = _KEYS_DATA
             if not nm_keys.issubset(expected_keys):
-                raise AttributeError(
-                    f"Namelist keys {nm_keys} unexpected for namelist {command}"
-                )
+                raise AttributeError(f"Namelist keys {nm_keys} unexpected for namelist {command}")
             file_mode = nm_dict["mode"]
             if mode != "auto":
                 assert mode == file_mode
@@ -1099,17 +1004,15 @@ def _read_header_v2(
                 nm_dict["lines_per_row"] = int(nm_dict["lines_per_row"])
             if "no_row_counts" in nm_keys:
                 nm_dict["no_row_counts"] = int(nm_dict["no_row_counts"])
-            if 'column_major_order' in nm_keys:
-                nm_dict['column_major_order'] = int(nm_dict['column_major_order'])
+            if "column_major_order" in nm_keys:
+                nm_dict["column_major_order"] = int(nm_dict["column_major_order"])
             if "endian" in nm_keys:
                 data_endianness = nm_dict["endian"]
                 if meta_endianness_set:
                     if data_endianness != sdds.endianness:
                         raise Exception("Mismatch of data and meta-command endianness")
                 sdds.endianness = nm_dict["endian"]
-                logger.debug(
-                    f"Binary file endianness set to ({sdds.endianness}) from data namelist"
-                )
+                logger.debug(f"Binary file endianness set to ({sdds.endianness}) from data namelist")
             sdds.mode = file_mode
             sdds.data = Data(nm_dict)
             break
@@ -1118,21 +1021,15 @@ def _read_header_v2(
         elif command == "&associate":
             expected_keys = _KEYS_ASSOCIATE
             if not nm_keys.issubset(expected_keys):
-                raise AttributeError(
-                    f"Namelist keys {nm_keys} unexpected for namelist {command}"
-                )
+                raise AttributeError(f"Namelist keys {nm_keys} unexpected for namelist {command}")
             # warnings.warn(f'Associate list found - it will be parsed but otherwise ignored')
             sdds.associates.append(Associate(nm_dict))
         else:
-            raise ValueError(
-                f"Unrecognized namelist command {command} on line {namelist_idx}"
-            )
+            raise ValueError(f"Unrecognized namelist command {command} on line {namelist_idx}")
 
     if sdds.columns or sdds.parameters or sdds.arrays:
         if sdds.data is None:
-            raise AttributeError(
-                "SDDS file contains columns, arrays, or parameters - &data namelist is required"
-            )
+            raise AttributeError("SDDS file contains columns, arrays, or parameters - &data namelist is required")
 
     sdds.n_parameters = len(sdds.parameters)
     sdds.n_arrays = len(sdds.arrays)
@@ -1241,9 +1138,7 @@ def _read_pages_binary(
         columns_store_type.append(_NUMPY_DTYPE_FINAL[t])
         columns_len.append(_NUMPY_DTYPE_SIZES[t])
         columns_type_struct.append(STRUCT_DTYPE_STRINGS[t])
-        columns_structs.append(
-            struct.Struct(STRUCT_DTYPE_STRINGS[t]) if t != "string" else None
-        )
+        columns_structs.append(struct.Struct(STRUCT_DTYPE_STRINGS[t]) if t != "string" else None)
     columns_all_numeric = object not in columns_type and n_columns > 0
     if columns_all_numeric:
         combined_struct = columns_type_struct[0]
@@ -1269,23 +1164,15 @@ def _read_pages_binary(
         and sdds._source_file_size > 500e6
     ):
         # Row by row parsing with single struct - memory efficient and fast
-        logger.debug(
-            "All columns numeric, no fixed rows, data is row order, large size -> using row-wide struct"
-        )
+        logger.debug("All columns numeric, no fixed rows, data is row order, large size -> using row-wide struct")
     elif columns_all_numeric and not sdds._meta_fixed_rowcount:
         # Whole page parsing by using buffer as structured array - the fastest, zero copy method
-        logger.debug(
-            "All columns numeric, no fixed rows, row order, small size -> using structured array"
-        )
+        logger.debug("All columns numeric, no fixed rows, row order, small size -> using structured array")
         # must specify endianness, or linux/windows struct lengths will differ!!!
-        combined_dtype = np.dtype(
-            [(str(i), c.descr[0][1]) for i, c in enumerate(columns_type)]
-        )
+        combined_dtype = np.dtype([(str(i), c.descr[0][1]) for i, c in enumerate(columns_type)])
     else:
         # Most general row-order parser
-        logger.debug(
-            "Not all columns numeric, data is row order -> using slow sequential parser"
-        )
+        logger.debug("Not all columns numeric, data is row order -> using slow sequential parser")
 
     page_idx = 0
     page_stored_idx = 0
@@ -1312,7 +1199,7 @@ def _read_pages_binary(
             raise ValueError(
                 f"Page size ({page_size}) ({byte_array}) is unreasonable - is file not {endianness}-endian?"
             )
-        logger.debug(f"Page %d size is %d | byte_array=%s", page_idx, page_size, byte_array)
+        logger.debug("Page %d size is %d | byte_array=%s", page_idx, page_size, byte_array)
 
         # Parameter loop
         for i, el in enumerate(parameters):
@@ -1324,8 +1211,7 @@ def _read_pages_binary(
                 type_len = int.from_bytes(byte_array, endianness)
                 if not 0 <= type_len < 10000:
                     raise ValueError(
-                        f"String length ({type_len}) ({byte_array}) too large - is file not "
-                        f"{endianness}-endian?"
+                        f"String length ({type_len}) ({byte_array}) too large - is file not {endianness}-endian?"
                     )
                 if type_len > 0:
                     byte_array = file.read(type_len)
@@ -1342,9 +1228,7 @@ def _read_pages_binary(
             else:
                 # All primitive types
                 byte_array = file.read(type_len)
-                assert len(byte_array) == type_len, (
-                    f"Invalid {len(byte_array)=} for type " f"{parameter_types[i]}"
-                )
+                assert len(byte_array) == type_len, f"Invalid {len(byte_array)=} for type {parameter_types[i]}"
                 val = np.frombuffer(byte_array, dtype=parameter_types[i], count=1)[0]
 
             if TRACE:
@@ -1376,9 +1260,7 @@ def _read_pages_binary(
                 )
             n_elements = np.prod(dimensions)
             if TRACE:
-                logger.debug(
-                    f">>Array {a.name} | dimensions {dimensions}, total of {n_elements}"
-                )
+                logger.debug(f">>Array {a.name} | dimensions {dimensions}, total of {n_elements}")
             if n_elements > 1e7:
                 raise Exception(f"Array is too large - {n_elements}")
 
@@ -1446,14 +1328,10 @@ def _read_pages_binary(
                     # primitive type -> read in full column
                     byte_array = file.read(type_len * page_size)
                     if flag:
-                        column_array = np.frombuffer(
-                            byte_array, dtype=columns_type[i], count=page_size
-                        )
+                        column_array = np.frombuffer(byte_array, dtype=columns_type[i], count=page_size)
                         if type_len == 1:
                             # Decode uint8 to <U1 to object
-                            column_array = np.char.decode(
-                                column_array.view("S1"), "ascii"
-                            ).astype(object)
+                            column_array = np.char.decode(column_array.view("S1"), "ascii").astype(object)
                         # l.debug(f'>>COL {i} {file.tell()} | {columns_type[i]} | {columns_size[i]} | {s} | {columns_data[i][row]} | {b_array}')
                 if TRACE:
                     logger.debug(f">COL {i} END | {file.tell()=}")
@@ -1468,24 +1346,18 @@ def _read_pages_binary(
         elif columns_all_numeric and sdds._meta_fixed_rowcount:
             for i in range(n_columns):
                 if columns_mask[i]:
-                    columns_data.append(
-                        np.empty(page_size, dtype=columns_store_type[i])
-                    )
+                    columns_data.append(np.empty(page_size, dtype=columns_store_type[i]))
             st = struct.Struct(combined_struct)
             page_size_actual = None
             for row in range(page_size):
                 byte_array = file.read(combined_size)
                 if len(byte_array) < combined_size:
                     if sdds._meta_fixed_rowcount:
-                        logger.info(
-                            f"Encountered fixed rowcount file end at row {row} of {page_size}"
-                        )
+                        logger.info(f"Encountered fixed rowcount file end at row {row} of {page_size}")
                         page_size_actual = row
                         fixed_rowcount_eof = True
                         if len(byte_array) > 0:
-                            logger.debug(
-                                f"Have leftover bytes {repr(byte_array)} in fixed rowcount mode, ignoring"
-                            )
+                            logger.debug(f"Have leftover bytes {repr(byte_array)} in fixed rowcount mode, ignoring")
                         break
                     else:
                         raise ValueError(f"Unexpected EOF at row {row}")
@@ -1508,21 +1380,13 @@ def _read_pages_binary(
                             # Hopefully no copy?
                             arr = columns_data[idx_active][:page_size_actual]
                             if columns_len[i] == 1:
-                                c.data.append(
-                                    np.char.decode(arr.view("S1"), "ascii").astype(
-                                        object
-                                    )
-                                )
+                                c.data.append(np.char.decode(arr.view("S1"), "ascii").astype(object))
                             else:
                                 c.data.append(arr)
                         else:
                             arr = columns_data[idx_active]
                             if columns_len[i] == 1:
-                                c.data.append(
-                                    np.char.decode(arr.view("S1"), "ascii").astype(
-                                        object
-                                    )
-                                )
+                                c.data.append(np.char.decode(arr.view("S1"), "ascii").astype(object))
                             else:
                                 c.data.append(arr)
                         c._page_numbers.append(page_idx)
@@ -1536,15 +1400,11 @@ def _read_pages_binary(
         ):
             for i in range(n_columns):
                 if columns_mask[i]:
-                    columns_data.append(
-                        np.empty(page_size, dtype=columns_store_type[i])
-                    )
+                    columns_data.append(np.empty(page_size, dtype=columns_store_type[i]))
             st = struct.Struct(combined_struct)
             byte_array = file.read(combined_size * page_size)
             if len(byte_array) < combined_size * page_size:
-                raise ValueError(
-                    f"Unexpected EOF - got {len(byte_array)} bytes, wanted {combined_size * page_size}"
-                )
+                raise ValueError(f"Unexpected EOF - got {len(byte_array)} bytes, wanted {combined_size * page_size}")
             if not page_skip:
                 for row, tp in enumerate(st.iter_unpack(byte_array)):
                     idx_active = 0
@@ -1558,9 +1418,7 @@ def _read_pages_binary(
                     if columns_mask[i]:
                         arr = columns_data[idx_active]
                         if columns_len[i] == 1:
-                            c.data.append(
-                                np.char.decode(arr.view("S1"), "ascii").astype(object)
-                            )
+                            c.data.append(np.char.decode(arr.view("S1"), "ascii").astype(object))
                         else:
                             c.data.append(arr)
                         c._page_numbers.append(page_idx)
@@ -1575,9 +1433,7 @@ def _read_pages_binary(
 
             byte_array = file.read(combined_size * page_size)
             if len(byte_array) != combined_size * page_size:
-                raise ValueError(
-                    f"Unexpected EOF - got {len(byte_array)} bytes, wanted {combined_size * page_size}"
-                )
+                raise ValueError(f"Unexpected EOF - got {len(byte_array)} bytes, wanted {combined_size * page_size}")
 
             if not page_skip:
                 array = np.frombuffer(byte_array, combined_dtype)
@@ -1587,11 +1443,7 @@ def _read_pages_binary(
                         # arr = array[f'f{i}'].copy()
                         if columns_len[i] == 1:
                             # c.data.append(np.char.decode(arr.view('S1'), 'ascii'))
-                            c.data.append(
-                                np.char.decode(
-                                    array[str(i)].view("S1"), "ascii"
-                                ).astype(object)
-                            )
+                            c.data.append(np.char.decode(array[str(i)].view("S1"), "ascii").astype(object))
                         else:
                             # For now, make a copy to be safe
                             c.data.append(array[str(i)].copy())
@@ -1601,9 +1453,7 @@ def _read_pages_binary(
         else:
             for i in range(n_columns):
                 if columns_mask[i]:
-                    columns_data.append(
-                        np.empty(page_size, dtype=columns_store_type[i])
-                    )
+                    columns_data.append(np.empty(page_size, dtype=columns_store_type[i]))
             page_size_actual = None
             for row in range(page_size):
                 idx_active = 0
@@ -1617,18 +1467,14 @@ def _read_pages_binary(
                         byte_array = file.read(4)
                         if len(byte_array) < 4:
                             if sdds._meta_fixed_rowcount:
-                                logger.info(
-                                    f"Encountered fixed rowcount file end at row {row} of {page_size}"
-                                )
+                                logger.info(f"Encountered fixed rowcount file end at row {row} of {page_size}")
                                 page_size_actual = row
                                 fixed_rowcount_eof = True
                                 if len(byte_array) > 0:
                                     raise ValueError(f"Weird leftover {byte_array}")
                                 break
                             else:
-                                raise ValueError(
-                                    f"Unexpected EOF at row {row}, column {i}"
-                                )
+                                raise ValueError(f"Unexpected EOF at row {row}, column {i}")
                         string_len_actual = int.from_bytes(byte_array, endianness)
                         assert 0 <= string_len_actual <= 10000  # sanity check
                         if string_len_actual == 0:
@@ -1640,9 +1486,7 @@ def _read_pages_binary(
                         else:
                             byte_array = file.read(string_len_actual)
                             if flag and not page_skip:
-                                columns_data[idx_active][row] = byte_array.decode(
-                                    "ascii"
-                                )
+                                columns_data[idx_active][row] = byte_array.decode("ascii")
                                 # l.debug(f'>>COL S {i} {file.tell()} | {columns_type[i]} | {columns_size[i]} | {s} | {columns_data[i][row]} | {b_array}')
                                 idx_active += 1
                     else:
@@ -1650,27 +1494,21 @@ def _read_pages_binary(
                         byte_array = file.read(type_len)
                         if len(byte_array) < type_len:
                             if sdds._meta_fixed_rowcount:
-                                logger.info(
-                                    f"Encountered fixed rowcount file end at row {row} of {page_size}"
-                                )
+                                logger.info(f"Encountered fixed rowcount file end at row {row} of {page_size}")
                                 page_size_actual = row
                                 fixed_rowcount_eof = True
                                 if len(byte_array) > 0:
                                     raise ValueError(f"Weird leftover {byte_array}")
                                 break
                             else:
-                                raise ValueError(
-                                    f"Unexpected EOF at row {row}, column {i}"
-                                )
+                                raise ValueError(f"Unexpected EOF at row {row}, column {i}")
                         if flag and not page_skip:
                             value = columns_structs[i].unpack(byte_array)[0]
                             # value = np.frombuffer(byte_array, dtype=mapped_t, count=1)[0]
                             if type_len == 1:
                                 # Decode uint8 to <U1
                                 # value = chr(int(value))
-                                value = np.char.decode(
-                                    np.array(value).view("S1"), "ascii"
-                                )
+                                value = np.char.decode(np.array(value).view("S1"), "ascii")
                             columns_data[idx_active][row] = value
                             # l.debug(f'>>COL {i} {file.tell()} | {columns_type[i]} | {columns_size[i]} | {s} | {columns_data[i][row]} | {b_array}')
                             idx_active += 1
@@ -1705,9 +1543,7 @@ def _read_pages_binary(
             if pos < file_size:
                 # More data exists
                 if pages_mask is not None and page_idx == len(pages_mask):
-                    logger.warning(
-                        f"Pages mask {pages_mask} is too short - expect {file_size - pos} more bytes"
-                    )
+                    logger.warning(f"Pages mask {pages_mask} is too short - expect {file_size - pos} more bytes")
                     break
             elif pos > file_size:
                 raise Exception(f"{pos=} is beyond file size {file_size=}???")
@@ -1719,9 +1555,7 @@ def _read_pages_binary(
             if len(next_byte) > 0:
                 # More data exists
                 if pages_mask is not None and page_idx == len(pages_mask):
-                    logger.warning(
-                        f"Pages mask {pages_mask} is too short - have at least {len(next_byte)} more bytes"
-                    )
+                    logger.warning(f"Pages mask {pages_mask} is too short - have at least {len(next_byte)} more bytes")
                     break
             else:
                 # End of file
@@ -1732,18 +1566,14 @@ def _read_pages_binary(
         for i, el in enumerate(sdds.arrays):
             if arrays_mask[i] and el.type not in ["string", "character"]:
                 for j in range(len(el.data)):
-                    el.data[j] = el.data[j].astype(
-                        arrays_store_type[i], copy=False
-                    )  # .newbyteorder().byteswap()
+                    el.data[j] = el.data[j].astype(arrays_store_type[i], copy=False)  # .newbyteorder().byteswap()
 
         for i, el in enumerate(sdds.columns):
             if columns_mask[i] and el.type not in ["string", "character"]:
                 for j in range(len(el.data)):
                     # If struct parser was used, data is already native, otherwise need to flip
                     el.data[j] = el.data[j].astype(columns_store_type[i], copy=False)
-        logging.info(
-            f"Data converted to native {sys.byteorder}-endian format, disable for max performance"
-        )
+        logging.info(f"Data converted to native {sys.byteorder}-endian format, disable for max performance")
     sdds.n_pages = page_stored_idx
 
 
@@ -1774,8 +1604,7 @@ def _read_pages_ascii_mixed_lines(
     columns_type = [_NUMPY_DTYPES[el.type] for el in columns]
     columns_store_type = [_NUMPY_DTYPE_FINAL[el.type] for el in columns]
     pd_column_dict = {
-        i: columns_store_type[i] if columns_store_type[i] != object else str
-        for i in range(len(columns_type))
+        i: columns_store_type[i] if columns_store_type[i] != object else str for i in range(len(columns_type))
     }
     assert object in columns_type
     struct_type = None
@@ -1789,9 +1618,7 @@ def _read_pages_ascii_mixed_lines(
     while True:
         if pages_mask is not None:
             if page_idx >= len(pages_mask):
-                logger.debug(
-                    f"Reached last page {page_idx} in mask, have at least 1 more remaining but exiting early"
-                )
+                logger.debug(f"Reached last page {page_idx} in mask, have at least 1 more remaining but exiting early")
                 break
             else:
                 page_skip = pages_mask[page_idx]
@@ -1840,9 +1667,7 @@ def _read_pages_ascii_mixed_lines(
                         if value.startswith("\\"):
                             if len(value) == 4:
                                 for i in range(1, 4):
-                                    assert (
-                                        value[i] in OCTAL_NUMBERS
-                                    ), "Bad octal character num"
+                                    assert value[i] in OCTAL_NUMBERS, "Bad octal character num"
                                 value = chr(int(value[1:], 8))
                             elif len(value) == 2:
                                 # single escaped character
@@ -1861,9 +1686,7 @@ def _read_pages_ascii_mixed_lines(
                         )
                 else:
                     # Primitive types
-                    value = np.fromstring(
-                        b_array, dtype=parameters_type[par_idx], sep=" ", count=1
-                    )[0]
+                    value = np.fromstring(b_array, dtype=parameters_type[par_idx], sep=" ", count=1)[0]
                     if TRACE:
                         logger.debug(
                             f">>PARV | p {file.tell()} | {par_idx=} | {parameters_type[par_idx]} "
@@ -1881,19 +1704,13 @@ def _read_pages_ascii_mixed_lines(
             # Array dimensions
             b_array = __get_next_line(file, strip=True)
             if b_array is None:
-                raise Exception(
-                    f">>ARRS | pos {file.tell()} | unexpected EOF at page {page_idx}"
-                )
+                raise Exception(f">>ARRS | pos {file.tell()} | unexpected EOF at page {page_idx}")
 
             dimensions = np.fromstring(b_array, dtype=int, sep=" ")
             n_elements = np.prod(dimensions)
             if len(dimensions) != a.dimensions:
-                raise ValueError(
-                    f">>Array {a.name} dimensions {b_array} did not match expected count {a.dimensions}"
-                )
-            logger.debug(
-                f">>Array {a.name} has dimensions {dimensions}, total of {n_elements}"
-            )
+                raise ValueError(f">>Array {a.name} dimensions {b_array} did not match expected count {a.dimensions}")
+            logger.debug(f">>Array {a.name} has dimensions {dimensions}, total of {n_elements}")
 
             # Start reading array
             n_lines_read = 0
@@ -1905,9 +1722,7 @@ def _read_pages_ascii_mixed_lines(
                     b_array = __get_next_line(file).strip()
                     n_lines_read += 1
                     if b_array is None:
-                        raise Exception(
-                            f">>ARRV | {file.tell()} | unexpected EOF at page {page_idx}"
-                        )
+                        raise Exception(f">>ARRV | {file.tell()} | unexpected EOF at page {page_idx}")
                     values = split_sdds(b_array, posix=True)
                     logger.debug(
                         f">>ARRV | {file.tell()} | {array_idx=} | {mapped_t} | {repr(b_array)} | {values} | {n_elements=} | {n_lines_read=}"
@@ -1929,9 +1744,7 @@ def _read_pages_ascii_mixed_lines(
                     b_array = __get_next_line(file)
                     n_lines_read += 1
                     if b_array is None:
-                        raise Exception(
-                            f">>ARRV | {file.tell()} | unexpected EOF at page {page_idx}"
-                        )
+                        raise Exception(f">>ARRV | {file.tell()} | unexpected EOF at page {page_idx}")
                     values = np.fromstring(b_array, dtype=mapped_t, sep=" ", count=-1)
                     if TRACE:
                         logger.debug(
@@ -1967,15 +1780,11 @@ def _read_pages_ascii_mixed_lines(
             # Read column page size
             b_array = __get_next_line(file)
             if b_array is None:
-                raise Exception(
-                    f">>COLS | {file.tell()} | unexpected EOF at page {page_idx}"
-                )
+                raise Exception(f">>COLS | {file.tell()} | unexpected EOF at page {page_idx}")
 
             page_size = int(b_array)
             assert 0 <= page_size <= 1e7
-            logger.debug(
-                f">>C ({file.tell()}) | page {page_idx} declared size {page_size}"
-            )
+            logger.debug(f">>C ({file.tell()}) | page {page_idx} declared size {page_size}")
 
         # line = file.readline().decode('ascii')
         # list instead of generator to hopefully preallocate space
@@ -2026,18 +1835,14 @@ def _read_pages_ascii_mixed_lines(
             if not page_skip:
                 for i, c in enumerate(sdds.columns):
                     if columns_mask[i]:
-                        columns_data.append(
-                            np.empty(page_size, dtype=columns_store_type[i])
-                        )
+                        columns_data.append(np.empty(page_size, dtype=columns_store_type[i]))
 
             for row in range(page_size):
                 line = __get_next_line(file, accept_meta_commands=False, strip=True)
                 if not page_skip:
                     line_len = len(line)
                     if line_len == 0:
-                        raise ValueError(
-                            f"Unexpected empty string at position {file.tell()}"
-                        )
+                        raise ValueError(f"Unexpected empty string at position {file.tell()}")
 
                     col_idx_active = 0
                     col_idx = 0
@@ -2050,9 +1855,7 @@ def _read_pages_ascii_mixed_lines(
                             if t == object:
                                 value = values[col_idx]
                             else:
-                                value = np.fromstring(
-                                    values[col_idx], dtype=t, count=1, sep=" "
-                                )[0]
+                                value = np.fromstring(values[col_idx], dtype=t, count=1, sep=" ")[0]
                             columns_data[col_idx_active][row] = value
                             if TRACE:
                                 logger.debug(f">>CR {row=} | {c.name}:{value}")
@@ -2085,20 +1888,14 @@ def _read_pages_ascii_mixed_lines(
                     cut_midline_comments=False,
                 )
                 if line is None or line == "\n" or line == "\r\n":
-                    logger.debug(
-                        f">>C ({file.tell()}) | End of no_row_counts page at row {row_cnt}"
-                    )
+                    logger.debug(f">>C ({file.tell()}) | End of no_row_counts page at row {row_cnt}")
                     break
                 if not page_skip:
                     line_len = len(line)
                     if line_len == 0:
-                        raise ValueError(
-                            f"Unexpected empty string at position {file.tell()}"
-                        )
+                        raise ValueError(f"Unexpected empty string at position {file.tell()}")
                     if row_cnt > 1e7:
-                        raise SDDSReadError(
-                            f"Read more than {row_cnt} rows - something is wrong"
-                        )
+                        raise SDDSReadError(f"Read more than {row_cnt} rows - something is wrong")
                     col_idx_active = 0
                     col_idx = 0
                     values = split_sdds(line.strip(), posix=True)
@@ -2110,9 +1907,7 @@ def _read_pages_ascii_mixed_lines(
                             if t == object:
                                 value = values[col_idx]
                             else:
-                                value = np.fromstring(
-                                    values[col_idx], dtype=t, count=1, sep=" "
-                                )[0]
+                                value = np.fromstring(values[col_idx], dtype=t, count=1, sep=" ")[0]
                             columns_list_data[col_idx_active].append(value)
                             if TRACE:
                                 logger.debug(f">>C ({file.tell()}) | {c.name}:{value}")
@@ -2125,9 +1920,7 @@ def _read_pages_ascii_mixed_lines(
                 if not any(columns_mask):
                     break
                 column_lengths = [len(x) for x in columns_list_data]
-                assert (
-                    len(set(column_lengths)) == 1
-                ), f"Column mismatch {column_lengths}"
+                assert len(set(column_lengths)) == 1, f"Column mismatch {column_lengths}"
                 col_idx_active = 0
                 for i, c in enumerate(sdds.columns):
                     if columns_mask[i]:
@@ -2264,20 +2057,16 @@ def _read_pages_ascii_mixed_lines(
                     if len(next_byte) > 0 and next_byte[:1].decode("ascii") == "\n":
                         file.read(1)
                     else:
-                        raise SDDSReadError(f'Unexpected \\r without \\n at {file.tell()}')
+                        raise SDDSReadError(f"Unexpected \\r without \\n at {file.tell()}")
                 else:
-                    logger.debug(
-                        f"Found character {repr(next_char)} at {file.tell()}, continuing to next page"
-                    )
+                    logger.debug(f"Found character {repr(next_char)} at {file.tell()}, continuing to next page")
                     break
             else:
                 break
         if len(next_byte) > 0:
             # More data exists
             if pages_mask is not None and page_idx == len(pages_mask):
-                logger.warning(
-                    f"Mask {pages_mask} ended but have at least {len(next_byte)} extra bytes - stopping"
-                )
+                logger.warning(f"Mask {pages_mask} ended but have at least {len(next_byte)} extra bytes - stopping")
                 break
         else:
             # End of file
@@ -2332,10 +2121,7 @@ def _read_pages_ascii_numeric_lines(
     while True:
         if pages_mask is not None:
             if page_idx >= len(pages_mask):
-                logger.debug(
-                    f"Reached last page {page_idx} in mask, have at least 1 more remaining"
-                    f" but exiting early"
-                )
+                logger.debug(f"Reached last page {page_idx} in mask, have at least 1 more remaining but exiting early")
                 break
             else:
                 page_skip = pages_mask[page_idx]
@@ -2356,15 +2142,11 @@ def _read_pages_ascii_numeric_lines(
             while par_idx < len(parameter_types):
                 b_array = __get_next_line(file, accept_meta_commands=False)
                 if b_array is None:
-                    raise Exception(
-                        f">>PARS | pos {file.tell()} | unexpected EOF at page {page_idx}"
-                    )
+                    raise Exception(f">>PARS | pos {file.tell()} | unexpected EOF at page {page_idx}")
                 par_line_num += 1
 
                 if par_line_num > 10000:
-                    raise Exception(
-                        "Still parsing parameters after 10000 lines - something is wrong"
-                    )
+                    raise Exception("Still parsing parameters after 10000 lines - something is wrong")
 
                 if parameter_types[par_idx] == object:
                     value = b_array.strip()
@@ -2377,9 +2159,7 @@ def _read_pages_ascii_numeric_lines(
                         )
                 else:
                     # Primitive types
-                    value = np.fromstring(
-                        b_array, dtype=parameter_types[par_idx], sep=" ", count=1
-                    )[0]
+                    value = np.fromstring(b_array, dtype=parameter_types[par_idx], sep=" ", count=1)[0]
                     if TRACE:
                         logger.debug(
                             f">>PARV | pos {file.tell()} | {par_idx=} | {parameter_types[par_idx]} | {repr(b_array)} | {value}"
@@ -2400,19 +2180,13 @@ def _read_pages_ascii_numeric_lines(
             # Array dimensions
             b_array = __get_next_line(file, accept_meta_commands=False)
             if b_array is None:
-                raise Exception(
-                    f">>ARRS | pos {file.tell()} | unexpected EOF at page {page_idx}"
-                )
+                raise Exception(f">>ARRS | pos {file.tell()} | unexpected EOF at page {page_idx}")
 
             dimensions = np.fromstring(b_array, dtype=int, sep=" ", count=-1)
             n_elements = np.prod(dimensions)
             if len(dimensions) != a.dimensions:
-                raise ValueError(
-                    f">>Array {a.name} dimensions {b_array} did not match expected count {a.dimensions}"
-                )
-            logger.debug(
-                f">>Array {a.name} has dimensions {dimensions}, total of {n_elements}"
-            )
+                raise ValueError(f">>Array {a.name} dimensions {b_array} did not match expected count {a.dimensions}")
+            logger.debug(f">>Array {a.name} has dimensions {dimensions}, total of {n_elements}")
 
             # Start reading array
             n_lines_read = 0
@@ -2424,9 +2198,7 @@ def _read_pages_ascii_numeric_lines(
                     b_array = __get_next_line(file).strip()
                     n_lines_read += 1
                     if b_array is None:
-                        raise Exception(
-                            f">>ARRV | {file.tell()} | unexpected EOF at page {page_idx}"
-                        )
+                        raise Exception(f">>ARRV | {file.tell()} | unexpected EOF at page {page_idx}")
                     values = split_sdds(b_array, posix=True)
                     logger.debug(
                         f">>ARRV | {file.tell()} | {array_idx=} | {mapped_t} | {repr(b_array)} | {values} | {n_elements=} | {n_lines_read=}"
@@ -2448,9 +2220,7 @@ def _read_pages_ascii_numeric_lines(
                     b_array = __get_next_line(file)
                     n_lines_read += 1
                     if b_array is None:
-                        raise Exception(
-                            f">>ARRV | {file.tell()} | unexpected EOF at page {page_idx}"
-                        )
+                        raise Exception(f">>ARRV | {file.tell()} | unexpected EOF at page {page_idx}")
                     values = np.fromstring(b_array, dtype=mapped_t, sep=" ", count=-1)
                     if TRACE:
                         logger.debug(
@@ -2483,17 +2253,13 @@ def _read_pages_ascii_numeric_lines(
             pass
         else:
             if sdds.data.no_row_counts:
-                logger.debug(
-                    f">>C ({file.tell()}) | starting no_row_count numerical ascii"
-                )
+                logger.debug(f">>C ({file.tell()}) | starting no_row_count numerical ascii")
                 page_size = None
             else:
                 # Read column page size
                 b_array = __get_next_line(file)
                 if b_array is None:
-                    raise Exception(
-                        f">>C {file.tell()} | unexpected EOF at page {page_idx}"
-                    )
+                    raise Exception(f">>C {file.tell()} | unexpected EOF at page {page_idx}")
 
                 page_size = int(b_array)
                 assert 0 <= page_size <= 1e7
@@ -2503,9 +2269,7 @@ def _read_pages_ascii_numeric_lines(
             # list instead of generator to hopefully preallocate space
             if _ASCII_NUMERIC_PARSE_METHOD == "loadtxt" and page_size is not None:
                 gen = (
-                    __get_next_line(
-                        file, accept_meta_commands=False, strip=True, replace_tabs=True
-                    )
+                    __get_next_line(file, accept_meta_commands=False, strip=True, replace_tabs=True)
                     for _ in range(page_size)
                 )
                 if not page_skip:
@@ -2527,9 +2291,7 @@ def _read_pages_ascii_numeric_lines(
             elif _ASCII_NUMERIC_PARSE_METHOD == "loadtxt" and page_size is None:
 
                 def gen():
-                    l = __get_next_line(
-                        file, accept_meta_commands=False, strip=False, replace_tabs=True
-                    )
+                    l = __get_next_line(file, accept_meta_commands=False, strip=False, replace_tabs=True)
                     if l == "\n" or l is None:
                         return
                     yield l
@@ -2556,9 +2318,7 @@ def _read_pages_ascii_numeric_lines(
             elif _ASCII_NUMERIC_PARSE_METHOD == "read_table" and page_size is not None:
                 pd_column_dict = {i: columns_type[i] for i in range(len(columns_type))}
                 lines = [file.readline().decode("ascii") for i in range(page_size)]
-                buf = io.StringIO(
-                    "\n".join((l for l in lines if not l.startswith("!")))
-                )
+                buf = io.StringIO("\n".join((l for l in lines if not l.startswith("!"))))
                 # buf = io.StringIO('\n'.join(lines))
                 # lines = [file.readline() for i in range(page_size)]
                 # buf = io.BytesIO(b''.join(lines))
@@ -2616,10 +2376,7 @@ def _read_pages_ascii_numeric_lines(
                         yield l
 
                 buf = io.StringIO("\n".join((l for l in gen())))
-                logger.debug(
-                    f">>C {file.tell()} | Feeding buffer {cnt=} {line_cnt=} to "
-                    f"parse_table"
-                )
+                logger.debug(f">>C {file.tell()} | Feeding buffer {cnt=} {line_cnt=} to parse_table")
                 opts = dict(
                     sep="\s+",
                     comment="!",
@@ -2667,10 +2424,7 @@ def _read_pages_ascii_numeric_lines(
         if len(next_byte) > 0:
             # More data exists
             if pages_mask is not None and page_idx == len(pages_mask):
-                logger.warning(
-                    f"Mask {pages_mask} ended but have at least {len(next_byte)}"
-                    f" extra bytes - stopping"
-                )
+                logger.warning(f"Mask {pages_mask} ended but have at least {len(next_byte)} extra bytes - stopping")
                 break
         else:
             # End of file

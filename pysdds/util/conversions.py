@@ -39,9 +39,5 @@ def float80_to_float64(buffer: bytearray, endianness: Literal["big", "little"]):
 
     m2 = int.from_bytes(mantissa, "big") & 0x7FFFFFFFFFFFFFFF
 
-    value = (
-        sign
-        * (normalizeCorrection + float(m2 / (1 << 63)))
-        * math.pow(2, exponent - 16383)
-    )
+    value = sign * (normalizeCorrection + float(m2 / (1 << 63))) * math.pow(2, exponent - 16383)
     return value

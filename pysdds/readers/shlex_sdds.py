@@ -16,9 +16,7 @@ __all__ = ["shlex_sdds", "split_sdds", "quote", "join"]
 class shlex_sdds:
     "A lexical analyzer class for simple shell-like syntaxes."
 
-    def __init__(
-        self, instream=None, infile=None, posix=False, punctuation_chars=False
-    ):
+    def __init__(self, instream=None, infile=None, posix=False, punctuation_chars=False):
         if isinstance(instream, str):
             instream = StringIO(instream)
         if instream is not None:
@@ -34,9 +32,7 @@ class shlex_sdds:
             self.eof = ""
         self.commenters = "#"
         self.octal_numbers = "01234567"
-        self.wordchars = (
-            "abcdfeghijklmnopqrstuvwxyz" "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_"
-        )
+        self.wordchars = "abcdfeghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_"
         # if self.posix:
         #     self.wordchars += ('ßàáâãäåæçèéêëìíîïðñòóôõöøùúûüýþÿ'
         #                        'ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞ')
@@ -208,11 +204,7 @@ class shlex_sdds:
                         break
                     else:
                         state = "a"
-                elif (
-                    self.posix
-                    and nextchar in self.escape
-                    and state in self.escapedquotes
-                ):
+                elif self.posix and nextchar in self.escape and state in self.escapedquotes:
                     escapedstate = state
                     state = nextchar
                 else:
@@ -240,11 +232,7 @@ class shlex_sdds:
                     # sdds escape
                     token += nextchar
                     state = escapedstate
-                elif (
-                    escapedstate in self.quotes
-                    and nextchar != state
-                    and nextchar != escapedstate
-                ):
+                elif escapedstate in self.quotes and nextchar != state and nextchar != escapedstate:
                     # In posix shells, only the quote itself or the escape
                     # character may be escaped within quotes.
                     token += state
@@ -287,9 +275,7 @@ class shlex_sdds:
                 elif self.posix and nextchar in self.escape:
                     escapedstate = "a"
                     state = nextchar
-                elif nextchar in self.quotes or (
-                    self.whitespace_split and nextchar not in self.punctuation_chars
-                ):
+                elif nextchar in self.quotes or (self.whitespace_split and nextchar not in self.punctuation_chars):
                     token += nextchar
                 else:
                     token += nextchar

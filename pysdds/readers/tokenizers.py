@@ -3,6 +3,7 @@ from pysdds.util.errors import SDDSReadError
 delimiters = {"\r", "\n", " "}
 delimiterscomma = {",", "\r", "\n", " "}
 
+
 def tokenize_namelist(line):
     assert line[0] == "&", f"Unexpected namelist start {line[0]}"
     tags = []
@@ -102,7 +103,7 @@ def tokenize_namelist(line):
                             i = j
                             value_parse_started = mode_kv = value_quote_mode = False
                             kv_key_section = True
-                            #print("end of quoted segment", values[-1])
+                            # print("end of quoted segment", values[-1])
 
                             if nextchar != ",":
                                 # might not have comma if only a single item or at the end
@@ -110,7 +111,7 @@ def tokenize_namelist(line):
                                 found_next_item_or_end = False
                                 for jmp in range(0, 20):
                                     c = line[j + jmp]
-                                    #print("nextscan ", jmp, c)
+                                    # print("nextscan ", jmp, c)
                                     if c in delimiters:
                                         continue
                                     elif c == ",":
@@ -126,13 +127,9 @@ def tokenize_namelist(line):
                                         i = j
                                         break
                                     else:
-                                        raise ValueError(
-                                            f"Invalid char [{c}] after quoted string"
-                                        )
+                                        raise ValueError(f"Invalid char [{c}] after quoted string")
                                 if not found_next_item_or_end:
-                                    raise ValueError(
-                                        "Too many spaces after quoted string?"
-                                    )
+                                    raise ValueError("Too many spaces after quoted string?")
                             else:
                                 parsing_tag_or_kv = False
                                 mode_gap = True

@@ -57,16 +57,12 @@ class ValuesEncoder:
     def __init__(self, bit_array=None, float_format="f64"):
         if float_format not in INIT_CONSTS.keys():
             raise ValueError(
-                "Unexpected `float_format` value ({}). Sould be one of f64, f32, f16.".format(
-                    float_format
-                )
+                "Unexpected `float_format` value ({}). Sould be one of f64, f32, f16.".format(float_format)
             )
 
         self.float_format = float_format
         self.n_bits_value = INIT_CONSTS[float_format]["n_bits_value"]
-        self.n_bits_number_of_leading_zeros = INIT_CONSTS[float_format][
-            "n_bits_number_of_leading_zeros"
-        ]
+        self.n_bits_number_of_leading_zeros = INIT_CONSTS[float_format]["n_bits_number_of_leading_zeros"]
         self.n_bits_length_of_the_meaningful_xored_value = INIT_CONSTS[float_format][
             "n_bits_length_of_the_meaningful_xored_value"
         ]
@@ -147,14 +143,10 @@ class ValuesEncoder:
             self.bit_array.append(1)
 
             # Encode number of leading zeros.
-            self.bit_array += util.int2ba(
-                n_leading_zeros, length=self.n_bits_number_of_leading_zeros
-            )
+            self.bit_array += util.int2ba(n_leading_zeros, length=self.n_bits_number_of_leading_zeros)
 
             # Encode length of the meaningful XORed value.
-            length_of_the_meaningful_xored_value = (
-                self.n_bits_value - n_leading_zeros - n_trailing_zeros
-            )
+            length_of_the_meaningful_xored_value = self.n_bits_value - n_leading_zeros - n_trailing_zeros
             self.bit_array += util.int2ba(
                 length_of_the_meaningful_xored_value - BLOCK_SIZE_ADJUSTMENT,
                 length=self.n_bits_length_of_the_meaningful_xored_value,
@@ -165,8 +157,7 @@ class ValuesEncoder:
 
         # Encode meaningful bits of the XORed value.
         meaningful_xored_value = xored_value[
-            self.previous_n_leading_zeros : self.n_bits_value
-            - self.previous_n_trailing_zeros
+            self.previous_n_leading_zeros : self.n_bits_value - self.previous_n_trailing_zeros
         ]
 
         self.bit_array += meaningful_xored_value

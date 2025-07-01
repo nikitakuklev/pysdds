@@ -55,9 +55,7 @@ def _compare_arrays(one, two, eps=None) -> bool:
                 return False
         return True
     else:
-        raise ValueError(
-                f"Comparison of two different types - {type(one)} vs {type(two)}"
-        )
+        raise ValueError(f"Comparison of two different types - {type(one)} vs {type(two)}")
 
 
 def _find_different_indices(one, two):
@@ -80,9 +78,7 @@ def _namelist_to_str(nm_dict, omit_defaults=None):
     for k, v in nm_dict.items():
         if omit_defaults is not None and k in omit_defaults and omit_defaults[k] == v:
             continue
-        if isinstance(v, str) and (
-                " " in v or '"' in v or "," in v or "$" in v or "!" in v
-        ):
+        if isinstance(v, str) and (" " in v or '"' in v or "," in v or "$" in v or "!" in v):
             kv_strings.append(f'{k}="{escape_string_sdds(v)}"')
         else:
             kv_strings.append(f"{k}={v}")
@@ -122,9 +118,7 @@ class Description:
 
         def err(stage, *args):
             if raise_error:
-                raise ValueError(
-                        fail_str + stage + " " + "|".join([str(a) for a in args])
-                )
+                raise ValueError(fail_str + stage + " " + "|".join([str(a) for a in args]))
 
         if other is None:
             err("None comparison")
@@ -200,20 +194,18 @@ class Parameter:
         return f"&parameter {_namelist_to_str(self.nm)},  &end"
 
     def compare(
-            self,
-            other,
-            eps: Optional[float] = None,
-            raise_error: bool = False,
-            fixed_equivalent: bool = True,
+        self,
+        other,
+        eps: Optional[float] = None,
+        raise_error: bool = False,
+        fixed_equivalent: bool = True,
     ) -> bool:
         """Compare to another object based solely on data and not layout"""
         fail_str = f"Parameter {self.name} mismatch: "
 
         def err(stage, *args):
             if raise_error:
-                raise ValueError(
-                        fail_str + stage + " " + "|".join([repr(a) for a in args])
-                )
+                raise ValueError(fail_str + stage + " " + "|".join([repr(a) for a in args]))
 
         if type(self) != type(other):
             err("type", type(self), type(other))
@@ -222,11 +214,7 @@ class Parameter:
             if fixed_equivalent:
                 keys = set(self.nm.keys()).union(set(other.nm.keys())) - {"fixed_value"}
                 for k in keys:
-                    if (
-                            k not in self.nm
-                            or k not in other.nm
-                            or self.nm[k] != other.nm[k]
-                    ):
+                    if k not in self.nm or k not in other.nm or self.nm[k] != other.nm[k]:
                         err("nm", self.nm, other.nm)
                         return False
             else:
@@ -239,9 +227,7 @@ class Parameter:
                     err("strict fixed_value")
                     return False
             else:
-                if not math.isclose(
-                        self.fixed_value, other.fixed_value, abs_tol=eps, rel_tol=0.0
-                ):
+                if not math.isclose(self.fixed_value, other.fixed_value, abs_tol=eps, rel_tol=0.0):
                     err("eps fixed_value")
                     return False
         # elif ((self.fixed_value is not None and other.fixed_value is None) or
@@ -276,9 +262,7 @@ class Parameter:
                         return False
             else:
                 for i in range(len(self.data)):
-                    if not math.isclose(
-                            self.data[i], other.data[i], abs_tol=eps, rel_tol=0.0
-                    ):
+                    if not math.isclose(self.data[i], other.data[i], abs_tol=eps, rel_tol=0.0):
                         # if not _compare_arrays(self.data, other.data, eps):
                         err("eps", self.data, other.data)
                         return False
@@ -299,9 +283,7 @@ class Parameter:
             return None
 
         if self.type not in ["string", "character"]:
-            v = np.fromstring(v_raw, dtype=_NUMPY_DTYPES[self.type], sep=" ", count=1)[
-                0
-            ]
+            v = np.fromstring(v_raw, dtype=_NUMPY_DTYPES[self.type], sep=" ", count=1)[0]
             return v
         else:
             assert isinstance(v_raw, str)
@@ -320,9 +302,7 @@ class Parameter:
             if self.__cached_page_count != self.sdds.n_pages:
                 v = self._fixed_value_raw
                 if self.type != "string":
-                    v = np.fromstring(
-                            v, dtype=_NUMPY_DTYPES[self.type], sep=" ", count=1
-                    )[0]
+                    v = np.fromstring(v, dtype=_NUMPY_DTYPES[self.type], sep=" ", count=1)[0]
                 self.__cached_data = [v for _ in range(self.sdds.n_pages)]
                 self.__cached_page_count = self.sdds.n_pages
             return self.__cached_data
@@ -333,7 +313,7 @@ class Parameter:
     def data(self, value):
         if self.fixed_value is not None:
             raise ValueError(
-                    f"Attempted to set data for parameter ({self.name}), but it already has fixed value ({self.fixed_value})"
+                f"Attempted to set data for parameter ({self.name}), but it already has fixed value ({self.fixed_value})"
             )
         else:
             assert isinstance(value, list)
@@ -390,16 +370,12 @@ class Array:
     def to_sdds(self):
         return f"&array {_namelist_to_str(self.nm)},  &end"
 
-    def compare(
-            self, other: "Array", eps: Optional[float] = None, raise_error: bool = False
-    ) -> bool:
+    def compare(self, other: "Array", eps: Optional[float] = None, raise_error: bool = False) -> bool:
         fail_str = f"Array {self.name} mismatch: "
 
         def err(stage, *args):
             if raise_error:
-                raise ValueError(
-                        fail_str + stage + " " + "|".join([str(a) for a in args])
-                )
+                raise ValueError(fail_str + stage + " " + "|".join([str(a) for a in args]))
 
         """ Compare to another Array """
         if type(self) != type(other):
@@ -498,34 +474,24 @@ class Column:
             return self.data[key]
         elif isinstance(key, tuple):
             assert len(key) == 2, f"Tuple {key} index length != 2"
-            assert all(
-                    isinstance(k, int) for k in key
-            ), f"Not all indices in tuple {key} are integers"
+            assert all(isinstance(k, int) for k in key), f"Not all indices in tuple {key} are integers"
             page_data = self.data[key[0]]
             if key[1] >= len(page_data) or key[1] < 0:
-                raise KeyError(
-                        f"Index {key} invalid - page {key[0]} length is {len(page_data)}"
-                )
+                raise KeyError(f"Index {key} invalid - page {key[0]} length is {len(page_data)}")
             return page_data[key[1]]
         else:
-            raise ValueError(
-                    "Only integer or integer tuple indexing is allowed for columns"
-            )
+            raise ValueError("Only integer or integer tuple indexing is allowed for columns")
 
     def to_sdds(self):
         return f"&column {_namelist_to_str(self.nm)},  &end"
 
-    def compare(
-            self, other: "Column", eps: Optional[float] = None, raise_error: bool = False
-    ) -> bool:
+    def compare(self, other: "Column", eps: Optional[float] = None, raise_error: bool = False) -> bool:
         """Compare to another Column, optionally with tolerance and other options"""
         fail_str = f"Column {self.name} mismatch: "
 
         def err(stage, *args):
             if raise_error:
-                raise Exception(
-                        f"{fail_str} {stage=} {'|'.join([str(a) for a in args])}"
-                )
+                raise Exception(f"{fail_str} {stage=} {'|'.join([str(a) for a in args])}")
 
         if type(self) != type(other):
             err("type")
@@ -548,22 +514,16 @@ class Column:
         for i in range(len(self._page_numbers)):
             if eps is not None:
                 if not _compare_arrays(self.data[i], other.data[i], eps):
-                    different_idxs = _find_different_indices(
-                            self.data[i], other.data[i]
-                    )
-                    logger.error(
-                            f"Comparison at page {i} had diffences at indices {different_idxs}"
-                    )
-                    logger.error(
-                            f"Value tuples: {[(self.data[i][j], other.data[i][j]) for j in different_idxs]}"
-                    )
+                    different_idxs = _find_different_indices(self.data[i], other.data[i])
+                    logger.error(f"Comparison at page {i} had diffences at indices {different_idxs}")
+                    logger.error(f"Value tuples: {[(self.data[i][j], other.data[i][j]) for j in different_idxs]}")
                     err(
-                            "values eps",
-                            i,
-                            self.data[i].dtype,
-                            other.data[i].dtype,
-                            self.data[i],
-                            other.data[i],
+                        "values eps",
+                        i,
+                        self.data[i].dtype,
+                        other.data[i].dtype,
+                        self.data[i],
+                        other.data[i],
                     )
                     return False
             else:
@@ -630,9 +590,7 @@ class Data:
 
         def err(stage, *args):
             if raise_error:
-                raise Exception(
-                        fail_str + stage + " " + "|".join([str(a) for a in args])
-                )
+                raise Exception(fail_str + stage + " " + "|".join([str(a) for a in args]))
 
         if type(self) != type(other):
             err("type")
@@ -708,9 +666,7 @@ class Associate:
 
         def err(stage, *args):
             if raise_error:
-                raise Exception(
-                        fail_str + stage + " " + "|".join([str(a) for a in args])
-                )
+                raise Exception(fail_str + stage + " " + "|".join([str(a) for a in args]))
 
         if type(self) != type(other):
             err("type")
@@ -791,24 +747,16 @@ class SDDSFile:
             page = keys[0]
             column = keys[1]
             if not isinstance(page, int):
-                raise ValueError(
-                        "First index is expected to be an integer corresponding to page number"
-                )
+                raise ValueError("First index is expected to be an integer corresponding to page number")
 
             if not 0 <= page <= self.n_pages - 1:
-                raise KeyError(
-                        f"Page {page} is not within acceptable bounds (0 - {self.n_pages})"
-                )
+                raise KeyError(f"Page {page} is not within acceptable bounds (0 - {self.n_pages})")
 
             if not isinstance(column, str):
-                raise ValueError(
-                        "Second index is expected to be a string denoting the column"
-                )
+                raise ValueError("Second index is expected to be a string denoting the column")
 
             if column not in self.column_names:
-                raise KeyError(
-                        f"Column {column} is not found (have {self.column_names})"
-                )
+                raise KeyError(f"Column {column} is not found (have {self.column_names})")
 
             return self.col(column).data[page]
         elif isinstance(keys, str):
@@ -820,13 +768,10 @@ class SDDSFile:
                 return self.parameter_dict[keys]
             else:
                 raise KeyError(
-                        f"Key {keys} is not found, have {self.column_names}|"
-                        f"{self.array_names}|{self.parameter_names}"
+                    f"Key {keys} is not found, have {self.column_names}|{self.array_names}|{self.parameter_names}"
                 )
         else:
-            raise ValueError(
-                    f"Unrecognized key object (should be tuple or str): {keys}"
-            )
+            raise ValueError(f"Unrecognized key object (should be tuple or str): {keys}")
 
     def __eq__(self, other):
         """
@@ -889,12 +834,12 @@ class SDDSFile:
         return line
 
     def compare(
-            self,
-            other,
-            eps: Optional[float] = None,
-            ignore_data_mode: bool = True,
-            fixed_value_equivalent: bool = False,
-            raise_error: bool = False,
+        self,
+        other,
+        eps: Optional[float] = None,
+        ignore_data_mode: bool = True,
+        fixed_value_equivalent: bool = False,
+        raise_error: bool = False,
     ) -> bool:
         """
         Compares this SDDS file with another, allowing small discrepancies.
@@ -920,9 +865,7 @@ class SDDSFile:
 
         def err(stage, *args):
             if raise_error:
-                raise Exception(
-                        fail_str + stage + " " + "|".join([str(a) for a in args])
-                )
+                raise Exception(fail_str + stage + " " + "|".join([str(a) for a in args]))
 
         if not isinstance(other, SDDSFile):
             err("type", type(self), type(other))
@@ -956,10 +899,10 @@ class SDDSFile:
             #         return False
             # else:
             if not self.parameters[i].compare(
-                    other.parameters[i],
-                    eps,
-                    raise_error,
-                    fixed_equivalent=fixed_value_equivalent,
+                other.parameters[i],
+                eps,
+                raise_error,
+                fixed_equivalent=fixed_value_equivalent,
             ):
                 return False
 
@@ -1055,34 +998,38 @@ class SDDSFile:
 
     def set_endianness(self, endianness: Literal["big", "little"]):
         if endianness == self.endianness:
-            if (
-                    self.mode == "binary"
-                    and self.data is not None
-                    and "endian" in self.data.nm
-            ):
+            if self.mode == "binary" and self.data is not None and "endian" in self.data.nm:
                 assert self.data.nm["endian"] == endianness
         else:
             self.endianness = endianness
             if self.mode == "binary" and self.data is not None:
                 self.data.nm["endian"] = endianness
 
-    def add_parameter(self, name: str, type: str, symbol: str = None, units: str = None, description: str = None,
-                      fixed_value: Union[int, float, str] = None, data: Optional[List[Union[int, float, str]]] = None):
+    def add_parameter(
+        self,
+        name: str,
+        type: str,
+        symbol: str = None,
+        units: str = None,
+        description: str = None,
+        fixed_value: Union[int, float, str] = None,
+        data: Optional[List[Union[int, float, str]]] = None,
+    ):
         # STRING name = NULL
         # STRING symbol = NULL
         # STRING units = NULL
         # STRING description = NULL
         # STRING type = NULL
         # STRING fixed_value = NULL
-        nm = {'name': name, 'type': type}
+        nm = {"name": name, "type": type}
         if symbol is not None:
-            nm['symbol'] = symbol
+            nm["symbol"] = symbol
         if units is not None:
-            nm['units'] = units
+            nm["units"] = units
         if description is not None:
-            nm['description'] = description
+            nm["description"] = description
         if fixed_value is not None:
-            nm['fixed_value'] = fixed_value
+            nm["fixed_value"] = fixed_value
         par = Parameter(nm, self)
         if data is not None:
             par.data = data
@@ -1090,9 +1037,19 @@ class SDDSFile:
         self.n_parameters += 1
         return par
 
-    def add_column(self, name: str, type: str, symbol: str = None, units: str = None, description: str = None,
-                   format_string: str = None, group_name: str = None, field_length: int = 0, dimensions: int = 1,
-                   data: Optional[List[np.ndarray]] = None):
+    def add_column(
+        self,
+        name: str,
+        type: str,
+        symbol: str = None,
+        units: str = None,
+        description: str = None,
+        format_string: str = None,
+        group_name: str = None,
+        field_length: int = 0,
+        dimensions: int = 1,
+        data: Optional[List[np.ndarray]] = None,
+    ):
         # STRING name = NULL
         # STRING symbol = NULL
         # STRING units = NULL
@@ -1102,21 +1059,21 @@ class SDDSFile:
         # STRING group_name = NULL
         # long field_length = 0
         # long dimensions = 1
-        nm = {'name': name, 'type': type}
+        nm = {"name": name, "type": type}
         if symbol is not None:
-            nm['symbol'] = symbol
+            nm["symbol"] = symbol
         if units is not None:
-            nm['units'] = units
+            nm["units"] = units
         if description is not None:
-            nm['description'] = description
+            nm["description"] = description
         if format_string is not None:
-            nm['format_string'] = format_string
+            nm["format_string"] = format_string
         if group_name is not None:
-            nm['group_name'] = group_name
+            nm["group_name"] = group_name
         if field_length != 0:
-            nm['field_length'] = field_length
+            nm["field_length"] = field_length
         if dimensions != 1:
-            nm['dimensions'] = dimensions
+            nm["dimensions"] = dimensions
         col = Column(nm, self)
         if data is not None:
             col.data = data
@@ -1126,10 +1083,10 @@ class SDDSFile:
 
     @staticmethod
     def from_df(
-            df_list: List[pd.DataFrame],
-            parameter_dict: Optional[Dict[str, list]] = None,
-            mode: Literal["binary", "ascii"] = "binary",
-            endianness: Literal["big", "little"] = None,
+        df_list: List[pd.DataFrame],
+        parameter_dict: Optional[Dict[str, list]] = None,
+        mode: Literal["binary", "ascii"] = "binary",
+        endianness: Literal["big", "little"] = None,
     ) -> "SDDSFile":
         """
         Create SDDS object from lists of dataframes
@@ -1171,9 +1128,7 @@ class SDDSFile:
             sdds_type = constants._NUMPY_DTYPES_INV[df.dtypes.iloc[i]]
             if sdds_type == object:
                 if not isinstance(val[0], str):
-                    raise ValueError(
-                            f"Column [{c}] is of object type but items are not strings"
-                    )
+                    raise ValueError(f"Column [{c}] is of object type but items are not strings")
             namelist = {"name": c, "type": sdds_type}
             col = Column(namelist, sdds)
             sdds.columns.append(col)
@@ -1182,10 +1137,7 @@ class SDDSFile:
         if parameter_dict is not None:
             for i, (k, v) in enumerate(parameter_dict.items()):
                 assert isinstance(v, list), f"Data of parameter [{k}] is not a list"
-                assert len(v) == n_pages, (
-                    f"Length {len(v)} of parameter {k} different from page "
-                    f"count {n_pages}"
-                )
+                assert len(v) == n_pages, f"Length {len(v)} of parameter {k} different from page count {n_pages}"
                 namelist = {"name": k, "type": constants._PYTHON_TYPE_INV[type(v[0])]}
                 par = Parameter(namelist, sdds)
                 sdds.parameters.append(par)
@@ -1201,9 +1153,7 @@ class SDDSFile:
         for page_idx in range(1, len(df_list)):
             df = df_list[page_idx]
             if not np.array_equal(columns, df.columns):
-                raise ValueError(
-                        f"Dataframe columns not same - {columns} vs {df.columns}"
-                )
+                raise ValueError(f"Dataframe columns not same - {columns} vs {df.columns}")
             for i, c in enumerate(columns):
                 if df.dtypes.iloc[i] == np.dtype(np.int64):
                     val = df.iloc[:, i].to_numpy(np.int32)
@@ -1302,21 +1252,15 @@ class SDDSFile:
 
         for el in self.parameters:
             data = el.data
-            assert (
-                    len(data) == n_pages
-            ), f"Expected {n_pages} points but have {len(data)} for {el}"
+            assert len(data) == n_pages, f"Expected {n_pages} points but have {len(data)} for {el}"
             assert isinstance(data, list)
             for v in data:
                 if type(v) != _PYTHON_TYPE_FINAL[el.type]:
-                    raise Exception(
-                            f"Parameter type {type(v)} ({v}) does not match {_PYTHON_TYPE_FINAL[el.type]}"
-                    )
+                    raise Exception(f"Parameter type {type(v)} ({v}) does not match {_PYTHON_TYPE_FINAL[el.type]}")
 
         for el in self.arrays:
             data = el.data
-            assert (
-                    len(data) == n_pages
-            ), f"Expected {n_pages} points but have {len(data)} for {el}"
+            assert len(data) == n_pages, f"Expected {n_pages} points but have {len(data)} for {el}"
             assert all(isinstance(v, np.ndarray) for v in data)
             assert all(v.dtype == _NUMPY_DTYPE_FINAL[el.type] for v in data)
 
@@ -1326,62 +1270,61 @@ class SDDSFile:
                 assert len(data) == 0
                 continue
 
-            assert (
-                    len(data) == n_pages
-            ), f"Expected {n_pages} points but have {len(data)} for {el}"
+            assert len(data) == n_pages, f"Expected {n_pages} points but have {len(data)} for {el}"
             assert all(isinstance(v, np.ndarray) for v in data)
             for v in data:
                 expected_dtype = _NUMPY_DTYPE_FINAL[el.type]
                 if not v.dtype == _NUMPY_DTYPE_FINAL[el.type]:
-                    if np.issubdtype(v.dtype, np.integer) and np.issubdtype(
-                            _NUMPY_DTYPE_FINAL[el.type], np.integer
-                    ):
+                    if np.issubdtype(v.dtype, np.integer) and np.issubdtype(_NUMPY_DTYPE_FINAL[el.type], np.integer):
                         # If both integer-like, probably ok since converts up to max values
                         pass
                     else:
-                        raise Exception(
-                                f"dtype {v.dtype} does not match expected {expected_dtype}"
-                        )
+                        raise Exception(f"dtype {v.dtype} does not match expected {expected_dtype}")
 
     def to_sdds(self):
         """Convert SDDS object to a bytes object, ready for writing to file"""
         from .. import write
+
         buf = io.BytesIO()
         write(self, buf)
         return buf.getvalue()
 
-    def write(self,
-              filename: Union[Path, str, io.BytesIO],
-              compression: Optional[str] = None,
-              overwrite: Optional[bool] = False,
-              use_best_settings: bool = True
-              ):
+    def write(
+        self,
+        filename: Union[Path, str, io.BytesIO],
+        compression: Optional[str] = None,
+        overwrite: Optional[bool] = False,
+        use_best_settings: bool = True,
+    ):
         """
         Write SDDS object to file.
 
         This is syntactic sugar for the pysdds.write method; same arguments apply.
         """
         from .. import write
+
         with open(filename, "wb") as f:
             write(self, filepath=f, compression=compression, overwrite=overwrite, use_best_settings=use_best_settings)
 
-    def get_streaming_writer(self,
-                             filename: Union[Path, str, io.BytesIO],
-                             compression: Optional[str] = None,
-                             overwrite: Optional[bool] = False,
-                             use_best_settings: bool = True
-                             ):
+    def get_streaming_writer(
+        self,
+        filename: Union[Path, str, io.BytesIO],
+        compression: Optional[str] = None,
+        overwrite: Optional[bool] = False,
+        use_best_settings: bool = True,
+    ):
         """
-         Create a write stream for incremental writing of rows. All header namelists must be fully
-         defined before calling this method, but data structures should be empty.
+        Create a write stream for incremental writing of rows. All header namelists must be fully
+        defined before calling this method, but data structures should be empty.
 
-         Returned object is a class with methods begin(), write_row(), next_page(), and end(); each call will immediately
-            write to file.
+        Returned object is a class with methods begin(), write_row(), next_page(), and end(); each call will immediately
+           write to file.
 
-         Note that in streaming mode column_major_order is not supported.
+        Note that in streaming mode column_major_order is not supported.
         """
         if not self.is_empty:
             raise ValueError("Cannot mix streaming with regular writes - data object must be empty")
         from ..writers.writers import IncrementalWriter
+
         streamer = IncrementalWriter(self, filename, compression, overwrite, use_best_settings)
         return streamer
