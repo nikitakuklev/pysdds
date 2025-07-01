@@ -1046,7 +1046,7 @@ def _read_header_v2(
         # hack around newlines in escaped strings
         if command == "&parameter":
             if "fixed_value" in nm_dict:
-                nm_dict["fixed_value"] = nm_dict["fixed_value"].replace("\n", " ")
+                nm_dict["fixed_value"] = nm_dict["fixed_value"].replace("\r\n", " ").replace("\n", " ")
 
         nm_keys = set(nm_dict.keys())
         namelists.append(nm_dict)
@@ -2084,10 +2084,7 @@ def _read_pages_ascii_mixed_lines(
                     strip=False,
                     cut_midline_comments=False,
                 )
-                # if line == '\n':
-                # empty lines at the end of file?
-                #    continue
-                if line is None or line == "\n":
+                if line is None or line == "\n" or line == "\r\n":
                     logger.debug(
                         f">>C ({file.tell()}) | End of no_row_counts page at row {row_cnt}"
                     )
@@ -2261,6 +2258,13 @@ def _read_pages_ascii_mixed_lines(
                 if next_char == "\n":
                     file.read(1)
                     continue
+                elif next_char == "\r":
+                    file.read(1)
+                    next_byte = file.peek(1)
+                    if len(next_byte) > 0 and next_byte[:1].decode("ascii") == "\n":
+                        file.read(1)
+                    else:
+                        raise SDDSReadError(f'Unexpected \\r without \\n at {file.tell()}')
                 else:
                     logger.debug(
                         f"Found character {repr(next_char)} at {file.tell()}, continuing to next page"
