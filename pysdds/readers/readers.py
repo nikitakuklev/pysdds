@@ -1101,7 +1101,7 @@ def _read_pages_binary(
     logger.debug(f"Parameters to parse: {len(parameters)} of {len(sdds.parameters)}")
     logger.debug(f"Parameter types: {parameter_types}")
     logger.debug(f"Parameter lengths: {parameter_lengths}")
-    n_parameters = len(parameters)
+    #n_parameters = len(parameters)
 
     # Arrays go here
     arrays = sdds.arrays
@@ -1604,7 +1604,7 @@ def _read_pages_ascii_mixed_lines(
     columns_type = [_NUMPY_DTYPES[el.type] for el in columns]
     columns_store_type = [_NUMPY_DTYPE_FINAL[el.type] for el in columns]
     pd_column_dict = {
-        i: columns_store_type[i] if columns_store_type[i] != object else str for i in range(len(columns_type))
+        i: columns_store_type[i] if columns_store_type[i] is not object else str for i in range(len(columns_type))
     }
     assert object in columns_type
     struct_type = None
@@ -1639,7 +1639,7 @@ def _read_pages_ascii_mixed_lines(
                     f"Unexpected EOF during parameter parsing at page {page_idx} | {page_idx=} {par_idx=} | pos {file.tell()}"
                 )
             if not page_skip:
-                if parameters_type[par_idx] == object:
+                if parameters_type[par_idx] is object:
                     value = b_array.strip()
 
                     # Indicates a variable length string
@@ -1716,7 +1716,7 @@ def _read_pages_ascii_mixed_lines(
             n_lines_read = 0
             n_elements_read = 0
             line_values = []
-            if arrays_type[array_idx] == object:
+            if arrays_type[array_idx] is object:
                 # Strings need special treatment
                 while True:
                     b_array = __get_next_line(file).strip()
@@ -1765,7 +1765,7 @@ def _read_pages_ascii_mixed_lines(
             if arrays_mask[array_idx] and not page_skip:
                 values = np.concatenate(line_values)
                 # Arrays are initialized in C order by default, matching SDDS
-                if mapped_t == str:
+                if mapped_t is str:
                     data_array = np.empty(dimensions, dtype=object)
                 else:
                     data_array = np.empty(dimensions, dtype=mapped_t)
@@ -1852,7 +1852,7 @@ def _read_pages_ascii_mixed_lines(
                     for c in sdds.columns:
                         if columns_mask[col_idx]:
                             t = columns_type[col_idx]
-                            if t == object:
+                            if t is object:
                                 value = values[col_idx]
                             else:
                                 value = np.fromstring(values[col_idx], dtype=t, count=1, sep=" ")[0]
@@ -1904,7 +1904,7 @@ def _read_pages_ascii_mixed_lines(
                     for c in sdds.columns:
                         if columns_mask[col_idx]:
                             t = columns_type[col_idx]
-                            if t == object:
+                            if t is object:
                                 value = values[col_idx]
                             else:
                                 value = np.fromstring(values[col_idx], dtype=t, count=1, sep=" ")[0]
@@ -2096,7 +2096,7 @@ def _read_pages_ascii_numeric_lines(
     n_columns = len(columns)
     if n_columns > 0:
         columns_type = [_NUMPY_DTYPES[el.type] for el in columns]
-        columns_store_type = [_NUMPY_DTYPE_FINAL[el.type] for el in columns]
+        # columns_store_type = [_NUMPY_DTYPE_FINAL[el.type] for el in columns]
         assert object not in columns_type
         struct_type = np.dtype(", ".join(columns_type))
 
@@ -2104,7 +2104,7 @@ def _read_pages_ascii_numeric_lines(
         logger.debug(f"Column struct_type: {struct_type}")
     else:
         columns_type = []
-        columns_store_type = []
+        # columns_store_type = []
 
     page_idx = 0
     page_stored_idx = 0
@@ -2148,7 +2148,7 @@ def _read_pages_ascii_numeric_lines(
                 if par_line_num > 10000:
                     raise Exception("Still parsing parameters after 10000 lines - something is wrong")
 
-                if parameter_types[par_idx] == object:
+                if parameter_types[par_idx] is object:
                     value = b_array.strip()
                     # Indicates a variable length string
                     if value.startswith('"') and value.endswith('"'):
@@ -2192,7 +2192,7 @@ def _read_pages_ascii_numeric_lines(
             n_lines_read = 0
             n_elements_read = 0
             line_values = []
-            if arrays_type[array_idx] == object:
+            if arrays_type[array_idx] is object:
                 # Strings need special treatment
                 while True:
                     b_array = __get_next_line(file).strip()
@@ -2241,7 +2241,7 @@ def _read_pages_ascii_numeric_lines(
             if arrays_mask[array_idx] and not page_skip:
                 values = np.concatenate(line_values)
                 # Arrays are initialized in C order by default, matching SDDS
-                if mapped_t == str:
+                if mapped_t is str:
                     data_array = np.empty(dimensions, dtype=object)
                 else:
                     data_array = np.empty(dimensions, dtype=mapped_t)

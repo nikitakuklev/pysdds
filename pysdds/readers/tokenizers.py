@@ -21,7 +21,7 @@ def tokenize_namelist(line):
     value_quote_mode = False
     value_escape_next = False
     value_parse_started = False
-    value_parse_space_seen = False
+    # value_parse_space_seen = False
 
     while True:
         if mode_gap:

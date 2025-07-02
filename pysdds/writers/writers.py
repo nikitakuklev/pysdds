@@ -191,10 +191,10 @@ class IncrementalWriter:
 
         if self.endianness == "big":
             NUMPY_DTYPE = _NUMPY_DTYPE_BE
-            STRUCT_DTYPE_STRINGS = _STRUCT_STRINGS_BE
+            #STRUCT_DTYPE_STRINGS = _STRUCT_STRINGS_BE
         else:
             NUMPY_DTYPE = _NUMPY_DTYPE_LE
-            STRUCT_DTYPE_STRINGS = _STRUCT_STRINGS_LE
+            #STRUCT_DTYPE_STRINGS = _STRUCT_STRINGS_LE
         self.NUMPY_DTYPE = NUMPY_DTYPE
 
         parameters = []
@@ -280,7 +280,7 @@ class IncrementalWriter:
                 arr = np.array([parameter_data[i]], dtype=self.p_types[i])
                 file.write(arr)
 
-        for i, el in enumerate(sdds.arrays):
+        for i, el in enumerate(self.sdds.arrays):
             # file.write(el.data[page_idx].shape.view(NUMPY_DTYPE['character'])])
             for d in array_data[i].shape:
                 file.write(d.to_bytes(4, self.endianness))
@@ -760,10 +760,10 @@ def _dump_data_ascii(sdds: SDDSFile, file: IO[bytes], best_settings):
 def _dump_data_binary(sdds: SDDSFile, file: IO[bytes], endianness):
     if endianness == "big":
         NUMPY_DTYPE = _NUMPY_DTYPE_BE
-        STRUCT_DTYPE_STRINGS = _STRUCT_STRINGS_BE
+        #STRUCT_DTYPE_STRINGS = _STRUCT_STRINGS_BE
     else:
         NUMPY_DTYPE = _NUMPY_DTYPE_LE
-        STRUCT_DTYPE_STRINGS = _STRUCT_STRINGS_LE
+        #STRUCT_DTYPE_STRINGS = _STRUCT_STRINGS_LE
 
     def _write_str(s: str):
         slen = len(s)
@@ -788,7 +788,7 @@ def _dump_data_binary(sdds: SDDSFile, file: IO[bytes], endianness):
                 p_types.append(NUMPY_DTYPE[t])
                 p_lengths.append(_NUMPY_DTYPE_SIZES[t])
 
-    n_parameters = len(parameters)
+    # n_parameters = len(parameters)
     logger.debug(f"Parameters: {len(parameters)} of {len(sdds.parameters)}")
     logger.debug(f"Parameter types: {p_types}")
     logger.debug(f"Parameter lengths: {p_lengths}")

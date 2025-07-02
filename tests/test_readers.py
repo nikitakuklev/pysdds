@@ -9,7 +9,11 @@ cwd = Path(__file__).parent
 root_sources = cwd / "files"
 print(f"Executing readers in {cwd=} {root_sources=}")
 subroots = ["sources", "sources_binary_rowmajor", "sources_binary_colmajor", "sources_ascii"]
-to_str = lambda l: [str(s) for s in l]
+
+
+def to_str(l):
+    return [str(s) for s in l]
+
 
 ff = to_str((root_sources / "sources").glob("*"))
 ff_ascii = to_str((root_sources / "sources_ascii").glob("*"))
@@ -29,8 +33,14 @@ fl_binary_rowmajor = to_str((root_sources / "sources_large_binary_rowmajor").glo
 files_all_nolarge = ff + ff_ascii + ff_binary_colmajor + ff_binary_rowmajor + fc
 files_all = ff + ff_ascii + ff_binary_colmajor + ff_binary_rowmajor + fl + fc
 
-get_names = lambda xa: [Path(x).name for x in xa]
-get_name = lambda x: Path(x).name
+
+def get_names(xa):
+    return [Path(x).name for x in xa]
+
+
+def get_name(x):
+    return Path(x).name
+
 
 # Generate pairs [(file1, file1_ascii, ...), (file2, ...)] for equality testing
 file_name_dict = {}

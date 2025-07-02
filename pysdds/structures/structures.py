@@ -123,7 +123,7 @@ class Description:
         if other is None:
             err("None comparison")
             return False
-        if type(self) != type(other):
+        if type(self) is not type(other):
             err("type")
             return False
         if self.nm != other.nm:
@@ -207,7 +207,7 @@ class Parameter:
             if raise_error:
                 raise ValueError(fail_str + stage + " " + "|".join([repr(a) for a in args]))
 
-        if type(self) != type(other):
+        if type(self) is not type(other):
             err("type", type(self), type(other))
             return False
         if self.nm != other.nm:
@@ -378,7 +378,7 @@ class Array:
                 raise ValueError(fail_str + stage + " " + "|".join([str(a) for a in args]))
 
         """ Compare to another Array """
-        if type(self) != type(other):
+        if type(self) is not type(other):
             err("type")
             return False
         if self.nm != other.nm:
@@ -493,7 +493,7 @@ class Column:
             if raise_error:
                 raise Exception(f"{fail_str} {stage=} {'|'.join([str(a) for a in args])}")
 
-        if type(self) != type(other):
+        if type(self) is not type(other):
             err("type")
             return False
         if self.nm != other.nm:
@@ -592,7 +592,7 @@ class Data:
             if raise_error:
                 raise Exception(fail_str + stage + " " + "|".join([str(a) for a in args]))
 
-        if type(self) != type(other):
+        if type(self) is not type(other):
             err("type")
             return False
         if self.nm != other.nm:
@@ -668,7 +668,7 @@ class Associate:
             if raise_error:
                 raise Exception(fail_str + stage + " " + "|".join([str(a) for a in args]))
 
-        if type(self) != type(other):
+        if type(self) is not type(other):
             err("type")
             return False
         if self.nm != other.nm:
@@ -1126,7 +1126,7 @@ class SDDSFile:
             else:
                 val = df.iloc[:, i].values
             sdds_type = constants._NUMPY_DTYPES_INV[df.dtypes.iloc[i]]
-            if sdds_type == object:
+            if sdds_type is object:
                 if not isinstance(val[0], str):
                     raise ValueError(f"Column [{c}] is of object type but items are not strings")
             namelist = {"name": c, "type": sdds_type}
@@ -1255,7 +1255,7 @@ class SDDSFile:
             assert len(data) == n_pages, f"Expected {n_pages} points but have {len(data)} for {el}"
             assert isinstance(data, list)
             for v in data:
-                if type(v) != _PYTHON_TYPE_FINAL[el.type]:
+                if type(v) is not _PYTHON_TYPE_FINAL[el.type]:
                     raise Exception(f"Parameter type {type(v)} ({v}) does not match {_PYTHON_TYPE_FINAL[el.type]}")
 
         for el in self.arrays:

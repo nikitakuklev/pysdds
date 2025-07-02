@@ -1,1 +1,1 @@
-from .writers import write
+from .writers import write as write

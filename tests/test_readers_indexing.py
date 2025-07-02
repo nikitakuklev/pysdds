@@ -8,7 +8,12 @@ from pathlib import Path
 
 cwd = Path(__file__).parent
 root_sources = cwd / "files"
-to_str = lambda l: [str(s) for s in l]
+
+
+def to_str(l):
+    return [str(s) for s in l]
+
+
 ff = to_str((root_sources / "sources").glob("*"))
 
 
