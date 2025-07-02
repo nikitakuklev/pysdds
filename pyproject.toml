@@ -43,6 +43,11 @@ dynamic = ['version']
 [tool.ruff]
 line-length = 120
 
+[tool.ruff.lint]
+ignore = [
+    "E741", # ambiguous variable name
+]
+
 
 [tool.setuptools.packages.find]
 where = ["."]

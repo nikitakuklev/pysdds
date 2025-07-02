@@ -14,8 +14,8 @@ root_binary_colmajor = root_sources / "sources_binary_colmajor"
 root_ascii = root_sources / "ascii"
 
 
-def to_str(l):
-    return [str(s) for s in l]
+def to_str(slist):
+    return [str(s) for s in slist]
 
 
 files_sources = to_str((root_sources / "sources").glob("*"))
@@ -47,8 +47,7 @@ sets_list = []
 for f in set_sources:
     if f in set_union:
         sets_list.append(
-                [str(root_sources) + f, str(root_binary_colmajor) + f, str(root_binary_rowmajor) + f,
-                 str(root_ascii) + f]
+            [str(root_sources) + f, str(root_binary_colmajor) + f, str(root_binary_rowmajor) + f, str(root_ascii) + f]
         )
     else:
         continue

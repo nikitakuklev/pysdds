@@ -11,8 +11,8 @@ print(f"Executing readers in {cwd=} {root_sources=}")
 subroots = ["sources", "sources_binary_rowmajor", "sources_binary_colmajor", "sources_ascii"]
 
 
-def to_str(l):
-    return [str(s) for s in l]
+def to_str(slist):
+    return [str(s) for s in slist]
 
 
 ff = to_str((root_sources / "sources").glob("*"))
@@ -44,13 +44,13 @@ def get_name(x):
 
 # Generate pairs [(file1, file1_ascii, ...), (file2, ...)] for equality testing
 file_name_dict = {}
-for l in [
+for slist in [
     ff + fc + fl,
     ff_ascii + fc_ascii + fl_ascii,
     ff_binary_rowmajor + fc_binary_rowmajor + fl_binary_rowmajor,
     ff_binary_colmajor + fc_binary_colmajor + fl_binary_colmajor,
 ]:
-    for f in l:
+    for f in slist:
         name = get_name(f)
         if name in file_name_dict:
             file_name_dict[name].append(f)
@@ -60,8 +60,8 @@ for l in [
 all_tuples = list(file_name_dict.values())
 
 file_name_dict = {}
-for l in [ff_binary_rowmajor, ff_binary_colmajor]:
-    for f in l:
+for slist in [ff_binary_rowmajor, ff_binary_colmajor]:
+    for f in slist:
         name = get_name(f)
         if name in file_name_dict:
             file_name_dict[name].append(f)

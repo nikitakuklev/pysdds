@@ -10,8 +10,8 @@ cwd = Path(__file__).parent
 root_sources = cwd / "files"
 
 
-def to_str(l):
-    return [str(s) for s in l]
+def to_str(slist):
+    return [str(s) for s in slist]
 
 
 ff = to_str((root_sources / "sources").glob("*"))

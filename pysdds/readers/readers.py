@@ -1101,7 +1101,7 @@ def _read_pages_binary(
     logger.debug(f"Parameters to parse: {len(parameters)} of {len(sdds.parameters)}")
     logger.debug(f"Parameter types: {parameter_types}")
     logger.debug(f"Parameter lengths: {parameter_lengths}")
-    #n_parameters = len(parameters)
+    # n_parameters = len(parameters)
 
     # Arrays go here
     arrays = sdds.arrays
@@ -2375,7 +2375,7 @@ def _read_pages_ascii_numeric_lines(
                         line_cnt += 1
                         yield l
 
-                buf = io.StringIO("\n".join((l for l in gen())))
+                buf = io.StringIO("\n".join((line for line in gen())))
                 logger.debug(f">>C {file.tell()} | Feeding buffer {cnt=} {line_cnt=} to parse_table")
                 opts = dict(
                     sep="\s+",

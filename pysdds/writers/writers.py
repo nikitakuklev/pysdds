@@ -18,8 +18,6 @@ from pysdds.util.constants import (
     _NUMPY_DTYPE_BE,
     _NUMPY_DTYPE_LE,
     _NUMPY_DTYPE_SIZES,
-    _STRUCT_STRINGS_BE,
-    _STRUCT_STRINGS_LE,
 )
 from pysdds.util.errors import SDDSWriteException
 
@@ -191,10 +189,10 @@ class IncrementalWriter:
 
         if self.endianness == "big":
             NUMPY_DTYPE = _NUMPY_DTYPE_BE
-            #STRUCT_DTYPE_STRINGS = _STRUCT_STRINGS_BE
+            # STRUCT_DTYPE_STRINGS = _STRUCT_STRINGS_BE
         else:
             NUMPY_DTYPE = _NUMPY_DTYPE_LE
-            #STRUCT_DTYPE_STRINGS = _STRUCT_STRINGS_LE
+            # STRUCT_DTYPE_STRINGS = _STRUCT_STRINGS_LE
         self.NUMPY_DTYPE = NUMPY_DTYPE
 
         parameters = []
@@ -760,10 +758,10 @@ def _dump_data_ascii(sdds: SDDSFile, file: IO[bytes], best_settings):
 def _dump_data_binary(sdds: SDDSFile, file: IO[bytes], endianness):
     if endianness == "big":
         NUMPY_DTYPE = _NUMPY_DTYPE_BE
-        #STRUCT_DTYPE_STRINGS = _STRUCT_STRINGS_BE
+        # STRUCT_DTYPE_STRINGS = _STRUCT_STRINGS_BE
     else:
         NUMPY_DTYPE = _NUMPY_DTYPE_LE
-        #STRUCT_DTYPE_STRINGS = _STRUCT_STRINGS_LE
+        # STRUCT_DTYPE_STRINGS = _STRUCT_STRINGS_LE
 
     def _write_str(s: str):
         slen = len(s)
