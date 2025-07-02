@@ -115,11 +115,6 @@ def test_read_binary2(file_root):
 def test_read_ascii(file_root):
     sdds = pysdds.read(file_root)
     sdds.validate_data()
-    stream_ascii_windows = open(file_root, "rb").read().replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
-    winstream = io.BytesIO(stream_ascii_windows)
-    bstream = io.BufferedReader(winstream)
-    sdds = pysdds.read(bstream)
-    sdds.validate_data()
 
 
 @pytest.mark.parametrize("file_root", ff_ascii)

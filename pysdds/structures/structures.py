@@ -1255,8 +1255,9 @@ class SDDSFile:
             assert len(data) == n_pages, f"Expected {n_pages} points but have {len(data)} for {el}"
             assert isinstance(data, list)
             for v in data:
-                if type(v) is not _PYTHON_TYPE_FINAL[el.type]:
-                    raise Exception(f"Parameter type {type(v)} ({v}) does not match {_PYTHON_TYPE_FINAL[el.type]}")
+                print(v)
+                if type(v) != _PYTHON_TYPE_FINAL[el.type]:  # noqa: E721
+                    raise Exception(f"Parameter type ({type(v)}) ({v}) does not match {_PYTHON_TYPE_FINAL[el.type]}")
 
         for el in self.arrays:
             data = el.data
