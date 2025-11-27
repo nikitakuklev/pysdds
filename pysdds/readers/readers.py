@@ -158,9 +158,10 @@ def _open_file(
     # a buffered reader to at least read large chunks from network storage
     # If file size is small enough, we try to buffer whole file immediately
     # See bpo-41486 for Python 3.10 patch that will improve decompress performance
-    if buffer_size == 0 and filesize < 8388608:
+    BUFSIZE = 8192 * 8  # 8388608
+    if buffer_size == 0 and filesize < BUFSIZE:
         try:
-            with open(filepath, "rb", buffering=8388608) as f:
+            with open(filepath, "rb", buffering=BUFSIZE) as f:
                 buf = f.read()
             if compression == "xz":
                 import lzma
@@ -197,7 +198,7 @@ def _open_file(
             else:
                 # If file was too large to ingest fully, fall back to standard buffer
                 # Too large a value might be detrimental due to CPU caches
-                sbuf = 1048576 if buffer_size == 0 else buffer_size  # 2**20
+                sbuf = BUFSIZE if buffer_size == 0 else buffer_size  # 1048576 2**20
                 buffered_stream = open(filepath, "rb", buffering=sbuf)
             if compression == "xz":
                 import lzma
