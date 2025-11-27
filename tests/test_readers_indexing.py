@@ -1,10 +1,13 @@
 import itertools
+import logging
 import random
+import time
 
 import numpy as np
 import pytest
 import pysdds
 from pathlib import Path
+
 
 cwd = Path(__file__).parent
 root_sources = cwd / "files"
@@ -40,6 +43,7 @@ def test_read_cols(file_root):
 
 
 file_ts = [str(root_sources / "sources_compressed/timeSeries.sdds.xz")]
+file_twi = [str(root_sources / "sources/twiss_binary")]
 
 
 @pytest.mark.parametrize("file_root", file_ts)
@@ -79,4 +83,51 @@ def test_col_mask(file_root):
     assert not sdds.columns[0]._enabled
     assert sdds.columns[1]._enabled
     assert sdds.n_parameters == 11
+    sdds.validate_data()
+
+
+@pytest.mark.parametrize("file_root", file_ts)
+def test_col_empty_shortcut(file_root):
+    sdds = pysdds.read(file_root, cols=[], pages=[0])
+    assert sdds.n_pages == 1
+    assert sdds.n_columns == 2
+    assert not sdds.columns[0]._enabled
+    assert not sdds.columns[1]._enabled
+    assert sdds.n_parameters == 11
+    sdds.validate_data()
+
+    sdds = pysdds.read(file_root, cols=[], pages=[1,3])
+    assert sdds.n_pages == 2
+    assert sdds.n_columns == 2
+    assert not sdds.columns[0]._enabled
+    assert not sdds.columns[1]._enabled
+    assert sdds.n_parameters == 11
+    sdds.validate_data()
+
+
+@pytest.mark.parametrize("file_root", file_twi)
+def test_col_empty_perf(file_root):
+    root = logging.getLogger()
+    for handler in root.handlers:
+        root.removeHandler(handler)
+    logging.basicConfig(level=logging.DEBUG,
+                        # format='%(asctime)s %(processName)-10s %(name)s %(levelname)-8s %(message)s', #[%(name)s]
+                        format='[%(levelname)-5.5s][%(asctime)s.%(msecs)03d '
+                               '%(filename)10s %(lineno)4s] %(message)s',
+                        datefmt='%H:%M:%S',
+                        force=True
+                        )
+
+    sdds = pysdds.read(file_root, cols=[], pages=[0])
+    t1 = time.perf_counter()
+    for i in range(10):
+        sdds = pysdds.read(file_root, cols=[], pages=[0])
+    t2 = time.perf_counter()
+    for i in range(10):
+        sdds = pysdds.read(file_root, pages=[0])
+    t3 = time.perf_counter()
+    logging.info(f"Empty cols read time: {t2 - t1:.6f}s vs full read time: {t3 - t2:.6f}s")
+    assert t3 - t2 > t2 - t1
+    assert sdds.n_pages == 1
+    assert sdds.n_columns == 18
     sdds.validate_data()

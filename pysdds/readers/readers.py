@@ -1,5 +1,6 @@
 import csv
 import io
+import os
 import sys
 import logging
 import time
@@ -1098,9 +1099,9 @@ def _read_pages_binary(
                 numpy_type = NUMPY_DTYPE_STRINGS[t]
                 parameter_types.append(numpy_type)
                 parameter_lengths.append(_NUMPY_DTYPE_SIZES[t])
-    logger.debug(f"Parameters to parse: {len(parameters)} of {len(sdds.parameters)}")
-    logger.debug(f"Parameter types: {parameter_types}")
-    logger.debug(f"Parameter lengths: {parameter_lengths}")
+    logger.debug("Parameters to parse: %d of %d", len(parameters), len(sdds.parameters))
+    logger.debug("Parameter types: %s", parameter_types)
+    logger.debug("Parameter lengths: %s", parameter_lengths)
     # n_parameters = len(parameters)
 
     # Arrays go here
@@ -1119,9 +1120,9 @@ def _read_pages_binary(
         arrays_size.append(_NUMPY_DTYPE_SIZES[t])
     n_arrays = len(arrays_type)
     if n_arrays > 0:
-        logger.debug(f"Arrays to parse: {len(arrays_type)}")
-        logger.debug(f"Array types: {arrays_type}")
-        logger.debug(f"Array lengths: {arrays_size}")
+        logger.debug("Arrays to parse: %d", len(arrays_type))
+        logger.debug("Array types: %s", arrays_type)
+        logger.debug("Array lengths: %s", arrays_size)
 
     # Columns follow arrays
     columns_type = []
@@ -1132,6 +1133,7 @@ def _read_pages_binary(
     combined_struct = combined_size = combined_dtype = None
     columns = sdds.columns
     n_columns = len(columns)
+    skip_all_columns = all(not v for v in columns_mask)
     for i, c in enumerate(columns):
         t = c.type
         columns_type.append(NUMPY_DTYPE_STRINGS[t])
@@ -1146,10 +1148,10 @@ def _read_pages_binary(
             combined_struct += v[1]
         combined_size = sum(columns_len)
     if n_columns > 0:
-        logger.debug(f"Columns to parse: {n_columns}")
-        logger.debug(f"Column types: {columns_type}")
-        logger.debug(f"Column lengths: {columns_len}")
-        logger.debug(f"All numeric: {columns_all_numeric}")
+        logger.debug("Columns to parse: %d", n_columns)
+        logger.debug("Column types: %s", columns_type)
+        logger.debug("Column lengths: %s", columns_len)
+        logger.debug("All numeric: %s", columns_all_numeric)
 
     if sdds.data.column_major_order != 0:
         logger.debug("Data is in column-major order - no special handling required")
@@ -1176,6 +1178,7 @@ def _read_pages_binary(
 
     page_idx = 0
     page_stored_idx = 0
+    page_last_active_idx = max(i for i, v in enumerate(pages_mask) if v) if pages_mask is not None else None
     while True:
         columns_data = []
 
@@ -1297,6 +1300,11 @@ def _read_pages_binary(
         if n_columns == 0:
             page_stored_idx += 1
             pass
+        elif page_last_active_idx is not None and page_idx == page_last_active_idx and skip_all_columns:
+            # end of file, don't need columns - terminate early
+            logger.debug("Last active page with no columns to read - terminating early")
+            if not page_skip:
+                page_stored_idx += 1
         elif sdds.data.column_major_order != 0:
             # Column major order
             for i in range(n_columns):
@@ -1431,11 +1439,17 @@ def _read_pages_binary(
                     f" {combined_dtype.itemsize=} {(combined_size * page_size) % combined_dtype.itemsize=}"
                 )
 
-            byte_array = file.read(combined_size * page_size)
-            if len(byte_array) != combined_size * page_size:
-                raise ValueError(f"Unexpected EOF - got {len(byte_array)} bytes, wanted {combined_size * page_size}")
+            if page_skip or skip_all_columns:
+                # Fast skip
+                file.seek(combined_size * page_size, os.SEEK_CUR)
+                page_stored_idx += 1
+            else:
+                byte_array = file.read(combined_size * page_size)
+                if len(byte_array) != combined_size * page_size:
+                    raise ValueError(
+                        f"Unexpected EOF - got {len(byte_array)} bytes, wanted {combined_size * page_size}"
+                    )
 
-            if not page_skip:
                 array = np.frombuffer(byte_array, combined_dtype)
                 idx_active = 0
                 for i, c in enumerate(columns):
@@ -1591,13 +1605,13 @@ def _read_pages_ascii_mixed_lines(
     parameters_type = [_NUMPY_DTYPES[el.type] for el in parameters]
     n_parameters = len(parameters)
     if n_parameters > 0:
-        logger.debug(f"Parameter types: {parameters_type}")
+        logger.debug("Parameter types: %s", parameters_type)
 
     arrays = sdds.arrays
     arrays_type = [_NUMPY_DTYPES[el.type] for el in arrays]
     n_arrays = len(arrays)
     if n_arrays > 0:
-        logger.debug(f"Array types: {arrays_type}")
+        logger.debug("Array types: %s", arrays_type)
 
     columns = sdds.columns
     n_columns = len(columns)
