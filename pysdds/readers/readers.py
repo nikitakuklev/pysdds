@@ -1569,7 +1569,7 @@ def _read_pages_binary(
             next_byte = file.peek(1)
             if len(next_byte) > 0:
                 # More data exists
-                if pages_mask is not None and page_idx == len(pages_mask):
+                if pages_mask is not None and page_idx == len(pages_mask) and not skip_all_columns:
                     logger.warning(f"Pages mask {pages_mask} is too short - have at least {len(next_byte)} more bytes")
                     break
             else:
