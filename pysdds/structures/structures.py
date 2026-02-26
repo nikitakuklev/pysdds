@@ -1121,12 +1121,17 @@ class SDDSFile:
         columns = df.columns
 
         for i, c in enumerate(columns):
-            if df.dtypes.iloc[i] == np.dtype(np.int64):
+            col_dtype = df.dtypes.iloc[i]
+            if isinstance(col_dtype, pd.StringDtype):
+                val = df.iloc[:, i].to_numpy(dtype=object, na_value="")
+                sdds_type = "string"
+            elif col_dtype == np.dtype(np.int64):
                 val = df.iloc[:, i].values  # .astype(np.int32)
+                sdds_type = constants._NUMPY_DTYPES_INV[col_dtype]
             else:
                 val = df.iloc[:, i].values
-            sdds_type = constants._NUMPY_DTYPES_INV[df.dtypes.iloc[i]]
-            if sdds_type is object:
+                sdds_type = constants._NUMPY_DTYPES_INV[col_dtype]
+            if sdds_type == "string" and val.dtype == object:
                 if not isinstance(val[0], str):
                     raise ValueError(f"Column [{c}] is of object type but items are not strings")
             namelist = {"name": c, "type": sdds_type}
@@ -1155,7 +1160,10 @@ class SDDSFile:
             if not np.array_equal(columns, df.columns):
                 raise ValueError(f"Dataframe columns not same - {columns} vs {df.columns}")
             for i, c in enumerate(columns):
-                if df.dtypes.iloc[i] == np.dtype(np.int64):
+                col_dtype = df.dtypes.iloc[i]
+                if isinstance(col_dtype, pd.StringDtype):
+                    val = df.iloc[:, i].to_numpy(dtype=object, na_value="")
+                elif col_dtype == np.dtype(np.int64):
                     val = df.iloc[:, i].to_numpy(np.int32)
                 else:
                     val = df.iloc[:, i].to_numpy()
