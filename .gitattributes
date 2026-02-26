@@ -1,2 +1,3 @@
 pysdds/_version.py export-subst
 text eol=lf
+tests/files/** -text
