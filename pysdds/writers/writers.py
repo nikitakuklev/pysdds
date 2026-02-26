@@ -371,7 +371,7 @@ class IncrementalWriter:
         self.current_page += 1
         self.write_stage = WriterState.WRITING_PAGE
 
-    def write_rows(self, data_arrays: Union[list[np.ndarray], list[Union[str, float, int]]]):
+    def write_rows(self, data_arrays: Union[List[np.ndarray], List[Union[str, float, int]]]):
         if self.write_stage != WriterState.WRITING_PAGE:
             raise Exception("Cannot write data before starting new page")
         if not all(isinstance(arr, np.ndarray) for arr in data_arrays):
@@ -393,7 +393,7 @@ class IncrementalWriter:
             if self.write_method == "fixed_rowcount":
                 self._write_rows_binary(data_arrays_np)
 
-    def _write_rows_binary(self, data_arrays: list[np.ndarray]):
+    def _write_rows_binary(self, data_arrays: List[np.ndarray]):
         """
         Write one or multiple rows to the current page. Data arrays must be in the same order as columns in the
         SDDSFile, and of uniform length.

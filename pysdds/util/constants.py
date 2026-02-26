@@ -34,8 +34,11 @@ _NUMPY_DTYPES_INV = {
     object: "string",
     np.dtype("O"): "string",
     pd.StringDtype(): "string",
-    pd.StringDtype(na_value=float("nan")): "string",
 }
+try:
+    _NUMPY_DTYPES_INV[pd.StringDtype(na_value=float("nan"))] = "string"
+except TypeError:
+    pass
 
 # Only add them is likely available, since otherwise np.dtype(np.longdouble) == np.dtype(np.float64)
 # which confuses dict type lookups
