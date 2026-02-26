@@ -7,7 +7,7 @@ from pysdds.structures import SDDSFile  # noqa: F401
 from importlib.metadata import version, PackageNotFoundError
 
 try:
-    __version__ = version("package-name")
+    __version__ = version("pysdds")
 except PackageNotFoundError:
     # package is not installed
     __version__ = "[unknown]"

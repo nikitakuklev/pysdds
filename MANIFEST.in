@@ -1,6 +1,7 @@
-include versioneer.py
-include pysdds/_version.py
 include README.md LICENSE MANIFEST.in
-recursive-include pysdds *
-recursive-include demos *
-recursive-include tests *
+recursive-include pysdds *.py
+prune tests
+prune demos
+prune conda
+prune .github
+prune .gitlab

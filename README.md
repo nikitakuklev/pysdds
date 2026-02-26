@@ -132,23 +132,6 @@ Major differences are:
 
 Package architecture is straightforward - file header is first parsed to determine overall structure. Then, dispatch method picks one of multiple reader and writer implementations depending on file contents and compatibility constraints. Custom implementations can be provided as well (might perform better for your particular use case).
 
-## Roadmap
-- [ ] ASCII readers
-  - [x] Line by line 
-  - [ ] Streaming
-  - [x] Text block
-- [x] Binary readers
-  - [x] Streaming
-  - [x] Binary block via numpy
-  - [x] Binary block via struct
-- [x] Writers
-  - [x] ASCII
-  - [x] Binary
-- [x] Tests
-  - [x] Read tests
-  - [x] Compressed file tests
-  - [x] Automated file gen for various format permutations
-
 ## Contributing
 
 Pull requests are welcome, but current codebase is expected to evolve quickly until `1.0` release. It is probably more useful to just submit a feature request.
