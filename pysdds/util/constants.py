@@ -1,6 +1,8 @@
 import numpy as np
 import os
 
+import pandas as pd
+
 # SDDS specification has short, long, float, double, character, or string
 # SDDS 2 adds ulong, ushort
 # SDDS 4/5 adds long64, ulong64
@@ -31,6 +33,8 @@ _NUMPY_DTYPES_INV = {
     np.dtype(np.float32): "float",
     object: "string",
     np.dtype("O"): "string",
+    pd.StringDtype(): "string",
+    pd.StringDtype(na_value=float("nan")): "string",
 }
 
 # Only add them is likely available, since otherwise np.dtype(np.longdouble) == np.dtype(np.float64)
