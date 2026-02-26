@@ -1306,6 +1306,7 @@ def _read_pages_binary(
             logger.debug("Last active page with no columns to read - terminating early")
             if not page_skip:
                 page_stored_idx += 1
+            break
         elif sdds.data.column_major_order != 0:
             # Column major order
             for i in range(n_columns):
