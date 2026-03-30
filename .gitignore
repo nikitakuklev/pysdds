@@ -4,6 +4,7 @@ tests/files/**
 !tests/files/sources/**
 !tests/files/sources_compressed
 !tests/files/sources_compressed/**
+!tests/files/example_all_types.sdds
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
