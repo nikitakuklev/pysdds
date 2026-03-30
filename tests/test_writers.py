@@ -222,6 +222,7 @@ def test_round_trip_best_settings_column_major(file_root):
 # Column-major vs row-major writer tests
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.parametrize("file_root", files_sources)
 def test_write_binary_row_major_round_trip(file_root):
     """Write binary row-major, read back, compare data."""
@@ -294,6 +295,7 @@ def test_col_major_big_endian_round_trip(file_root):
 # Byte-level comparison: pysdds output vs C sddsconvert reference files
 # ---------------------------------------------------------------------------
 
+
 def _skip_header(raw: bytes) -> int:
     """Return the byte offset just past the header (after the &data...&end line)."""
     # Header is ASCII text ending with a line containing "&data ... &end"
@@ -321,8 +323,7 @@ _ref_rowmajor_pairs = [
 ]
 
 
-@pytest.mark.parametrize("source,ref_file", _ref_rowmajor_pairs,
-                         ids=[Path(p[0]).name for p in _ref_rowmajor_pairs])
+@pytest.mark.parametrize("source,ref_file", _ref_rowmajor_pairs, ids=[Path(p[0]).name for p in _ref_rowmajor_pairs])
 def test_binary_data_matches_c_reference_rowmajor(source, ref_file):
     """Read the C sddsconvert-produced reference, rewrite as binary row-major LE,
     compare data sections byte-for-byte. Uses the reference as input so both
@@ -337,8 +338,8 @@ def test_binary_data_matches_c_reference_rowmajor(source, ref_file):
         ref_bytes = f.read()
 
     # Compare data sections (skip headers since comments/formatting may differ)
-    py_data = py_bytes[_skip_header(py_bytes):]
-    ref_data = ref_bytes[_skip_header(ref_bytes):]
+    py_data = py_bytes[_skip_header(py_bytes) :]
+    ref_data = ref_bytes[_skip_header(ref_bytes) :]
     assert py_data == ref_data, (
         f"Binary data mismatch: pysdds wrote {len(py_data)} bytes, "
         f"reference has {len(ref_data)} bytes. "
@@ -346,8 +347,7 @@ def test_binary_data_matches_c_reference_rowmajor(source, ref_file):
     )
 
 
-@pytest.mark.parametrize("source,ref_file", _ref_colmajor_pairs,
-                         ids=[Path(p[0]).name for p in _ref_colmajor_pairs])
+@pytest.mark.parametrize("source,ref_file", _ref_colmajor_pairs, ids=[Path(p[0]).name for p in _ref_colmajor_pairs])
 def test_binary_data_matches_c_reference_colmajor(source, ref_file):
     """Read the C sddsconvert-produced reference, rewrite as binary col-major LE,
     compare data sections byte-for-byte."""
@@ -360,8 +360,8 @@ def test_binary_data_matches_c_reference_colmajor(source, ref_file):
     with open(ref_file, "rb") as f:
         ref_bytes = f.read()
 
-    py_data = py_bytes[_skip_header(py_bytes):]
-    ref_data = ref_bytes[_skip_header(ref_bytes):]
+    py_data = py_bytes[_skip_header(py_bytes) :]
+    ref_data = ref_bytes[_skip_header(ref_bytes) :]
     assert py_data == ref_data, (
         f"Binary data mismatch: pysdds wrote {len(py_data)} bytes, "
         f"reference has {len(ref_data)} bytes. "
@@ -369,8 +369,7 @@ def test_binary_data_matches_c_reference_colmajor(source, ref_file):
     )
 
 
-@pytest.mark.parametrize("source,ref_file", _ref_rowmajor_pairs,
-                         ids=[Path(p[0]).name for p in _ref_rowmajor_pairs])
+@pytest.mark.parametrize("source,ref_file", _ref_rowmajor_pairs, ids=[Path(p[0]).name for p in _ref_rowmajor_pairs])
 def test_source_to_binary_logical_match_rowmajor(source, ref_file):
     """Read original source, write as binary row-major, read back, compare
     logically against C sddsconvert reference."""
@@ -390,8 +389,7 @@ def test_source_to_binary_logical_match_rowmajor(source, ref_file):
     ref_sdds.compare(sdds2, ignore_data_mode=True)
 
 
-@pytest.mark.parametrize("source,ref_file", _ref_colmajor_pairs,
-                         ids=[Path(p[0]).name for p in _ref_colmajor_pairs])
+@pytest.mark.parametrize("source,ref_file", _ref_colmajor_pairs, ids=[Path(p[0]).name for p in _ref_colmajor_pairs])
 def test_source_to_binary_logical_match_colmajor(source, ref_file):
     """Read original source, write as binary col-major, read back, compare
     logically against C sddsconvert reference."""

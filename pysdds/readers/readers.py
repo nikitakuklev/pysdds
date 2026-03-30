@@ -1207,9 +1207,7 @@ def _read_pages_binary(
             page_size = int.from_bytes(byte_array_64, endianness, signed=True)
             logger.debug("Page %d uses 64-bit row count: %d", page_idx, page_size)
         if page_size < 0:
-            raise ValueError(
-                f"Page size ({page_size}) ({byte_array}) is negative - file is likely corrupt"
-            )
+            raise ValueError(f"Page size ({page_size}) ({byte_array}) is negative - file is likely corrupt")
         if page_size > 1e12:
             raise ValueError(
                 f"Page size ({page_size}) ({byte_array}) is unreasonable - is file not {endianness}-endian?"
@@ -1225,9 +1223,7 @@ def _read_pages_binary(
                 assert len(byte_array) == 4
                 type_len = int.from_bytes(byte_array, endianness, signed=True)
                 if type_len < 0:
-                    raise ValueError(
-                        f"String length ({type_len}) ({byte_array}) is negative - file is likely corrupt"
-                    )
+                    raise ValueError(f"String length ({type_len}) ({byte_array}) is negative - file is likely corrupt")
                 if type_len >= 1000000:
                     raise ValueError(
                         f"String length ({type_len}) ({byte_array}) too large - is file not {endianness}-endian?"
@@ -1291,7 +1287,9 @@ def _read_pages_binary(
                     assert len(byte_array) == 4
                     string_len_actual = int.from_bytes(byte_array, endianness, signed=True)
                     if string_len_actual < 0:
-                        raise ValueError(f"Array string length ({string_len_actual}) is negative - file is likely corrupt")
+                        raise ValueError(
+                            f"Array string length ({string_len_actual}) is negative - file is likely corrupt"
+                        )
                     assert string_len_actual <= 1000000
                     if string_len_actual == 0:
                         if flag:
@@ -1342,7 +1340,9 @@ def _read_pages_binary(
                         assert len(byte_array) == 4
                         string_len_actual = int.from_bytes(byte_array, endianness, signed=True)
                         if string_len_actual < 0:
-                            raise ValueError(f"Column string length ({string_len_actual}) is negative - file is likely corrupt")
+                            raise ValueError(
+                                f"Column string length ({string_len_actual}) is negative - file is likely corrupt"
+                            )
                         assert string_len_actual <= 1000000  # sanity check
                         if string_len_actual == 0:
                             # empty string
@@ -1514,7 +1514,9 @@ def _read_pages_binary(
                                 raise ValueError(f"Unexpected EOF at row {row}, column {i}")
                         string_len_actual = int.from_bytes(byte_array, endianness, signed=True)
                         if string_len_actual < 0:
-                            raise ValueError(f"Column string length ({string_len_actual}) is negative - file is likely corrupt")
+                            raise ValueError(
+                                f"Column string length ({string_len_actual}) is negative - file is likely corrupt"
+                            )
                         assert string_len_actual <= 1000000  # sanity check
                         if string_len_actual == 0:
                             # empty string

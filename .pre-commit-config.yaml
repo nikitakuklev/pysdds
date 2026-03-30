@@ -3,9 +3,12 @@ repos:
     rev: v5.0.0
     hooks:
       - id: trailing-whitespace
+        exclude: '^tests/files/'
       - id: end-of-file-fixer
+        exclude: '^tests/files/'
       - id: mixed-line-ending
         args: [--fix=lf]
+        exclude: '^tests/files/'
       - id: check-yaml
       - id: check-toml
       - id: check-added-large-files

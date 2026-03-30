@@ -160,4 +160,3 @@
       - conda-bld/**/*.tar.bz2
       # the feedstock
       #- feedstock/
-

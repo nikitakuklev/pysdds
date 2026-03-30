@@ -11,11 +11,11 @@
 </div>
 
 ## About
-Self Describing Data Set (SDDS) [file format](https://ops.aps.anl.gov/manuals/sdds/SDDS.html) is 
-a common format used in accelerator physics, notably by `elegant` simulation code and other 
-[tools](https://www.aps.anl.gov/Accelerator-Operations-Physics/Software) developed at the 
-Advanced Photon Source/ANL. 
-_pysdds_ is a pure-Python SDDS reader and writer with several nifty features that help with 
+Self Describing Data Set (SDDS) [file format](https://ops.aps.anl.gov/manuals/sdds/SDDS.html) is
+a common format used in accelerator physics, notably by `elegant` simulation code and other
+[tools](https://www.aps.anl.gov/Accelerator-Operations-Physics/Software) developed at the
+Advanced Photon Source/ANL.
+_pysdds_ is a pure-Python SDDS reader and writer with several nifty features that help with
 integration into standard Python ML and data analysis workflows.
 
 ## Getting started
