@@ -1560,7 +1560,7 @@ def _read_pages_binary(
             if pos < file_size:
                 # More data exists
                 if pages_mask is not None and page_idx == len(pages_mask):
-                    logger.warning(f"Pages mask {pages_mask} is too short - expect {file_size - pos} more bytes")
+                    logger.debug(f"Pages mask {pages_mask} is too short - expect {file_size - pos} more bytes")
                     break
             elif pos > file_size:
                 raise Exception(f"{pos=} is beyond file size {file_size=}???")
@@ -1572,7 +1572,7 @@ def _read_pages_binary(
             if len(next_byte) > 0:
                 # More data exists
                 if pages_mask is not None and page_idx == len(pages_mask):
-                    logger.warning(f"Pages mask {pages_mask} is too short - have at least {len(next_byte)} more bytes")
+                    logger.debug(f"Pages mask {pages_mask} is too short - have at least {len(next_byte)} more bytes")
                     break
             else:
                 # End of file
@@ -2083,7 +2083,7 @@ def _read_pages_ascii_mixed_lines(
         if len(next_byte) > 0:
             # More data exists
             if pages_mask is not None and page_idx == len(pages_mask):
-                logger.warning(f"Mask {pages_mask} ended but have at least {len(next_byte)} extra bytes - stopping")
+                logger.debug(f"Mask {pages_mask} ended but have at least {len(next_byte)} extra bytes - stopping")
                 break
         else:
             # End of file
@@ -2441,7 +2441,7 @@ def _read_pages_ascii_numeric_lines(
         if len(next_byte) > 0:
             # More data exists
             if pages_mask is not None and page_idx == len(pages_mask):
-                logger.warning(f"Mask {pages_mask} ended but have at least {len(next_byte)} extra bytes - stopping")
+                logger.debug(f"Mask {pages_mask} ended but have at least {len(next_byte)} extra bytes - stopping")
                 break
         else:
             # End of file
