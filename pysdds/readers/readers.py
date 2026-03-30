@@ -1299,8 +1299,8 @@ def _read_pages_binary(
         # Column reading loop
         fixed_rowcount_eof = False
         if n_columns == 0:
-            page_stored_idx += 1
-            pass
+            if not page_skip:
+                page_stored_idx += 1
         elif page_last_active_idx is not None and page_idx == page_last_active_idx and skip_all_columns:
             # end of file, don't need columns - terminate early
             logger.debug("Last active page with no columns to read - terminating early")
@@ -1444,7 +1444,8 @@ def _read_pages_binary(
             if page_skip or skip_all_columns:
                 # Fast skip
                 file.seek(combined_size * page_size, os.SEEK_CUR)
-                page_stored_idx += 1
+                if not page_skip:
+                    page_stored_idx += 1
             else:
                 byte_array = file.read(combined_size * page_size)
                 if len(byte_array) != combined_size * page_size:
@@ -1637,7 +1638,7 @@ def _read_pages_ascii_mixed_lines(
                 logger.debug(f"Reached last page {page_idx} in mask, have at least 1 more remaining but exiting early")
                 break
             else:
-                page_skip = pages_mask[page_idx]
+                page_skip = not pages_mask[page_idx]
         else:
             page_skip = False
 
@@ -2140,7 +2141,7 @@ def _read_pages_ascii_numeric_lines(
                 logger.debug(f"Reached last page {page_idx} in mask, have at least 1 more remaining but exiting early")
                 break
             else:
-                page_skip = pages_mask[page_idx]
+                page_skip = not pages_mask[page_idx]
         else:
             page_skip = False
 
