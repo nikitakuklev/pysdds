@@ -259,8 +259,17 @@ def test_read_all_sdds_types_header_only():
     assert len(sdds.columns) == 11
 
     expected_types = [
-        "short", "ushort", "long", "ulong", "long64", "ulong64",
-        "float", "double", "longdouble", "string", "character",
+        "short",
+        "ushort",
+        "long",
+        "ulong",
+        "long64",
+        "ulong64",
+        "float",
+        "double",
+        "longdouble",
+        "string",
+        "character",
     ]
     assert [p.type for p in sdds.parameters] == expected_types
     assert [a.type for a in sdds.arrays] == expected_types
