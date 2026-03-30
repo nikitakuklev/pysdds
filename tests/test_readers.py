@@ -1,6 +1,7 @@
 import io
 
 import pytest
+import numpy as np
 import pysdds
 from pathlib import Path
 import itertools
@@ -138,3 +139,39 @@ def test_read_data_compare_all(files):
     sdds_objects = [pysdds.read(f) for f in files]
     for pair in itertools.product(sdds_objects, repeat=2):
         assert pair[0].compare(pair[1], eps=1e-5, raise_error=True, fixed_value_equivalent=True)
+
+
+def test_masked_string_array_does_not_corrupt_columns():
+    """Masking out a string array must still read columns correctly."""
+    import io
+
+    source = str(root_sources / "sources" / "L3_QM1.excitation.proc")
+    # Read full file as reference
+    sdds_full = pysdds.read(source)
+    assert len(sdds_full.arrays) == 3
+    assert sdds_full.arrays[2].type == "string"
+
+    # Read again, masking out all arrays
+    sdds_no_arrays = pysdds.read(source, arrays=[])
+    # Columns must still be intact
+    for i, col in enumerate(sdds_full.columns):
+        assert np.array_equal(col.data[0], sdds_no_arrays.columns[i].data[0]), (
+            f"Column {col.name} data mismatch when arrays are masked out"
+        )
+
+    # Read again, masking out only the string array (keep numeric arrays)
+    sdds_partial = pysdds.read(source, arrays=["Order", "Coefficient"])
+    for i, col in enumerate(sdds_full.columns):
+        assert np.array_equal(col.data[0], sdds_partial.columns[i].data[0]), (
+            f"Column {col.name} data mismatch when string array is masked out"
+        )
+
+    # Also verify via round-trip: write to buffer, read back with mask
+    buf = io.BytesIO()
+    pysdds.write(sdds_full, buf)
+    buf.seek(0)
+    sdds_rt = pysdds.read(io.BufferedReader(buf), arrays=[])
+    for i, col in enumerate(sdds_full.columns):
+        assert np.array_equal(col.data[0], sdds_rt.columns[i].data[0]), (
+            f"Column {col.name} data mismatch after round-trip with masked arrays"
+        )
