@@ -98,7 +98,7 @@ def test_col_empty_shortcut(file_root):
     assert sdds.n_parameters == 11
     sdds.validate_data()
 
-    sdds = pysdds.read(file_root, cols=[], pages=[1,3])
+    sdds = pysdds.read(file_root, cols=[], pages=[1, 3])
     assert sdds.n_pages == 2
     assert sdds.n_columns == 2
     assert not sdds.columns[0]._enabled
@@ -112,13 +112,13 @@ def test_col_empty_perf(file_root):
     root = logging.getLogger()
     for handler in root.handlers:
         root.removeHandler(handler)
-    logging.basicConfig(level=logging.DEBUG,
-                        # format='%(asctime)s %(processName)-10s %(name)s %(levelname)-8s %(message)s', #[%(name)s]
-                        format='[%(levelname)-5.5s][%(asctime)s.%(msecs)03d '
-                               '%(filename)10s %(lineno)4s] %(message)s',
-                        datefmt='%H:%M:%S',
-                        force=True
-                        )
+    logging.basicConfig(
+        level=logging.DEBUG,
+        # format='%(asctime)s %(processName)-10s %(name)s %(levelname)-8s %(message)s', #[%(name)s]
+        format="[%(levelname)-5.5s][%(asctime)s.%(msecs)03d %(filename)10s %(lineno)4s] %(message)s",
+        datefmt="%H:%M:%S",
+        force=True,
+    )
 
     sdds = pysdds.read(file_root, cols=[], pages=[0])
     t1 = time.perf_counter()
@@ -143,14 +143,12 @@ def _make_multipage_sdds(mode, n_pages=5, mixed=False):
     """
     if mixed:
         dfs = [
-            pd.DataFrame({"x": np.arange(10, dtype=np.float64) + i * 100,
-                           "label": [f"p{i}r{j}" for j in range(10)]})
+            pd.DataFrame({"x": np.arange(10, dtype=np.float64) + i * 100, "label": [f"p{i}r{j}" for j in range(10)]})
             for i in range(n_pages)
         ]
     else:
         dfs = [
-            pd.DataFrame({"x": np.arange(10, dtype=np.float64) + i * 100,
-                           "y": np.arange(10, dtype=np.int32) + i * 200})
+            pd.DataFrame({"x": np.arange(10, dtype=np.float64) + i * 100, "y": np.arange(10, dtype=np.int32) + i * 200})
             for i in range(n_pages)
         ]
     params = {"idx": list(range(n_pages))}
