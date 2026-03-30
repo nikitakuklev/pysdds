@@ -1,9 +1,11 @@
+import io
 import itertools
 import logging
 import random
 import time
 
 import numpy as np
+import pandas as pd
 import pytest
 import pysdds
 from pathlib import Path
@@ -131,3 +133,51 @@ def test_col_empty_perf(file_root):
     assert sdds.n_pages == 1
     assert sdds.n_columns == 18
     sdds.validate_data()
+
+
+def _make_multipage_sdds(mode, n_pages=5):
+    """Create an n-page SDDS file with all-numeric columns in memory."""
+    dfs = [
+        pd.DataFrame({"x": np.arange(10, dtype=np.float64) + i * 100,
+                       "y": np.arange(10, dtype=np.int32) + i * 200})
+        for i in range(n_pages)
+    ]
+    params = {"idx": list(range(n_pages))}
+    sdds = pysdds.SDDSFile.from_df(dfs, parameter_dict=params, mode=mode)
+    buf = io.BytesIO()
+    pysdds.write(sdds, buf)
+    buf.seek(0)
+    return buf, dfs
+
+
+@pytest.mark.parametrize("mode", ["binary", "ascii"])
+def test_page_select_non_first(mode):
+    """Selecting a non-first page returns only that page."""
+    buf, dfs = _make_multipage_sdds(mode)
+    sdds = pysdds.read(io.BufferedReader(buf), pages=[2])
+    assert sdds.n_pages == 1
+    df = sdds.columns_to_df(0)
+    assert np.array_equal(df["x"].values, dfs[2]["x"].values)
+    assert np.array_equal(df["y"].values, dfs[2]["y"].values)
+
+
+@pytest.mark.parametrize("mode", ["binary", "ascii"])
+def test_page_select_sparse(mode):
+    """Selecting non-contiguous pages returns only those pages."""
+    buf, dfs = _make_multipage_sdds(mode)
+    sdds = pysdds.read(io.BufferedReader(buf), pages=[1, 3])
+    assert sdds.n_pages == 2
+    for out_idx, src_idx in enumerate([1, 3]):
+        df = sdds.columns_to_df(out_idx)
+        assert np.array_equal(df["x"].values, dfs[src_idx]["x"].values)
+        assert np.array_equal(df["y"].values, dfs[src_idx]["y"].values)
+
+
+@pytest.mark.parametrize("mode", ["binary", "ascii"])
+def test_page_select_last(mode):
+    """Selecting only the last page returns one page."""
+    buf, dfs = _make_multipage_sdds(mode)
+    sdds = pysdds.read(io.BufferedReader(buf), pages=[4])
+    assert sdds.n_pages == 1
+    df = sdds.columns_to_df(0)
+    assert np.array_equal(df["x"].values, dfs[4]["x"].values)
