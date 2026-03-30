@@ -1290,6 +1290,18 @@ class SDDSFile:
                     else:
                         raise Exception(f"dtype {v.dtype} does not match expected {expected_dtype}")
 
+        # Verify all enabled columns have the same row count on each page
+        enabled_columns = [el for el in self.columns if el._enabled]
+        if len(enabled_columns) > 1:
+            for page_idx in range(n_pages):
+                row_counts = [len(el.data[page_idx]) for el in enabled_columns]
+                if len(set(row_counts)) != 1:
+                    names = [el.name for el in enabled_columns]
+                    raise ValueError(
+                        f"Columns have mismatched row counts on page {page_idx}: "
+                        + ", ".join(f"{n}={c}" for n, c in zip(names, row_counts))
+                    )
+
     def to_sdds(self):
         """Convert SDDS object to a bytes object, ready for writing to file"""
         from .. import write
