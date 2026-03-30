@@ -1192,14 +1192,25 @@ def _read_pages_binary(
         else:
             page_skip = False
 
-        # Read page size
+        # Read page size (row count)
+        # The C reference uses a signed int32 here. If the value is INT32_MIN (-2147483648),
+        # it is a sentinel indicating that the actual row count follows as a signed int64.
         byte_array = file.read(4)
         if len(byte_array) == 0:
             # we have a blank file, abort
             break
         assert len(byte_array) == 4
-        page_size = int.from_bytes(byte_array, endianness)
-        if not 0 <= page_size <= 1e9:
+        page_size = int.from_bytes(byte_array, endianness, signed=True)
+        if page_size == -2147483648:  # INT32_MIN sentinel for 64-bit row count
+            byte_array_64 = file.read(8)
+            assert len(byte_array_64) == 8
+            page_size = int.from_bytes(byte_array_64, endianness, signed=True)
+            logger.debug("Page %d uses 64-bit row count: %d", page_idx, page_size)
+        if page_size < 0:
+            raise ValueError(
+                f"Page size ({page_size}) ({byte_array}) is negative - file is likely corrupt"
+            )
+        if page_size > 1e9:
             raise ValueError(
                 f"Page size ({page_size}) ({byte_array}) is unreasonable - is file not {endianness}-endian?"
             )
@@ -1212,8 +1223,12 @@ def _read_pages_binary(
                 # Indicates a variable length string
                 byte_array = file.read(4)
                 assert len(byte_array) == 4
-                type_len = int.from_bytes(byte_array, endianness)
-                if not 0 <= type_len < 10000:
+                type_len = int.from_bytes(byte_array, endianness, signed=True)
+                if type_len < 0:
+                    raise ValueError(
+                        f"String length ({type_len}) ({byte_array}) is negative - file is likely corrupt"
+                    )
+                if type_len >= 1000000:
                     raise ValueError(
                         f"String length ({type_len}) ({byte_array}) too large - is file not {endianness}-endian?"
                     )
@@ -1274,8 +1289,10 @@ def _read_pages_binary(
                 for j in range(n_elements):
                     byte_array = file.read(4)
                     assert len(byte_array) == 4
-                    string_len_actual = int.from_bytes(byte_array, endianness)
-                    assert 0 <= string_len_actual <= 10000
+                    string_len_actual = int.from_bytes(byte_array, endianness, signed=True)
+                    if string_len_actual < 0:
+                        raise ValueError(f"Array string length ({string_len_actual}) is negative - file is likely corrupt")
+                    assert string_len_actual <= 1000000
                     if string_len_actual == 0:
                         if flag:
                             data_array[j] = ""
@@ -1322,8 +1339,10 @@ def _read_pages_binary(
                             logger.debug(f">CMO COL {i} ROW {row} | {file.tell()=}")
                         byte_array = file.read(4)
                         assert len(byte_array) == 4
-                        string_len_actual = int.from_bytes(byte_array, endianness)
-                        assert 0 <= string_len_actual <= 10000  # sanity check
+                        string_len_actual = int.from_bytes(byte_array, endianness, signed=True)
+                        if string_len_actual < 0:
+                            raise ValueError(f"Column string length ({string_len_actual}) is negative - file is likely corrupt")
+                        assert string_len_actual <= 1000000  # sanity check
                         if string_len_actual == 0:
                             # empty string
                             if flag:
@@ -1492,8 +1511,10 @@ def _read_pages_binary(
                                 break
                             else:
                                 raise ValueError(f"Unexpected EOF at row {row}, column {i}")
-                        string_len_actual = int.from_bytes(byte_array, endianness)
-                        assert 0 <= string_len_actual <= 10000  # sanity check
+                        string_len_actual = int.from_bytes(byte_array, endianness, signed=True)
+                        if string_len_actual < 0:
+                            raise ValueError(f"Column string length ({string_len_actual}) is negative - file is likely corrupt")
+                        assert string_len_actual <= 1000000  # sanity check
                         if string_len_actual == 0:
                             # empty string
                             if flag and not page_skip:
