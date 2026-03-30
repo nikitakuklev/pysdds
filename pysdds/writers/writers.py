@@ -101,9 +101,9 @@ def write(
     if use_best_settings:
         sdds = copy.copy(sdds)
         sdds.data = copy.deepcopy(sdds.data)
-        sdds.data.no_row_counts = 0
-        sdds.data.lines_per_row = 1
-        sdds.data.column_major_order = 1
+        sdds.data.nm["no_row_counts"] = 0
+        sdds.data.nm["lines_per_row"] = 1
+        sdds.data.nm["column_major_order"] = 1 if mode == "binary" else 0
         sdds.data.__use_best_settings = True
 
     _dump_header(sdds, file)
@@ -265,8 +265,7 @@ class IncrementalWriter:
     def _new_page_binary(self, parameter_data: List[Union[str, int, float]], array_data: List[np.ndarray]):
         file = self.file
         page_size = self.binary_fixed_rowcount
-        page_bytes = page_size.to_bytes(4, self.endianness)
-        file.write(page_bytes)
+        _write_row_count(file, page_size, self.endianness)
 
         for i, el in enumerate(self.sdds.parameters):
             type_len = self.p_lengths[i]
@@ -296,8 +295,7 @@ class IncrementalWriter:
     ):
         file = self.file
         page_size = self.binary_fixed_rowcount
-        page_bytes = page_size.to_bytes(4, self.endianness)
-        file.write(page_bytes)
+        _write_row_count(file, page_size, self.endianness)
         logger.debug(f"Starting page {self.current_page} with {page_size} rows in FIXED COUNT MODE")
 
         for i, el in enumerate(self.sdds.parameters):
@@ -755,6 +753,19 @@ def _dump_data_ascii(sdds: SDDSFile, file: IO[bytes], best_settings):
             # append('')
 
 
+_INT32_MAX = 2147483647  # 2^31 - 1
+_INT32_MIN = -2147483648  # -(2^31), used as sentinel for 64-bit row counts
+
+
+def _write_row_count(file: IO[bytes], row_count: int, endianness: str):
+    """Write binary page row count, using INT32_MIN sentinel for 64-bit counts."""
+    if row_count > _INT32_MAX:
+        file.write(_INT32_MIN.to_bytes(4, endianness, signed=True))
+        file.write(row_count.to_bytes(8, endianness, signed=True))
+    else:
+        file.write(row_count.to_bytes(4, endianness, signed=True))
+
+
 def _dump_data_binary(sdds: SDDSFile, file: IO[bytes], endianness):
     if endianness == "big":
         NUMPY_DTYPE = _NUMPY_DTYPE_BE
@@ -829,8 +840,7 @@ def _dump_data_binary(sdds: SDDSFile, file: IO[bytes], endianness):
         page_size = 0
         if len(sdds.columns) > 0:
             page_size = len(sdds.columns[0].data[page_idx])
-        page_bytes = page_size.to_bytes(4, endianness)
-        file.write(page_bytes)
+        _write_row_count(file, page_size, endianness)
 
         for i, el in enumerate(parameters):
             type_len = p_lengths[i]
@@ -852,24 +862,39 @@ def _dump_data_binary(sdds: SDDSFile, file: IO[bytes], endianness):
             elif t == "character":
                 file.write(el.data[page_idx].astype("S1").view(NUMPY_DTYPE["character"]))
             else:
-                file.write(el.data[page_idx].view(NUMPY_DTYPE[t]))
+                # astype (not view) to ensure byte order conversion for non-native endianness
+                file.write(el.data[page_idx].astype(NUMPY_DTYPE[t]))
 
-        page_data = []
-        for i, el in enumerate(sdds.columns):
-            t = el.type
-            if t == "string":
-                page_data.append(el.data[page_idx])
-            elif t == "character":
-                page_data.append(el.data[page_idx].astype("S1").view(dtype=NUMPY_DTYPE["character"]))
-            else:
-                page_data.append(el.data[page_idx].view(dtype=column_types[i]))
-            # print(t, el.data[page_idx], el.data[page_idx].dtype, page_data[-1])
-        for row in range(page_size):
+        if sdds.data.column_major_order:
+            # Column-major: write each column as a contiguous block
+            for i, el in enumerate(sdds.columns):
+                t = el.type
+                col_data = el.data[page_idx]
+                if t == "string":
+                    for row in range(page_size):
+                        _write_str(col_data[row])
+                elif t == "character":
+                    file.write(col_data.astype("S1").view(dtype=NUMPY_DTYPE["character"]))
+                else:
+                    # astype (not view) to ensure byte order conversion for non-native endianness
+                    file.write(col_data.astype(column_types[i]))
+        else:
+            # Row-major: interleave columns row by row
+            page_data = []
             for i, el in enumerate(sdds.columns):
                 t = el.type
                 if t == "string":
-                    _write_str(page_data[i][row])
+                    page_data.append(el.data[page_idx])
                 elif t == "character":
-                    file.write(page_data[i][row])
+                    page_data.append(el.data[page_idx].astype("S1").view(dtype=NUMPY_DTYPE["character"]))
                 else:
-                    file.write(page_data[i][row])
+                    page_data.append(el.data[page_idx].view(dtype=column_types[i]))
+            for row in range(page_size):
+                for i, el in enumerate(sdds.columns):
+                    t = el.type
+                    if t == "string":
+                        _write_str(page_data[i][row])
+                    elif t == "character":
+                        file.write(page_data[i][row])
+                    else:
+                        file.write(page_data[i][row])
