@@ -1210,7 +1210,7 @@ def _read_pages_binary(
             raise ValueError(
                 f"Page size ({page_size}) ({byte_array}) is negative - file is likely corrupt"
             )
-        if page_size > 1e9:
+        if page_size > 1e12:
             raise ValueError(
                 f"Page size ({page_size}) ({byte_array}) is unreasonable - is file not {endianness}-endian?"
             )
@@ -1297,8 +1297,9 @@ def _read_pages_binary(
                         if flag:
                             data_array[j] = ""
                     else:
+                        string_bytes = file.read(string_len_actual)
                         if flag:
-                            data_array[j] = file.read(string_len_actual).decode("ascii")
+                            data_array[j] = string_bytes.decode("ascii")
                 if flag:
                     arrays[i].data.append(data_array)
             else:
