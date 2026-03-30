@@ -135,13 +135,24 @@ def test_col_empty_perf(file_root):
     sdds.validate_data()
 
 
-def _make_multipage_sdds(mode, n_pages=5):
-    """Create an n-page SDDS file with all-numeric columns in memory."""
-    dfs = [
-        pd.DataFrame({"x": np.arange(10, dtype=np.float64) + i * 100,
-                       "y": np.arange(10, dtype=np.int32) + i * 200})
-        for i in range(n_pages)
-    ]
+def _make_multipage_sdds(mode, n_pages=5, mixed=False):
+    """Create an n-page SDDS file in memory.
+
+    mixed=False: all-numeric columns (routes to numeric parsers).
+    mixed=True: includes a string column (routes to mixed/generic parsers).
+    """
+    if mixed:
+        dfs = [
+            pd.DataFrame({"x": np.arange(10, dtype=np.float64) + i * 100,
+                           "label": [f"p{i}r{j}" for j in range(10)]})
+            for i in range(n_pages)
+        ]
+    else:
+        dfs = [
+            pd.DataFrame({"x": np.arange(10, dtype=np.float64) + i * 100,
+                           "y": np.arange(10, dtype=np.int32) + i * 200})
+            for i in range(n_pages)
+        ]
     params = {"idx": list(range(n_pages))}
     sdds = pysdds.SDDSFile.from_df(dfs, parameter_dict=params, mode=mode)
     buf = io.BytesIO()
@@ -181,3 +192,29 @@ def test_page_select_last(mode):
     assert sdds.n_pages == 1
     df = sdds.columns_to_df(0)
     assert np.array_equal(df["x"].values, dfs[4]["x"].values)
+
+
+@pytest.mark.parametrize("mode", ["binary", "ascii"])
+def test_page_select_mixed_columns(mode):
+    """Page selection with string columns (mixed/generic parser path)."""
+    buf, dfs = _make_multipage_sdds(mode, mixed=True)
+    sdds = pysdds.read(io.BufferedReader(buf), pages=[2])
+    assert sdds.n_pages == 1
+    df = sdds.columns_to_df(0)
+    assert np.array_equal(df["x"].values, dfs[2]["x"].values)
+    assert np.array_equal(df["label"].values, dfs[2]["label"].values)
+
+
+@pytest.mark.parametrize("mode", ["binary", "ascii"])
+def test_page_select_no_columns(mode):
+    """Page selection on a file with only parameters and no columns."""
+    n_pages = 5
+    dfs = [pd.DataFrame() for _ in range(n_pages)]
+    params = {"idx": list(range(n_pages))}
+    sdds = pysdds.SDDSFile.from_df(dfs, parameter_dict=params, mode=mode)
+    buf = io.BytesIO()
+    pysdds.write(sdds, buf)
+    buf.seek(0)
+    sdds2 = pysdds.read(io.BufferedReader(buf), pages=[2])
+    assert sdds2.n_pages == 1
+    assert sdds2.parameters[0].data[0] == 2
