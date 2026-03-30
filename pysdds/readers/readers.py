@@ -816,6 +816,10 @@ def _read_header_fullstream(file: IO[bytes], sdds: SDDSFile, mode: str, endianne
             expected_keys = _KEYS_ARRAY
             if not nm_keys.issubset(expected_keys):
                 raise AttributeError(f"Namelist keys {nm_keys} unexpected for namelist {command}")
+            if "dimensions" in nm_keys:
+                nm_dict["dimensions"] = int(nm_dict["dimensions"])
+            if "field_length" in nm_keys:
+                nm_dict["field_length"] = int(nm_dict["field_length"])
             sdds.arrays.append(Array(nm_dict, sdds=sdds))
         elif command == "&column":
             expected_keys = _KEYS_COLUMN
@@ -985,6 +989,10 @@ def _read_header_v2(file: IO[bytes], sdds: SDDSFile, mode: str, endianness: str)
             expected_keys = _KEYS_ARRAY
             if not nm_keys.issubset(expected_keys):
                 raise AttributeError(f"Namelist keys {nm_keys} unexpected for namelist {command}")
+            if "dimensions" in nm_keys:
+                nm_dict["dimensions"] = int(nm_dict["dimensions"])
+            if "field_length" in nm_keys:
+                nm_dict["field_length"] = int(nm_dict["field_length"])
             sdds.arrays.append(Array(nm_dict, sdds=sdds))
         elif command == "&column":
             expected_keys = _KEYS_COLUMN
@@ -1704,7 +1712,7 @@ def _read_pages_ascii_mixed_lines(
                             value = "".join(v2)
 
                     if parameters[par_idx].type == "character":
-                        # Convert octal value
+                        # Convert octal value or escaped character
                         if value.startswith("\\"):
                             if len(value) == 4:
                                 for i in range(1, 4):
@@ -1717,6 +1725,9 @@ def _read_pages_ascii_mixed_lines(
                                 pass
                             else:
                                 raise SDDSReadError(f"Unrecognized character {value=}")
+                        elif len(value) == 1:
+                            # bare printable character
+                            pass
                         else:
                             raise SDDSReadError(f"Unrecognized character {value=}")
 
@@ -1810,7 +1821,7 @@ def _read_pages_ascii_mixed_lines(
                     data_array = np.empty(dimensions, dtype=object)
                 else:
                     data_array = np.empty(dimensions, dtype=mapped_t)
-                data_array[:] = values[:]
+                data_array[:] = values.reshape(dimensions)
                 arrays[array_idx].data.append(data_array)
             array_idx += 1
 
@@ -2286,7 +2297,7 @@ def _read_pages_ascii_numeric_lines(
                     data_array = np.empty(dimensions, dtype=object)
                 else:
                     data_array = np.empty(dimensions, dtype=mapped_t)
-                data_array[:] = values[:]
+                data_array[:] = values.reshape(dimensions)
                 arrays[array_idx].data.append(data_array)
             array_idx += 1
 

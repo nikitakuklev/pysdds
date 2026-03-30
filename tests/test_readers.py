@@ -175,3 +175,99 @@ def test_masked_string_array_does_not_corrupt_columns():
         assert np.array_equal(col.data[0], sdds_rt.columns[i].data[0]), (
             f"Column {col.name} data mismatch after round-trip with masked arrays"
         )
+
+
+@pytest.mark.skipif(
+    np.dtype(np.longdouble) == np.dtype(np.float64),
+    reason="longdouble == float64 on this platform (e.g. Windows), cannot parse 80-bit floats",
+)
+def test_read_all_sdds_types():
+    """Read the reference example.sdds that exercises every SDDS data type:
+    short, ushort, long, ulong, long64, ulong64, float, double, longdouble,
+    string, character — in parameters, 1D/2D arrays, and columns."""
+    source = str(root_sources / "example_all_types.sdds")
+    sdds = pysdds.read(source, allow_longdouble=True)
+
+    assert sdds.n_pages == 2
+    assert len(sdds.parameters) == 11
+    assert len(sdds.arrays) == 11
+    assert len(sdds.columns) == 11
+
+    # Verify parameter types and page 1 values
+    expected_params = {
+        "shortParam": ("short", np.int16(10)),
+        "ushortParam": ("ushort", np.uint16(11)),
+        "longParam": ("long", np.int32(1000)),
+        "ulongParam": ("ulong", np.uint32(1001)),
+        "long64Param": ("long64", np.int64(1002)),
+        "ulong64Param": ("ulong64", np.uint64(1003)),
+        "floatParam": ("float", np.float32(3.14)),
+        "doubleParam": ("double", np.float64(2.71828)),
+        "stringParam": ("string", "FirstPage"),
+        "charParam": ("character", "A"),
+    }
+    for p in sdds.parameters:
+        if p.name in expected_params:
+            exp_type, exp_val = expected_params[p.name]
+            assert p.type == exp_type, f"{p.name}: type {p.type} != {exp_type}"
+            if p.type in ("string", "character"):
+                assert p.data[0] == exp_val, f"{p.name}: {p.data[0]} != {exp_val}"
+            elif p.type == "float":
+                assert np.isclose(p.data[0], exp_val, rtol=1e-5), f"{p.name}: {p.data[0]} != {exp_val}"
+            else:
+                assert p.data[0] == exp_val, f"{p.name}: {p.data[0]} != {exp_val}"
+
+    # Verify 1D arrays (first 4)
+    assert sdds.arrays[0].name == "shortArray"
+    assert np.array_equal(sdds.arrays[0].data[0], np.array([1, 2, 3], dtype=np.int16))
+
+    # Verify 2D arrays
+    long64_arr = sdds.arrays[4]
+    assert long64_arr.name == "long64Array"
+    assert long64_arr.dimensions == 2
+    assert long64_arr.data[0].shape == (4, 2)
+    assert long64_arr.data[0][0, 0] == 1002
+
+    string_arr = sdds.arrays[9]
+    assert string_arr.name == "stringArray"
+    assert string_arr.data[0].shape == (4, 2)
+    assert string_arr.data[0][0, 0] == "one"
+    assert string_arr.data[0][3, 1] == "eight"
+
+    char_arr = sdds.arrays[10]
+    assert char_arr.name == "charArray"
+    assert char_arr.data[0][0, 0] == "A"
+
+    # Verify column data page 1
+    assert np.array_equal(sdds.columns[0].data[0], np.array([1, 2, 3, 4, 5], dtype=np.int16))
+    assert list(sdds.columns[9].data[0]) == ["one", "two", "three", "four", "five"]
+    assert list(sdds.columns[10].data[0]) == ["a", "b", "c", "d", "e"]
+
+    # Verify page 2
+    assert sdds.parameters[0].data[1] == np.int16(20)
+    assert list(sdds.columns[9].data[1]) == ["six", "seven", "eight"]
+
+
+def test_read_all_sdds_types_header_only():
+    """Verify header parsing of all SDDS types works on every platform
+    (no longdouble data is actually parsed, just the header)."""
+    source = str(root_sources / "example_all_types.sdds")
+    sdds = pysdds.read(source, header_only=True)
+
+    assert len(sdds.parameters) == 11
+    assert len(sdds.arrays) == 11
+    assert len(sdds.columns) == 11
+
+    expected_types = [
+        "short", "ushort", "long", "ulong", "long64", "ulong64",
+        "float", "double", "longdouble", "string", "character",
+    ]
+    assert [p.type for p in sdds.parameters] == expected_types
+    assert [a.type for a in sdds.arrays] == expected_types
+    assert [c.type for c in sdds.columns] == expected_types
+
+    # Verify multi-dimensional array declarations
+    for a in sdds.arrays[:4]:
+        assert a.dimensions == 1
+    for a in sdds.arrays[4:]:
+        assert a.dimensions == 2
