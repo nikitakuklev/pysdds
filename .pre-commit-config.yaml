@@ -10,6 +10,7 @@ repos:
         args: [--fix=lf]
         exclude: '^tests/files/'
       - id: check-yaml
+        exclude: '^(\.gitlab-ci\.yml|\.gitlab/|conda/)'
       - id: check-toml
       - id: check-added-large-files
         args: [--maxkb=500]
