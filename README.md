@@ -10,28 +10,6 @@
   <img alt="GitHub release (latest by date including pre-releases)" src="https://img.shields.io/github/v/release/nikitakuklev/pysdds?include_prereleases&label=dev%20release">
 </div>
 
-<details>
-  <summary>Table of Contents</summary>
-  <ol>
-    <li>
-      <a href="#about">About</a>
-    </li>
-    <li>
-      <a href="#getting-started">Getting Started</a>
-      <ul>
-        <li><a href="#prerequisites">Prerequisites</a></li>
-        <li><a href="#installation">Installation</a></li>
-      </ul>
-    </li>
-    <li><a href="#usage">Usage</a></li>
-    <li><a href="#advanced-considerations">Advanced considerations</a></li>
-    <li><a href="#roadmap">Roadmap</a></li>
-    <li><a href="#version-history">Version history</a></li>
-    <li><a href="#contributing">Contributing</a></li>
-    <li><a href="#license">License</a></li>
-  </ol>
-</details>
-
 ## About
 Self Describing Data Set (SDDS) [file format](https://ops.aps.anl.gov/manuals/sdds/SDDS.html) is 
 a common format used in accelerator physics, notably by `elegant` simulation code and other 
