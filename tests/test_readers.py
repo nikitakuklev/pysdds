@@ -358,13 +358,17 @@ def test_read_ascii_no_page_data_terminates():
     def on_alarm(signum, frame):
         raise TimeoutError("reader hung")
 
-    old = signal.signal(signal.SIGALRM, on_alarm)
-    signal.alarm(10)
+    # SIGALRM is POSIX-only; on Windows the test still runs, just without the hang guard
+    has_alarm = hasattr(signal, "SIGALRM")
+    if has_alarm:
+        old = signal.signal(signal.SIGALRM, on_alarm)
+        signal.alarm(10)
     try:
         sdds = pysdds.read(io.BytesIO(src))
     finally:
-        signal.alarm(0)
-        signal.signal(signal.SIGALRM, old)
+        if has_alarm:
+            signal.alarm(0)
+            signal.signal(signal.SIGALRM, old)
     assert sdds.n_pages == 1
     assert sdds.par("p").data == [1.5]
     # Global pushback buffer must not leak into the next read
