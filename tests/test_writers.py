@@ -70,7 +70,7 @@ def test_round_trip_ascii_ascii(file_root):
     #     pass
     # print('--')
     sdds2 = pysdds.read(io.BufferedReader(buf))
-    sdds.compare(sdds2)
+    assert sdds.compare(sdds2, raise_error=True)
 
 
 @pytest.mark.parametrize("file_root", files_sources)
@@ -82,7 +82,7 @@ def test_round_trip_sources(file_root):
     # print(buf.getvalue().decode())
     sdds2 = pysdds.read(io.BufferedReader(buf))
     assert sdds2.endianness == sdds.endianness
-    sdds.compare(sdds2)
+    assert sdds.compare(sdds2, raise_error=True)
 
 
 @pytest.mark.parametrize("file_root", files_sources)
@@ -105,7 +105,7 @@ def test_round_trip_sources_ascii(file_root):
     #     f.write(buf.getbuffer())
 
     sdds2 = pysdds.read(io.BufferedReader(buf))
-    sdds.compare(sdds2)
+    assert sdds.compare(sdds2, raise_error=True)
 
     # sdds3 = pysdds.read(file_root+'_writeback')
     # sdds.compare(sdds3)
@@ -123,7 +123,7 @@ def test_round_trip_sources_bincol_le(file_root):
     buf.seek(0)
     sdds2 = pysdds.read(io.BufferedReader(buf))
     assert sdds2.endianness == "little"
-    sdds.compare(sdds2)
+    assert sdds.compare(sdds2, raise_error=True)
 
 
 @pytest.mark.parametrize("file_root", files_sources)
@@ -139,7 +139,7 @@ def test_round_trip_sources_bincol_be(file_root):
     # print('--')
     sdds2 = pysdds.read(io.BufferedReader(buf))
     assert sdds2.endianness == "big"
-    sdds.compare(sdds2)
+    assert sdds.compare(sdds2, raise_error=True)
 
 
 def test_write_from_df():
@@ -183,7 +183,7 @@ def test_write_from_df():
         pysdds.write(sdds, buf)
         buf.seek(0)
         sdds2 = pysdds.read(io.BufferedReader(buf))
-        sdds.compare(sdds2)
+        assert sdds.compare(sdds2, raise_error=True)
         assert np.array_equal(sdds2.columns[0].data[0], df_meas.iloc[:, 0])
         assert np.array_equal(sdds2.columns[1].data[0], df_meas.iloc[:, 1])
         assert np.array_equal(sdds2.columns[2].data[0], df_meas.iloc[:, 2])
@@ -215,7 +215,7 @@ def test_round_trip_best_settings_column_major(file_root):
     pysdds.write(sdds, buf, use_best_settings=True)
     buf.seek(0)
     sdds2 = pysdds.read(io.BufferedReader(buf))
-    sdds.compare(sdds2)
+    assert sdds.compare(sdds2, raise_error=True)
 
 
 # ---------------------------------------------------------------------------
@@ -235,7 +235,7 @@ def test_write_binary_row_major_round_trip(file_root):
     buf.seek(0)
     sdds2 = pysdds.read(io.BufferedReader(buf))
     assert sdds2.data.column_major_order == 0
-    sdds.compare(sdds2)
+    assert sdds.compare(sdds2, raise_error=True)
 
 
 @pytest.mark.parametrize("file_root", files_sources)
@@ -250,7 +250,7 @@ def test_write_binary_col_major_round_trip(file_root):
     buf.seek(0)
     sdds2 = pysdds.read(io.BufferedReader(buf))
     assert sdds2.data.column_major_order == 1
-    sdds.compare(sdds2)
+    assert sdds.compare(sdds2, raise_error=True)
 
 
 @pytest.mark.parametrize("file_root", files_sources)
@@ -272,7 +272,7 @@ def test_row_major_and_col_major_produce_same_data(file_root):
     buf_col.seek(0)
     sdds_col = pysdds.read(io.BufferedReader(buf_col))
 
-    sdds_row.compare(sdds_col)
+    assert sdds_row.compare(sdds_col, raise_error=True)
 
 
 @pytest.mark.parametrize("file_root", files_sources)
@@ -288,7 +288,7 @@ def test_col_major_big_endian_round_trip(file_root):
     sdds2 = pysdds.read(io.BufferedReader(buf))
     assert sdds2.endianness == "big"
     assert sdds2.data.column_major_order == 1
-    sdds.compare(sdds2)
+    assert sdds.compare(sdds2, raise_error=True)
 
 
 # ---------------------------------------------------------------------------
