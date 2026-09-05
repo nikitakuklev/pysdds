@@ -79,7 +79,8 @@ def decode_longdouble_fields(buffer, endianness: Literal["big", "little"] = "lit
 
     with np.errstate(over="ignore", under="ignore"):
         # The significand is an integer scaled by 2^(e - bias - 63); float64() rounds it to 53 bits
-        values = np.ldexp(mantissa.astype(np.float64), exponent - _X87_EXP_BIAS - 63)
+        # ldexp takes a C int exponent, which is 32-bit on Windows
+        values = np.ldexp(mantissa.astype(np.float64), (exponent - _X87_EXP_BIAS - 63).astype(np.int32))
     # Exponent 0 is zero or denormal (tiny beyond double range either way, ldexp already gave 0);
     # all-ones exponent is inf or nan depending on the fraction bits
     special = exponent == _X87_EXP_MAX
