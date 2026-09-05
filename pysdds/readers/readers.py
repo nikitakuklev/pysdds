@@ -2161,6 +2161,13 @@ def _read_pages_ascii_numeric_lines(
         columns_type = []
         # columns_store_type = []
 
+    def _append_empty_columns(pg_idx):
+        # Zero-row page - store empty arrays of the right dtype for every active column
+        for ci, col in enumerate(columns):
+            if columns_mask[ci]:
+                col.data.append(np.empty(0, dtype=columns_type[ci]))
+                col._page_numbers.append(pg_idx)
+
     page_idx = 0
     page_stored_idx = 0
 
@@ -2370,6 +2377,10 @@ def _read_pages_ascii_numeric_lines(
                             c._page_numbers.append(page_idx)
                             col_idx_active += 1
                     page_stored_idx += 1
+            elif _ASCII_NUMERIC_PARSE_METHOD == "read_table" and page_size == 0:
+                # pandas raises EmptyDataError on an empty buffer, so build the empty columns directly
+                if not page_skip:
+                    _append_empty_columns(page_idx)
             elif _ASCII_NUMERIC_PARSE_METHOD == "read_table" and page_size is not None:
                 pd_column_dict = {i: columns_type[i] for i in range(len(columns_type))}
                 lines = [file.readline().decode("ascii") for i in range(page_size)]
@@ -2432,6 +2443,14 @@ def _read_pages_ascii_numeric_lines(
 
                 buf = io.StringIO("\n".join((line for line in gen())))
                 logger.debug(f">>C {file.tell()} | Feeding buffer {cnt=} {line_cnt=} to parse_table")
+                if line_cnt == 0:
+                    # Page ended immediately - pandas cannot parse an empty buffer
+                    if not page_skip:
+                        _append_empty_columns(page_idx)
+                    page_idx += 1
+                    if not page_skip:
+                        page_stored_idx += 1
+                    continue
                 opts = dict(
                     sep=r"\s+",
                     comment="!",

@@ -280,6 +280,39 @@ def test_read_ascii_character_column_without_string_columns():
     assert np.array_equal(sdds.col("n").data[0], np.array([1, 2, 3], dtype=np.int32))
 
 
+@pytest.mark.parametrize("mixed", [False, True])
+@pytest.mark.parametrize(
+    "mode,column_major_order,no_row_counts",
+    [("binary", 0, 0), ("binary", 1, 0), ("ascii", 0, 0), ("ascii", 0, 1)],
+)
+def test_read_zero_row_page(mode, column_major_order, no_row_counts, mixed):
+    """A page with parameters but no rows must not break any of the page parsers"""
+    import pandas as pd
+
+    dfs = [
+        pd.DataFrame({"x": [1.0, 2.0], "n": np.array([1, 2], dtype=np.int32)}),
+        pd.DataFrame({"x": np.array([], dtype=float), "n": np.array([], dtype=np.int32)}),
+        pd.DataFrame({"x": [3.0], "n": np.array([3], dtype=np.int32)}),
+    ]
+    if mixed:
+        for df in dfs:
+            df["s"] = pd.array(["a"] * len(df), dtype="string")
+    sdds = pysdds.SDDSFile.from_df(dfs, parameter_dict={"p": [10, 20, 30]}, mode=mode)
+    sdds.data.nm["column_major_order"] = column_major_order
+    sdds.data.nm["no_row_counts"] = no_row_counts
+    buf = io.BytesIO()
+    pysdds.write(sdds, buf, use_best_settings=False)
+
+    sdds2 = pysdds.read(io.BytesIO(buf.getvalue()))
+    sdds2.validate_data()
+    assert sdds2.n_pages == 3
+    assert [len(v) for v in sdds2.col("x").data] == [2, 0, 1]
+    assert sdds2.col("x").data[1].dtype == np.float64
+    assert sdds2.col("n").data[1].dtype == np.int32
+    assert list(sdds2.par("p").data) == [10, 20, 30]
+    assert np.array_equal(sdds2.col("x").data[2], [3.0])
+
+
 def test_read_all_sdds_types_header_only():
     """Verify header parsing of all SDDS types works on every platform
     (no longdouble data is actually parsed, just the header)."""
