@@ -450,3 +450,16 @@ def test_write_multidimensional_arrays(mode):
     sdds2 = pysdds.read(io.BytesIO(buf.getvalue()))
     assert np.array_equal(sdds2.arrays[0].data[0], np.arange(1, 7, dtype=float).reshape(2, 3))
     assert sdds2.arrays[1].data[0].tolist() == [["a", "b c"], ["d", ""]]
+
+
+@pytest.mark.parametrize("mode", ["ascii", "binary"])
+def test_from_df_multipage_int_columns(mode):
+    """int64 columns must keep the same dtype on every page (later pages used to be downcast)"""
+    dfs = [pd.DataFrame({"i": [1, 2], "x": [1.0, 2.0]}), pd.DataFrame({"i": [3], "x": [3.0]})]
+    sdds = pysdds.SDDSFile.from_df(dfs, mode=mode)
+    assert sdds.col("i").type == "long64"
+    buf = io.BytesIO()
+    pysdds.write(sdds, buf)
+    sdds2 = pysdds.read(io.BytesIO(buf.getvalue()))
+    assert [v.tolist() for v in sdds2.col("i").data] == [[1, 2], [3]]
+    assert sdds2.col("i").data[1].dtype == np.int64

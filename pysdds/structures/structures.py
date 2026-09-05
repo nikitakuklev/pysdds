@@ -1163,11 +1163,14 @@ class SDDSFile:
                 col_dtype = df.dtypes.iloc[i]
                 if isinstance(col_dtype, pd.StringDtype):
                     val = df.iloc[:, i].to_numpy(dtype=object, na_value="")
-                elif col_dtype == np.dtype(np.int64):
-                    val = df.iloc[:, i].to_numpy(np.int32)
                 else:
+                    # Keep the dtype as-is so it matches the first page (int64 stays long64)
                     val = df.iloc[:, i].to_numpy()
-                assert sdds.columns[i].data[0].dtype == val.dtype
+                if sdds.columns[i].data[0].dtype != val.dtype:
+                    raise ValueError(
+                        f"Column [{c}] dtype {val.dtype} on page {page_idx} differs from page 0 "
+                        f"({sdds.columns[i].data[0].dtype})"
+                    )
                 sdds.columns[i].data.append(val)
 
         sdds.data = Data({"mode": mode})
