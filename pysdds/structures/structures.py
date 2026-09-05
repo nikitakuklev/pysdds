@@ -222,7 +222,7 @@ class Parameter:
                 return False
         if self.fixed_value is not None and other.fixed_value is not None:
             # Only 1 value
-            if self.type in ["string", "char"] or eps is None:
+            if self.type in ["string", "character"] or eps is None:
                 if self.fixed_value != other.fixed_value:
                     err("strict fixed_value")
                     return False
@@ -301,7 +301,7 @@ class Parameter:
         if self._fixed_value_raw is not None:
             if self.__cached_page_count != self.sdds.n_pages:
                 v = self._fixed_value_raw
-                if self.type != "string":
+                if self.type not in ("string", "character"):
                     v = np.fromstring(v, dtype=_NUMPY_DTYPES[self.type], sep=" ", count=1)[0]
                 self.__cached_data = [v for _ in range(self.sdds.n_pages)]
                 self.__cached_page_count = self.sdds.n_pages
