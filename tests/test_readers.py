@@ -280,13 +280,14 @@ def test_read_ascii_character_column_without_string_columns():
     assert np.array_equal(sdds.col("n").data[0], np.array([1, 2, 3], dtype=np.int32))
 
 
+@pytest.mark.parametrize("empty_last", [False, True])
 @pytest.mark.parametrize("mixed", [False, True])
 @pytest.mark.parametrize(
     "mode,column_major_order,no_row_counts",
     [("binary", 0, 0), ("binary", 1, 0), ("ascii", 0, 0), ("ascii", 0, 1)],
 )
-def test_read_zero_row_page(mode, column_major_order, no_row_counts, mixed):
-    """A page with parameters but no rows must not break any of the page parsers"""
+def test_read_zero_row_page(mode, column_major_order, no_row_counts, mixed, empty_last):
+    """A page with no rows (in the middle, or last and without parameters) must not break any page parser"""
     import pandas as pd
 
     dfs = [
@@ -297,7 +298,16 @@ def test_read_zero_row_page(mode, column_major_order, no_row_counts, mixed):
     if mixed:
         for df in dfs:
             df["s"] = pd.array(["a"] * len(df), dtype="string")
-    sdds = pysdds.SDDSFile.from_df(dfs, parameter_dict={"p": [10, 20, 30]}, mode=mode)
+    if empty_last:
+        # Trailing empty page with nothing else on it - exercises end-of-file detection
+        dfs = [dfs[0], dfs[2], dfs[1]]
+        params = None
+        expected_lengths = [2, 1, 0]
+    else:
+        params = {"p": [10, 20, 30]}
+        expected_lengths = [2, 0, 1]
+    empty_idx = expected_lengths.index(0)
+    sdds = pysdds.SDDSFile.from_df(dfs, parameter_dict=params, mode=mode)
     sdds.data.nm["column_major_order"] = column_major_order
     sdds.data.nm["no_row_counts"] = no_row_counts
     buf = io.BytesIO()
@@ -306,11 +316,12 @@ def test_read_zero_row_page(mode, column_major_order, no_row_counts, mixed):
     sdds2 = pysdds.read(io.BytesIO(buf.getvalue()))
     sdds2.validate_data()
     assert sdds2.n_pages == 3
-    assert [len(v) for v in sdds2.col("x").data] == [2, 0, 1]
-    assert sdds2.col("x").data[1].dtype == np.float64
-    assert sdds2.col("n").data[1].dtype == np.int32
-    assert list(sdds2.par("p").data) == [10, 20, 30]
-    assert np.array_equal(sdds2.col("x").data[2], [3.0])
+    assert [len(v) for v in sdds2.col("x").data] == expected_lengths
+    assert sdds2.col("x").data[empty_idx].dtype == np.float64
+    assert sdds2.col("n").data[empty_idx].dtype == np.int32
+    if params is not None:
+        assert list(sdds2.par("p").data) == [10, 20, 30]
+    assert np.array_equal(sdds2.col("x").data[expected_lengths.index(1)], [3.0])
 
 
 def test_read_ascii_trailing_character_column_octal():

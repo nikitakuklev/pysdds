@@ -1346,8 +1346,9 @@ def _read_pages_binary(
                 if flag:
                     # Arrays are initialized in C order by default, matching SDDS
                     values = np.frombuffer(data_bytes, dtype=mapped_t)
-                    # data_array = np.empty(dimensions, dtype=mapped_t)
-                    # data_array[:] = values[:]
+                    if type_len == 1:
+                        # Character arrays are stored as str objects, like character columns and parameters
+                        values = np.char.decode(values.view("S1"), "ascii").astype(object)
                     arrays[i].data.append(values.reshape(dimensions))
 
         # Column reading loop
@@ -2167,7 +2168,7 @@ def _read_pages_ascii_numeric_lines(
     elif n_params_unfixed == 0 and len(arrays) == 0 and n_columns == 0:
         # Nothing is consumed per page, so ASCII pages are not delimited - treat any content as a single page
         # (without this, the page loop below would spin forever on the unconsumed line)
-        sdds.n_pages = 1
+        sdds.n_pages = 1 if pages_mask is None or pages_mask[0] else 0
         return
     else:
         pushback_line_buf.appendleft(b_array)
@@ -2443,38 +2444,33 @@ def _read_pages_ascii_numeric_lines(
                 logger.debug(f">>C {file.tell()} | Feeding buffer {cnt=} {line_cnt=} to parse_table")
                 if line_cnt == 0:
                     # Page ended immediately - pandas cannot parse an empty buffer
+                    # (fall through to the common page bookkeeping and EOF check below)
                     if not page_skip:
                         _append_empty_columns(page_idx)
-                    page_idx += 1
+                else:
+                    opts = dict(
+                        sep=r"\s+",
+                        comment="!",
+                        header=None,
+                        escapechar="\\",
+                        nrows=line_cnt,
+                        skip_blank_lines=True,
+                        skipinitialspace=True,
+                        doublequote=False,
+                        dtype=pd_column_dict,
+                        engine="c",
+                        low_memory=False,
+                        na_filter=False,
+                        na_values=None,
+                        keep_default_na=False,
+                    )
+                    df = pd.read_table(buf, encoding="ascii", **opts)
+                    # Assign data to the columns
                     if not page_skip:
-                        page_stored_idx += 1
-                    continue
-                opts = dict(
-                    sep=r"\s+",
-                    comment="!",
-                    header=None,
-                    escapechar="\\",
-                    nrows=line_cnt,
-                    skip_blank_lines=True,
-                    skipinitialspace=True,
-                    doublequote=False,
-                    dtype=pd_column_dict,
-                    engine="c",
-                    low_memory=False,
-                    na_filter=False,
-                    na_values=None,
-                    keep_default_na=False,
-                )
-                # iowrap = io.TextIOWrapper(file, encoding='ascii')
-                # df = pd.read_table(iowrap, **opts)
-                # iowrap.detach()
-                df = pd.read_table(buf, encoding="ascii", **opts)
-                # Assign data to the columns
-                if not page_skip:
-                    for i, c in enumerate(sdds.columns):
-                        if columns_mask[i]:
-                            c.data.append(df.iloc[:, i].values)
-                            c._page_numbers.append(page_idx)
+                        for i, c in enumerate(sdds.columns):
+                            if columns_mask[i]:
+                                c.data.append(df.iloc[:, i].values)
+                                c._page_numbers.append(page_idx)
         page_idx += 1
         if not page_skip:
             page_stored_idx += 1

@@ -436,11 +436,14 @@ def test_write_multidimensional_arrays(mode):
         b"SDDS1\n"
         b"&array name=a, type=double, dimensions=2, &end\n"
         b"&array name=s, type=string, dimensions=2, &end\n"
+        b"&array name=c, type=character, dimensions=2, &end\n"
         b"&data mode=ascii, &end\n"
         b"2 3\n"
         b"1 2 3 4 5 6\n"
         b"2 2\n"
         b'a "b c" d ""\n'
+        b"2 2\n"
+        b"a \\040 b c\n"
     )
     sdds = pysdds.read(io.BytesIO(src))
     sdds.set_mode(mode)
@@ -448,8 +451,10 @@ def test_write_multidimensional_arrays(mode):
     pysdds.write(sdds, buf, use_best_settings=False)
 
     sdds2 = pysdds.read(io.BytesIO(buf.getvalue()))
+    sdds2.validate_data()
     assert np.array_equal(sdds2.arrays[0].data[0], np.arange(1, 7, dtype=float).reshape(2, 3))
     assert sdds2.arrays[1].data[0].tolist() == [["a", "b c"], ["d", ""]]
+    assert sdds2.arrays[2].data[0].tolist() == [["a", " "], ["b", "c"]]
 
 
 @pytest.mark.parametrize("mode", ["ascii", "binary"])
