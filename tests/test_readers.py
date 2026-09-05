@@ -328,6 +328,25 @@ def test_read_ascii_trailing_character_column_octal():
     assert list(sdds.col("c").data[0]) == [" ", "b"]
 
 
+@pytest.mark.parametrize("mixed", [False, True])
+def test_ascii_text_parameter_escapes_round_trip(mixed):
+    """String/character parameters with escapes must decode the same in both ASCII page parsers"""
+    import pandas as pd
+
+    df = pd.DataFrame({"x": [1.0, 2.0]})
+    if mixed:
+        df["s"] = pd.array(["a", "b"], dtype="string")
+    text = 'say "hi" ! ok\ttab \\ back'
+    sdds = pysdds.SDDSFile.from_df([df], parameter_dict={"p": [text]}, mode="ascii")
+    sdds.add_parameter("c", "character", data=["\t"])
+    buf = io.BytesIO()
+    pysdds.write(sdds, buf)
+
+    sdds2 = pysdds.read(io.BytesIO(buf.getvalue()))
+    assert sdds2.par("p").data[0] == text
+    assert sdds2.par("c").data[0] == "\t"
+
+
 def test_read_all_sdds_types_header_only():
     """Verify header parsing of all SDDS types works on every platform
     (no longdouble data is actually parsed, just the header)."""

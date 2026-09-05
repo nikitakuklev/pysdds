@@ -81,7 +81,21 @@ _HEADER_PARSE_METHOD = "v2"
 _ASCII_TEXT_PARSE_METHOD = "shlex"
 _ASCII_NUMERIC_PARSE_METHOD = "read_table"  # 'fromtxt'
 
-OCTAL_NUMBERS = "01234567"
+
+def _decode_ascii_text_parameter(line: str, sdds_type: str) -> str:
+    """Decode a string or character parameter from its ASCII data line"""
+    value = line.strip()
+    if len(value) == 1:
+        # Single bare character (including \ or " themselves) is taken verbatim
+        pass
+    elif value.startswith('"') or "\\" in value:
+        # Quoted or escaped - reuse the column lexer so \" \\ \! and octal escapes decode identically
+        tokens = split_sdds(value, posix=True)
+        value = tokens[0] if tokens else ""
+    # Otherwise keep the whole line as-is (lenient towards unquoted strings with spaces)
+    if sdds_type == "character" and len(value) != 1:
+        raise SDDSReadError(f"Unrecognized character {value=}")
+    return value
 
 
 def _open_file(
@@ -1692,48 +1706,7 @@ def _read_pages_ascii_mixed_lines(
                 )
             if not page_skip:
                 if parameters_type[par_idx] is object:
-                    value = b_array.strip()
-
-                    # Indicates a variable length string
-                    if value.startswith('"') and value.endswith('"'):
-                        value = value[1:-1]
-                        if "\\" in value:
-                            # escapes in quoted string
-                            v2 = []
-                            i = 0
-                            while True:
-                                c = value[i]
-                                if c != "\\":
-                                    v2 += c
-                                    i += 1
-                                else:
-                                    v2 += value[i + 1]
-                                    i += 2
-
-                                if i >= len(value):
-                                    break
-                            value = "".join(v2)
-
-                    if parameters[par_idx].type == "character":
-                        # Convert octal value or escaped character
-                        if value.startswith("\\"):
-                            if len(value) == 4:
-                                for i in range(1, 4):
-                                    assert value[i] in OCTAL_NUMBERS, "Bad octal character num"
-                                value = chr(int(value[1:], 8))
-                            elif len(value) == 2:
-                                # single escaped character
-                                value = value[1:]
-                            elif len(value) == 1:
-                                pass
-                            else:
-                                raise SDDSReadError(f"Unrecognized character {value=}")
-                        elif len(value) == 1:
-                            # bare printable character
-                            pass
-                        else:
-                            raise SDDSReadError(f"Unrecognized character {value=}")
-
+                    value = _decode_ascii_text_parameter(b_array, parameters[par_idx].type)
                     if TRACE:
                         logger.debug(
                             f">>PARS | p {file.tell()} | {par_idx=} | {parameters_type[par_idx]} "
@@ -2211,10 +2184,7 @@ def _read_pages_ascii_numeric_lines(
                     raise Exception("Still parsing parameters after 10000 lines - something is wrong")
 
                 if parameter_types[par_idx] is object:
-                    value = b_array.strip()
-                    # Indicates a variable length string
-                    if value.startswith('"') and value.endswith('"'):
-                        value = value[1:-1]
+                    value = _decode_ascii_text_parameter(b_array, parameters[par_idx].type)
                     if TRACE:
                         logger.debug(
                             f">>PARS | pos {file.tell()} | {par_idx=} | {parameter_types[par_idx]} | {repr(b_array)} | {value}"
