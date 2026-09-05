@@ -535,6 +535,8 @@ def read(
                 raise IOError(f"Parser failed - got {sdds.n_pages} pages while {len(pages)} were requested")
     finally:
         file.close()
+        # Never let a pushed-back line leak into the next read() call
+        pushback_line_buf.clear()
 
     cols_enabled = [c for c in sdds.columns if c._enabled]
     n_cols_enabled = len(cols_enabled)
@@ -2148,6 +2150,11 @@ def _read_pages_ascii_numeric_lines(
     if b_array is None:
         # Empty file
         sdds.n_pages = 0
+        return
+    elif n_params_unfixed == 0 and len(arrays) == 0 and n_columns == 0:
+        # Nothing is consumed per page, so ASCII pages are not delimited - treat any content as a single page
+        # (without this, the page loop below would spin forever on the unconsumed line)
+        sdds.n_pages = 1
         return
     else:
         pushback_line_buf.appendleft(b_array)

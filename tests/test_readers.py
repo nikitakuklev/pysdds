@@ -347,6 +347,32 @@ def test_ascii_text_parameter_escapes_round_trip(mixed):
     assert sdds2.par("c").data[0] == "\t"
 
 
+def test_read_ascii_no_page_data_terminates():
+    """Only fixed parameters and trailing lines: nothing is consumed per page, reader must not spin forever"""
+    import signal
+
+    src = (
+        b"SDDS1\n&parameter name=p, type=double, fixed_value=1.5, &end\n&data mode=ascii, &end\n\n! trailing comment\n"
+    )
+
+    def on_alarm(signum, frame):
+        raise TimeoutError("reader hung")
+
+    old = signal.signal(signal.SIGALRM, on_alarm)
+    signal.alarm(10)
+    try:
+        sdds = pysdds.read(io.BytesIO(src))
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, old)
+    assert sdds.n_pages == 1
+    assert sdds.par("p").data == [1.5]
+    # Global pushback buffer must not leak into the next read
+    from pysdds.readers.readers import pushback_line_buf
+
+    assert len(pushback_line_buf) == 0
+
+
 def test_read_all_sdds_types_header_only():
     """Verify header parsing of all SDDS types works on every platform
     (no longdouble data is actually parsed, just the header)."""
