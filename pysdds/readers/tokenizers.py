@@ -1,7 +1,7 @@
 from pysdds.util.errors import SDDSReadError
 
-delimiters = {"\r", "\n", " "}
-delimiterscomma = {",", "\r", "\n", " "}
+delimiters = {"\r", "\n", " ", "\t"}
+delimiterscomma = {",", "\r", "\n", " ", "\t"}
 
 
 def tokenize_namelist(line):
