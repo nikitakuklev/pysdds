@@ -463,3 +463,20 @@ def test_from_df_multipage_int_columns(mode):
     sdds2 = pysdds.read(io.BytesIO(buf.getvalue()))
     assert [v.tolist() for v in sdds2.col("i").data] == [[1, 2], [3]]
     assert sdds2.col("i").data[1].dtype == np.int64
+
+
+def test_sddsfile_write_respects_overwrite(tmp_path):
+    """SDDSFile.write() must not truncate an existing file unless overwrite=True, and must accept streams"""
+    sdds = pysdds.SDDSFile.from_df([pd.DataFrame({"x": [1.0]})])
+    target = tmp_path / "out.sdds"
+    target.write_bytes(b"ORIGINAL")
+    with pytest.raises(IOError):
+        sdds.write(target)
+    assert target.read_bytes() == b"ORIGINAL"
+
+    sdds.write(str(target), overwrite=True)
+    assert pysdds.read(target).col("x").data[0][0] == 1.0
+
+    buf = io.BytesIO()
+    sdds.write(buf)
+    assert buf.getvalue().startswith(b"SDDS")

@@ -1327,8 +1327,10 @@ class SDDSFile:
         """
         from .. import write
 
-        with open(filename, "wb") as f:
-            write(self, filepath=f, compression=compression, overwrite=overwrite, use_best_settings=use_best_settings)
+        # Delegate path handling (overwrite check, compression, streams) to the writer itself
+        write(
+            self, filepath=filename, compression=compression, overwrite=overwrite, use_best_settings=use_best_settings
+        )
 
     def get_streaming_writer(
         self,
