@@ -458,37 +458,53 @@ class IncrementalWriter:
         self.write_stage = WriterState.CLOSED
 
 
-def _write_rows_row_major(file, arrays, sdds_types, numpy_dtypes, n_rows, write_str):
-    """Write column arrays interleaved row by row.
+# Row-major binary pages are packed/converted in chunks of about this many bytes, so the transient copy is
+# bounded regardless of page size (v0.6.0 wrote scalars from views and had no copy at all, but was ~50x slower)
+_ROW_MAJOR_CHUNK_BYTES = 4 << 20
 
-    Without string columns the page is packed into one structured array (fields in declared byte order,
-    characters as S1) and written in a single call - one page-sized copy, same as the per-column buffers
-    it replaces, but no Python loop. With string columns, lengths vary per cell, so rows are written one by one.
+
+def _write_rows_row_major(file, arrays, sdds_types, numpy_dtypes, n_rows, write_str):
+    """Write column arrays interleaved row by row, in bounded-size chunks.
+
+    Without string columns each chunk is packed into a structured array (fields in declared byte order,
+    characters as S1) and written in one call. With string columns, lengths vary per cell, so numeric
+    columns are converted per chunk and rows are written one by one.
     """
+    fixed_sizes = [
+        1 if t == "character" else (0 if t == "string" else dt.itemsize) for t, dt in zip(sdds_types, numpy_dtypes)
+    ]
+    row_bytes = max(1, sum(fixed_sizes))
+    chunk_rows = max(1, _ROW_MAJOR_CHUNK_BYTES // row_bytes)
+
     if "string" not in sdds_types:
         dt = np.dtype([(f"f{i}", "S1" if t == "character" else numpy_dtypes[i]) for i, t in enumerate(sdds_types)])
-        rec = np.empty(n_rows, dtype=dt)
-        for i, (arr, t) in enumerate(zip(arrays, sdds_types)):
-            rec[f"f{i}"] = arr.astype("S1") if t == "character" else arr
-        file.write(rec)
+        rec = np.empty(min(n_rows, chunk_rows), dtype=dt)
+        for start in range(0, n_rows, chunk_rows):
+            stop = min(start + chunk_rows, n_rows)
+            m = stop - start
+            for i, (arr, t) in enumerate(zip(arrays, sdds_types)):
+                rec[f"f{i}"][:m] = arr[start:stop].astype("S1") if t == "character" else arr[start:stop]
+            file.write(rec[:m])
         return
 
-    # Numeric columns are converted to the declared byte order once and sliced as bytes per row
-    # (a numpy scalar would be written in native order)
-    page_data = []
-    for arr, t, dtype in zip(arrays, sdds_types, numpy_dtypes):
-        if t == "string":
-            page_data.append((arr, None))
-        elif t == "character":
-            page_data.append((arr.astype("S1").tobytes(), 1))
-        else:
-            page_data.append((arr.astype(dtype, copy=False).tobytes(), dtype.itemsize))
-    for row in range(n_rows):
-        for buf, size in page_data:
-            if size is None:
-                write_str(buf[row])
+    for start in range(0, n_rows, chunk_rows):
+        stop = min(start + chunk_rows, n_rows)
+        # Numeric columns of this chunk as bytes in the declared byte order, sliced per row below
+        # (a numpy scalar would be written in native order)
+        chunk_data = []
+        for arr, t, dtype in zip(arrays, sdds_types, numpy_dtypes):
+            if t == "string":
+                chunk_data.append((arr[start:stop], None))
+            elif t == "character":
+                chunk_data.append((arr[start:stop].astype("S1").tobytes(), 1))
             else:
-                file.write(buf[row * size : (row + 1) * size])
+                chunk_data.append((arr[start:stop].astype(dtype, copy=False).tobytes(), dtype.itemsize))
+        for row in range(stop - start):
+            for buf, size in chunk_data:
+                if size is None:
+                    write_str(buf[row])
+                else:
+                    file.write(buf[row * size : (row + 1) * size])
 
 
 def _close_write_streams(file, raw_file, target):
