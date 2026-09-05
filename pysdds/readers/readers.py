@@ -1588,9 +1588,8 @@ def _read_pages_binary(
                             value = columns_structs[i].unpack(byte_array)[0]
                             # value = np.frombuffer(byte_array, dtype=mapped_t, count=1)[0]
                             if type_len == 1:
-                                # Decode uint8 to <U1
-                                # value = chr(int(value))
-                                value = np.char.decode(np.array(value).view("S1"), "ascii")
+                                # struct 'c' yields a 1-byte bytes object; store a plain str like the other paths
+                                value = value.decode("ascii")
                             columns_data[idx_active][row] = value
                             # l.debug(f'>>COL {i} {file.tell()} | {columns_type[i]} | {columns_size[i]} | {s} | {columns_data[i][row]} | {b_array}')
                             idx_active += 1
