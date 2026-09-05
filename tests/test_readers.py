@@ -94,6 +94,17 @@ def test_read_buffer(file_root):
         sdds.validate_data()
 
 
+@pytest.mark.parametrize("file_root", ff + ff_ascii + ff_binary_rowmajor)
+def test_read_raw_bytesio(file_root):
+    """A bare io.BytesIO has no peek(); reader must wrap it rather than fail"""
+    with open(file_root, "rb") as fs:
+        buf = fs.read()
+    sdds_stream = pysdds.read(io.BytesIO(buf))
+    sdds_stream.validate_data()
+    sdds_file = pysdds.read(file_root)
+    assert sdds_file.compare(sdds_stream, raise_error=True)
+
+
 @pytest.mark.parametrize("file_root", fl)
 def test_read_large(file_root):
     sdds = pysdds.read(file_root)

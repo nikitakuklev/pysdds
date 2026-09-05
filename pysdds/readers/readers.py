@@ -357,7 +357,8 @@ def read(
         try:
             filepath.peek(1)
             peek_available = True
-        except TypeError:
+        except (TypeError, AttributeError):
+            # Raw streams like io.BytesIO have no peek() - they get wrapped below
             peek_available = False
         sdds._source_file_size = 0
         logger.debug(
@@ -472,6 +473,11 @@ def read(
                 for i in range(sdds.data.additional_header_lines):
                     file.readline()
 
+        # ASCII parser always detects end of file via peek(); binary one only when the stream size is unknown
+        if not peek_available and (sdds.mode != "binary" or file_size is None):
+            logger.debug("Wrapping stream in buffered reader since peek() was not available")
+            file = io.BufferedReader(file)
+
         if sdds.mode == "binary":
             _read_pages_binary(
                 file,
@@ -482,10 +488,6 @@ def read(
                 pages_mask=pages_mask,
             )
         else:
-            # Need to use BufferedReader since file end is detected by peek()
-            if not peek_available:
-                logger.debug("Wrapping stream in buffered reader since peek() was not available")
-                file = io.BufferedReader(file)
             # Streaming ascii data is not yet supported because performance is bad
             if sdds.data.lines_per_row != 1:
                 raise NotImplementedError(f"lines_per_row = {sdds.data.lines_per_row} is not yet supported")
