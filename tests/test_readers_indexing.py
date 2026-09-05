@@ -3,13 +3,13 @@ import itertools
 import logging
 import random
 import time
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import pytest
-import pysdds
-from pathlib import Path
 
+import pysdds
 
 cwd = Path(__file__).parent
 root_sources = cwd / "files"
@@ -135,7 +135,7 @@ def test_col_empty_perf(file_root):
     pysdds.read(file_root, pages=[0])
     t_empty = best_of(7, cols=[], pages=[0])
     t_full = best_of(7, pages=[0])
-    logging.info(f"Empty cols read time: {t_empty:.6f}s vs full read time: {t_full:.6f}s")
+    logging.getLogger(__name__).info(f"Empty cols read time: {t_empty:.6f}s vs full read time: {t_full:.6f}s")
     assert t_full > t_empty
     sdds = pysdds.read(file_root, pages=[0])
     assert sdds.n_pages == 1

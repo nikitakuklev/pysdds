@@ -1,10 +1,10 @@
 __all__ = [
-    "Description",
-    "Parameter",
     "Array",
+    "Associate",
     "Column",
     "Data",
-    "Associate",
+    "Description",
+    "Parameter",
     "SDDSFile",
 ]
 
@@ -14,13 +14,14 @@ import logging
 import math
 import sys
 from pathlib import Path
-from typing import List, Optional, Literal, Dict, Union
+from typing import Dict, List, Literal, Optional, Union
 
 import numpy as np
 import pandas as pd
 
-from ..util import constants
 from pysdds.util.constants import _NUMPY_DTYPES
+
+from ..util import constants
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +29,7 @@ logger = logging.getLogger(__name__)
 def _compare_arrays(one, two, eps=None) -> bool:
     if isinstance(one, np.ndarray) and isinstance(two, np.ndarray):
         if one.dtype != two.dtype:
-            raise Exception(f"Dtypes dont match??? {repr(one.dtype)} {repr(two.dtype)}")
+            raise Exception(f"Dtypes dont match??? {one.dtype!r} {two.dtype!r}")
         assert len(one) == len(two)
         if np.issubdtype(one.dtype, np.number) and eps is not None:
             # Numeric
@@ -355,7 +356,7 @@ class Array:
     input file ahead of the tabular data; data for different arrays may not occupy portions of the same line.
     """
 
-    __slots__ = ("__dict__", "nm", "data", "sdds")
+    __slots__ = ("__dict__", "data", "nm", "sdds")
 
     def __init__(self, namelist, sdds: "SDDSFile" = None):
         self.nm = namelist
@@ -452,7 +453,7 @@ class Column:
     character string.
     """
 
-    __slots__ = ("__dict__", "nm", "data", "sdds")
+    __slots__ = ("__dict__", "data", "nm", "sdds")
 
     def __init__(self, namelist, sdds: "SDDSFile" = None):
         self.nm: dict = namelist
@@ -570,7 +571,7 @@ class Data:
     have been given.
     """
 
-    __slots__ = ("__dict__", "nm", "data", "sdds")
+    __slots__ = ("__dict__", "data", "nm", "sdds")
 
     def __init__(self, namelist=None):
         self.nm = namelist or {}
@@ -708,14 +709,14 @@ class SDDSFile:
 
     __slots__ = (
         "__dict__",
-        "description",
-        "parameters",
+        "_mode",
         "arrays",
         "columns",
         "data",
-        "_mode",
+        "description",
         "endianness",
         "n_pages",
+        "parameters",
     )
 
     def __init__(self, add_data_nm=False):
@@ -1014,10 +1015,10 @@ class SDDSFile:
         self,
         name: str,
         type: str,
-        symbol: str = None,
-        units: str = None,
-        description: str = None,
-        fixed_value: Union[int, float, str] = None,
+        symbol: Optional[str] = None,
+        units: Optional[str] = None,
+        description: Optional[str] = None,
+        fixed_value: Optional[Union[float, str]] = None,
         data: Optional[List[Union[int, float, str]]] = None,
     ):
         # STRING name = NULL
@@ -1047,11 +1048,11 @@ class SDDSFile:
         self,
         name: str,
         type: str,
-        symbol: str = None,
-        units: str = None,
-        description: str = None,
-        format_string: str = None,
-        group_name: str = None,
+        symbol: Optional[str] = None,
+        units: Optional[str] = None,
+        description: Optional[str] = None,
+        format_string: Optional[str] = None,
+        group_name: Optional[str] = None,
         field_length: int = 0,
         dimensions: int = 1,
         data: Optional[List[np.ndarray]] = None,
@@ -1093,7 +1094,7 @@ class SDDSFile:
         df_list: List[pd.DataFrame],
         parameter_dict: Optional[Dict[str, list]] = None,
         mode: Literal["binary", "ascii"] = "binary",
-        endianness: Literal["big", "little"] = None,
+        endianness: Optional[Literal["big", "little"]] = None,
     ) -> "SDDSFile":
         """
         Create SDDS object from lists of dataframes
@@ -1280,7 +1281,7 @@ class SDDSFile:
             assert len(data) == n_pages, f"Expected {n_pages} points but have {len(data)} for {el}"
             assert isinstance(data, list)
             for v in data:
-                if type(v) != _PYTHON_TYPE_FINAL[el.type]:  # noqa: E721
+                if type(v) != _PYTHON_TYPE_FINAL[el.type]:
                     raise Exception(f"Parameter type ({type(v)}) ({v}) does not match {_PYTHON_TYPE_FINAL[el.type]}")
 
         for el in self.arrays:
@@ -1299,7 +1300,7 @@ class SDDSFile:
             assert all(isinstance(v, np.ndarray) for v in data)
             for v in data:
                 expected_dtype = _NUMPY_DTYPE_FINAL[el.type]
-                if not v.dtype == _NUMPY_DTYPE_FINAL[el.type]:
+                if v.dtype != _NUMPY_DTYPE_FINAL[el.type]:
                     if np.issubdtype(v.dtype, np.integer) and np.issubdtype(_NUMPY_DTYPE_FINAL[el.type], np.integer):
                         # If both integer-like, probably ok since converts up to max values
                         pass

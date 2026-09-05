@@ -1,10 +1,7 @@
 from struct import pack
-from typing import Iterable
+from typing import Iterable, TypedDict
 
-from bitarray import bitarray
-from bitarray import util
-
-from typing import TypedDict
+from bitarray import bitarray, util
 
 INIT_CONSTS = {
     # IEEE 754, binary64, Big Endian
@@ -55,10 +52,8 @@ class ValuesEncoder:
     """
 
     def __init__(self, bit_array=None, float_format="f64"):
-        if float_format not in INIT_CONSTS.keys():
-            raise ValueError(
-                "Unexpected `float_format` value ({}). Sould be one of f64, f32, f16.".format(float_format)
-            )
+        if float_format not in INIT_CONSTS:
+            raise ValueError(f"Unexpected `float_format` value ({float_format}). Sould be one of f64, f32, f16.")
 
         self.float_format = float_format
         self.n_bits_value = INIT_CONSTS[float_format]["n_bits_value"]
@@ -123,8 +118,7 @@ class ValuesEncoder:
         n_leading_zeros = xored_value.index(1)
         n_trailing_zeros = len(xored_value) - util.rindex(xored_value, 1) - 1
 
-        if n_leading_zeros > self.max_n_leading_zeros:
-            n_leading_zeros = self.max_n_leading_zeros
+        n_leading_zeros = min(n_leading_zeros, self.max_n_leading_zeros)
 
         # The block of meaningful bits falls within the block of previous
         # meaningful bits, so we can use previous block information.

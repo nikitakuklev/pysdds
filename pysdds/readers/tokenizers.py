@@ -112,7 +112,7 @@ def tokenize_namelist(line):
                                 # might not have comma if only a single item or at the end
                                 # so scan ahead to find next state
                                 found_next_item_or_end = False
-                                for jmp in range(0, 20):
+                                for jmp in range(20):
                                     c = line[j + jmp]
                                     # print("nextscan ", jmp, c)
                                     if c in delimiters:

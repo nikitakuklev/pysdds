@@ -47,6 +47,12 @@ line-length = 120
 [tool.ruff.lint]
 ignore = [
     "E741", # ambiguous variable name
+    "FA100", # from __future__ import annotations - no benefit while 3.8 is supported
+    "SIM115", # file dispatchers return open handles for the caller to close
+    "EXE002", # executable bits come from the filesystem, not the repo
+    "SIM102", # nested ifs are often clearer than merged conditions
+    "TRY002", # bare Exception raises are the existing error API
+    "TRY004", # same, for type checks
 ]
 
 

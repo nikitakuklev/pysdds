@@ -68,9 +68,9 @@ def write(
 
     if isinstance(filepath, str):
         filepath = Path(filepath)
-    elif isinstance(filepath, (Path, io.IOBase, tempfile.SpooledTemporaryFile)):
-        pass
-    elif issubclass(filepath.__class__, _io.IOBase):
+    elif isinstance(filepath, (Path, io.IOBase, tempfile.SpooledTemporaryFile)) or issubclass(
+        filepath.__class__, _io.IOBase
+    ):
         pass
     else:
         raise Exception(f"Filepath type {type(filepath)} is not a string, Path, or BytesIO object")
@@ -161,9 +161,9 @@ class IncrementalWriter:
 
         if isinstance(filepath, str):
             filepath = Path(filepath)
-        elif isinstance(filepath, (Path, io.IOBase, tempfile.SpooledTemporaryFile)):
-            pass
-        elif issubclass(filepath.__class__, _io.IOBase):
+        elif isinstance(filepath, (Path, io.IOBase, tempfile.SpooledTemporaryFile)) or issubclass(
+            filepath.__class__, _io.IOBase
+        ):
             pass
         else:
             raise Exception(f"Filepath type {type(filepath)} is not a string, Path, or BytesIO object")
@@ -363,7 +363,11 @@ class IncrementalWriter:
 
         self.write_stage = WriterState.READY_FOR_NEXT_PAGE
 
-    def new_page(self, parameter_data: List[Union[str, int, float]] = None, array_data: List[np.ndarray] = None):
+    def new_page(
+        self,
+        parameter_data: Optional[List[Union[str, int, float]]] = None,
+        array_data: Optional[List[np.ndarray]] = None,
+    ):
         """
         Start writing a new page. Must be called after writing the header, and before writing any data.
         Can be called again at any point afterward to close current page and start next one.
@@ -516,7 +520,7 @@ def _close_write_streams(file, raw_file, target):
         raw_file.close()
 
 
-def _open_write_stream(stream: BytesIO, compression: str = None):
+def _open_write_stream(stream: BytesIO, compression: Optional[str] = None):
     if compression == "auto":
         logger.debug("Compression 'auto' on a stream target - writing uncompressed")
         compression = None
@@ -546,23 +550,23 @@ def _open_write_stream(stream: BytesIO, compression: str = None):
             logger.debug(f"File stream: {buffered_stream}")
             logger.debug(f"Final stream: {stream}")
         return stream
-    except IOError as ex:
+    except OSError:
         logger.exception("Buffer IO failed")
-        raise ex
+        raise
 
 
-def _open_write_file(filepath: Path, compression: str = None, overwrite_ok: bool = False):
+def _open_write_file(filepath: Path, compression: Optional[str] = None, overwrite_ok: bool = False):
     assert isinstance(filepath, Path)
 
     if filepath.exists():
         if not overwrite_ok:
-            raise IOError(f"File path {filepath} already exists")
+            raise OSError(f"File path {filepath} already exists")
         else:
             logger.warning(f"File {filepath} will be overwritten")
     if filepath.is_dir():
-        raise IOError(f"File path {filepath} is a directory, expect a file")
+        raise OSError(f"File path {filepath} is a directory, expect a file")
     if not filepath.parent.exists():
-        raise IOError(f"Parent directory {filepath.parent} does not exist")
+        raise OSError(f"Parent directory {filepath.parent} does not exist")
     # if not filepath.is_file():
     #    raise IOError(f'File ({filepath}) does not exist or cannot be read')
 
@@ -595,9 +599,9 @@ def _open_write_file(filepath: Path, compression: str = None, overwrite_ok: bool
             logger.debug(f"Final stream: {stream}")
         # Compression wrappers do not close the underlying file, so hand both back
         return stream, buffered_stream
-    except IOError as ex:
-        logger.exception(f"File {str(filepath)} IO failed")
-        raise ex
+    except OSError:
+        logger.exception(f"File {filepath!s} IO failed")
+        raise
 
 
 def _dump_header(sdds: SDDSFile, file: IO[bytes], ignore_fixed_rowcount: bool = True):
@@ -662,7 +666,7 @@ def _dump_data_ascii(sdds: SDDSFile, file: IO[bytes], best_settings):
                     result += ch
             else:
                 if ord(ch) >= 127:
-                    raise Exception(f"Non-ascii character {repr(ch)}")
+                    raise Exception(f"Non-ascii character {ch!r}")
                 else:
                     result += f"\\{ord(ch):03o}"
                     flag = True
@@ -725,18 +729,18 @@ def _dump_data_ascii(sdds: SDDSFile, file: IO[bytes], best_settings):
 
     if _ASCII_TEXT_WRITE_METHOD == "sequential_python":
         # Quoting needs to be handled carefully....
-        opts = dict(
-            header=False,
-            index=False,
-            mode="wb",
-            encoding="utf-8",
-            compression=None,
-            line_terminator=NEWLINE_CHAR,
-            quotechar='"',
-            doublequote=False,
-            escapechar="\\",
+        opts = {
+            "header": False,
+            "index": False,
+            "mode": "wb",
+            "encoding": "utf-8",
+            "compression": None,
+            "line_terminator": NEWLINE_CHAR,
+            "quotechar": '"',
+            "doublequote": False,
+            "escapechar": "\\",
             # float_format='%.15e'
-        )
+        }
 
         for page_idx in range(sdds.n_pages):
             if page_idx > 0 and sdds.data.no_row_counts == 1:
@@ -800,18 +804,18 @@ def _dump_data_ascii(sdds: SDDSFile, file: IO[bytes], best_settings):
 
     elif _ASCII_TEXT_WRITE_METHOD == "pandas":
         # Quoting needs to be handled carefully....
-        opts = dict(
-            header=False,
-            index=False,
-            mode="wb",
-            encoding="ascii",
-            compression=None,
-            line_terminator=NEWLINE_CHAR,
-            quotechar='"',
-            doublequote=False,
-            escapechar="\\",
+        opts = {
+            "header": False,
+            "index": False,
+            "mode": "wb",
+            "encoding": "ascii",
+            "compression": None,
+            "line_terminator": NEWLINE_CHAR,
+            "quotechar": '"',
+            "doublequote": False,
+            "escapechar": "\\",
             # float_format='%.15e'
-        )
+        }
 
         param_df = sdds.parameters_to_df()
         for page_idx in range(sdds.n_pages):

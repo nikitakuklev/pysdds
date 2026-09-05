@@ -9,6 +9,7 @@ import io
 import numpy as np
 import pandas as pd
 import pytest
+
 import pysdds
 from pysdds.structures import Array
 

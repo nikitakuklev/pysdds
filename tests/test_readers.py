@@ -1,10 +1,11 @@
 import io
-
-import pytest
-import numpy as np
-import pysdds
-from pathlib import Path
 import itertools
+from pathlib import Path
+
+import numpy as np
+import pytest
+
+import pysdds
 
 cwd = Path(__file__).parent
 root_sources = cwd / "files"

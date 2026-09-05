@@ -1,31 +1,31 @@
 import csv
 import io
-import os
-import sys
 import logging
+import os
+import struct
+import sys
 import time
 from collections import deque
-
-from .tokenizers import tokenize_namelist
-from ..util.errors import SDDSReadError
-from .shlex_sdds import split_sdds
 from pathlib import Path
-from typing import Union, Iterable, List, IO, Optional
-import struct
+from typing import IO, Iterable, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
 
 from pysdds.structures import Array, Associate, Column, Data, Description, Parameter, SDDSFile
 from pysdds.util.constants import (
-    _NUMPY_DTYPES,
-    _NUMPY_DTYPE_LE,
     _NUMPY_DTYPE_BE,
     _NUMPY_DTYPE_FINAL,
-    _STRUCT_STRINGS_LE,
-    _STRUCT_STRINGS_BE,
+    _NUMPY_DTYPE_LE,
     _NUMPY_DTYPE_SIZES,
+    _NUMPY_DTYPES,
+    _STRUCT_STRINGS_BE,
+    _STRUCT_STRINGS_LE,
 )
+
+from ..util.errors import SDDSReadError
+from .shlex_sdds import split_sdds
+from .tokenizers import tokenize_namelist
 
 # The proper way to implement conditional logging is to check current level,
 # but this creates too much overhead in hot loops. So, old school global vars it is.
@@ -131,7 +131,7 @@ def _open_file(
     filepath: Path,
     compression: str,
     use_magic_values: bool = False,
-    buffer_size: int = None,
+    buffer_size: Optional[int] = None,
 ) -> (IO[bytes], int, bool):
     """Open the file path for reading as a raw byte stream. Compression is determined based on either file extension,
     or magic strings If no matches are found, file is assumed to be uncompressed
@@ -155,7 +155,7 @@ def _open_file(
     assert isinstance(filepath, Path)
 
     if not filepath.is_file():
-        raise IOError(f"File ({filepath}) does not exist or cannot be read")
+        raise OSError(f"File ({filepath}) does not exist or cannot be read")
 
     # Check file size
     filesize = filepath.stat().st_size
@@ -174,7 +174,7 @@ def _open_file(
                 b"\x42\x5a\x68": "bz2",
                 b"\x50\x4b\x03\x04": "zip",
             }
-            max_len = max(len(x) for x in magic_dict.keys())
+            max_len = max(len(x) for x in magic_dict)
             with open(filepath, "rb") as f:
                 magic_bytes = f.read(max_len)
                 match = None
@@ -231,9 +231,9 @@ def _open_file(
                 logger.debug(f"File size {filesize} and parsing settings allow for full buffering")
                 logger.debug(f"Final stream: {buffered_stream}")
             return buffered_stream, stream_size, False
-        except IOError as ex:
-            logger.exception(f"File {str(filepath)} memory-buffered IO failed")
-            raise ex
+        except OSError:
+            logger.exception(f"File {filepath!s} memory-buffered IO failed")
+            raise
     else:
         try:
             if buffer_size is None:
@@ -261,9 +261,9 @@ def _open_file(
                 logger.debug(f"File stream: {buffered_stream}")
                 logger.debug(f"Final stream: {stream}")
             return stream, None, True
-        except IOError as ex:
-            logger.exception(f"File {str(filepath)} IO failed")
-            raise ex
+        except OSError:
+            logger.exception(f"File {filepath!s} IO failed")
+            raise
 
 
 def read(
@@ -354,10 +354,10 @@ def read(
         try:
             assert all(isinstance(i, int) for i in pages)
             # We will not know how many pages are present until reading file, so create mask now
-            pages_mask = [i in pages for i in range(0, max(pages) + 1)]
+            pages_mask = [i in pages for i in range(max(pages) + 1)]
             pages = np.array(pages)
-        except Exception:
-            raise ValueError("Pagelist is not an array-like object of ints")
+        except (AssertionError, TypeError, ValueError):
+            raise ValueError("Pagelist is not an array-like object of ints") from None
     else:
         pages_mask = None
 
@@ -471,7 +471,7 @@ def read(
             items_dict = sdds.array_dict
             if not available_set.issubset(parsed_set):
                 raise ValueError(f"Requested arrays ({arrays}) are not a subset of available ({parsed_names})")
-            array_mask = [True if el.name in available_set else False for el in sdds.arrays]
+            array_mask = [el.name in available_set for el in sdds.arrays]
             for c in parsed_set.difference(available_set):
                 items_dict[c]._enabled = False
         elif array_mask_mode == 2:
@@ -489,7 +489,7 @@ def read(
             parsed_set = set(parsed_names)
             if not available_set.issubset(parsed_set):
                 raise ValueError(f"Requested columns ({cols}) are not a subset file data ({parsed_names})")
-            column_mask = [True if c.name in available_set else False for c in sdds.columns]
+            column_mask = [c.name in available_set for c in sdds.columns]
             for c in parsed_set.difference(available_set):
                 sdds.columns_dict[c]._enabled = False
         elif column_mask_mode == 2:
@@ -565,7 +565,7 @@ def read(
 
         if pages is not None:
             if sdds.n_pages != len(pages):
-                raise IOError(f"Parser failed - got {sdds.n_pages} pages while {len(pages)} were requested")
+                raise OSError(f"Parser failed - got {sdds.n_pages} pages while {len(pages)} were requested")
     finally:
         file.close()
         # Never let a pushed-back line leak into the next read() call
@@ -634,7 +634,7 @@ def __get_next_line(
                 else:
                     # Regular comment
                     if TRACE:
-                        logger.debug(f">>NXL | pos {stream.tell()} | SKIP FULL {repr(line)}")
+                        logger.debug(f">>NXL | pos {stream.tell()} | SKIP FULL {line!r}")
                     line = None
                     continue
             else:
@@ -647,15 +647,15 @@ def __get_next_line(
                         if cut_midline_without_quotes and '"' in line[idx + 1 :]:
                             line_cut = line
                             if TRACE:
-                                logger.debug(f">>NXL {stream.tell()} | NO CUT QUOTES {repr(line)} -> {repr(line_cut)}")
+                                logger.debug(f">>NXL {stream.tell()} | NO CUT QUOTES {line!r} -> {line_cut!r}")
                         else:
                             line_cut = line[:idx]
                             if TRACE:
-                                logger.debug(f">>NXL {stream.tell()} | CUT LINE {repr(line)} -> {repr(line_cut)}")
+                                logger.debug(f">>NXL {stream.tell()} | CUT LINE {line!r} -> {line_cut!r}")
                     else:
                         line_cut = line
                         if TRACE:
-                            logger.debug(f">>NXL {stream.tell()} | escaped comment, not cutting {repr(line)}")
+                            logger.debug(f">>NXL {stream.tell()} | escaped comment, not cutting {line!r}")
                 else:
                     line_cut = line
                 if strip:
@@ -669,6 +669,77 @@ def __get_next_line(
                 return detab(line)
 
 
+def _parse_namelist_entry(line: str, pos: int) -> Tuple[str, str, int]:
+    """Parse one `key=value,` entry of a header namelist starting at line[pos].
+
+    Returns the key, the value with surrounding quotes removed, and the position just past the trailing comma.
+    """
+    len_line = len(line)
+    tokens = []
+    no_chars_allowed = False
+    while True:
+        # logger.debug(f'Char {line[pos]} | tokens {tokens} | nca {no_chars_allowed}')
+        if line[pos] == " ":
+            no_chars_allowed = True
+        elif line[pos] == "=":
+            # Transition to value
+            key = "".join(tokens)
+            break
+        else:
+            if no_chars_allowed:
+                raise Exception
+            else:
+                tokens.append(line[pos])
+        pos += 1
+        if pos >= len_line:
+            raise Exception("End of line reached")
+    if key == "":
+        raise Exception
+
+    pos += 1
+    no_chars_allowed = False
+    literal_mode = False
+    value_tokens = []
+    while True:
+        c = line[pos]
+        # logger.debug(f'{pos} | char {c} | nca {no_chars_allowed} | l {literal_mode} | tokens {value_tokens}')
+        if literal_mode:
+            # Inside the quotes
+            if c == '"':
+                # Toggle literal mode
+                literal_mode = False
+            else:
+                # Append anything else
+                value_tokens.append(c)
+        else:
+            # Outside the quotes
+            if c == " ":
+                # At end of namelist
+                no_chars_allowed = True
+            elif c == '"':
+                # Toggle literal mode
+                literal_mode = True
+            elif c == ",":
+                value = "".join(value_tokens)
+                pos += 1
+                break
+            else:
+                if no_chars_allowed:
+                    raise Exception
+                else:
+                    value_tokens.append(c)
+        pos += 1
+        if pos >= len_line:
+            raise Exception(f"End of line reached | {pos} | char {c} | tokens {value_tokens} | nca {no_chars_allowed}")
+
+    if literal_mode:
+        raise Exception
+
+    # l.debug(f'>>NM key: {key}')
+    # l.debug(f'>>NM value: {value}')
+    return key, value, pos
+
+
 def _read_header_fullstream(file: IO[bytes], sdds: SDDSFile, mode: str, endianness: str) -> None:
     """
     Read SDDS header - the ASCII text that described the data contained in the SDDS file. This parser uses the common
@@ -680,12 +751,12 @@ def _read_header_fullstream(file: IO[bytes], sdds: SDDSFile, mode: str, endianne
     version_line = file.readline(10).decode("ascii").rstrip()
     line_num = 1
     if version_line[:4] != "SDDS" or len(version_line) != 5:
-        raise AttributeError(f"Header parsing failed on line {line_num}: {repr(version_line)} is not a valid version")
+        raise AttributeError(f"Header parsing failed on line {line_num}: {version_line!r} is not a valid version")
 
     try:
         sdds_version = int(version_line[4])
-    except Exception:
-        raise AttributeError(f"Unrecognized SDDS version: {version_line[5]}")
+    except ValueError:
+        raise AttributeError(f"Unrecognized SDDS version: {version_line[4]!r}") from None
 
     if sdds_version > 5 or sdds_version < 1:
         raise ValueError(f"This package only supports SDDS version 5 or lower, file is version {sdds_version}")
@@ -709,7 +780,7 @@ def _read_header_fullstream(file: IO[bytes], sdds: SDDSFile, mode: str, endianne
                 line = __get_next_line(
                     stream, accept_meta_commands=False, cut_midline_comments=False
                 )  # stream.readline().decode('ascii')
-                logger.debug(f"Adding line [{repr(line)}] to multi-line namelist")
+                logger.debug(f"Adding line [{line!r}] to multi-line namelist")
                 if line is None:
                     raise SDDSReadError("Unexpected EOF during header parsing")
                 buffer += line
@@ -756,78 +827,10 @@ def _read_header_fullstream(file: IO[bytes], sdds: SDDSFile, mode: str, endianne
 
         # l.debug(f'>Command parse result: {command}')
 
-        def __parse_namelist_entry():
-            nonlocal line, pos
-            tokens = []
-            no_chars_allowed = False
-            while True:
-                # logger.debug(f'Char {line[pos]} | tokens {tokens} | nca {no_chars_allowed}')
-                if line[pos] == " ":
-                    no_chars_allowed = True
-                elif line[pos] == "=":
-                    # Transition to value
-                    key = "".join(tokens)
-                    break
-                else:
-                    if no_chars_allowed:
-                        raise Exception
-                    else:
-                        tokens.append(line[pos])
-                pos += 1
-                if pos >= len_line:
-                    raise Exception("End of line reached")
-            if key == "":
-                raise Exception
-
-            pos += 1
-            no_chars_allowed = False
-            literal_mode = False
-            value_tokens = []
-            while True:
-                c = line[pos]
-                # logger.debug(f'{pos} | char {c} | nca {no_chars_allowed} | l {literal_mode} | tokens {value_tokens}')
-                if literal_mode:
-                    # Inside the quotes
-                    if c == '"':
-                        # Toggle literal mode
-                        literal_mode = False
-                    else:
-                        # Append anything else
-                        value_tokens.append(c)
-                else:
-                    # Outside the quotes
-                    if c == " ":
-                        # At end of namelist
-                        no_chars_allowed = True
-                    elif c == '"':
-                        # Toggle literal mode
-                        literal_mode = True
-                    elif c == ",":
-                        value = "".join(value_tokens)
-                        pos += 1
-                        break
-                    else:
-                        if no_chars_allowed:
-                            raise Exception
-                        else:
-                            value_tokens.append(c)
-                pos += 1
-                if pos >= len_line:
-                    raise Exception(
-                        f"End of line reached | {pos} | char {c} | tokens {value_tokens} | nca {no_chars_allowed}"
-                    )
-
-            if literal_mode:
-                raise Exception
-
-            # l.debug(f'>>NM key: {key}')
-            # l.debug(f'>>NM value: {value}')
-            return key, value
-
         # Main nameloop iteration
         nm_dict = {}
         pos = pos_end
-        while pos < len(line):
+        while pos < len_line:
             if line[pos] == " ":
                 # skip
                 pos += 1
@@ -839,7 +842,7 @@ def _read_header_fullstream(file: IO[bytes], sdds: SDDSFile, mode: str, endianne
                     # unrecognized command end
                     raise Exception
             else:
-                k, v = __parse_namelist_entry()
+                k, v, pos = _parse_namelist_entry(line, pos)
                 nm_dict[k] = v
 
         logger.debug(">Parse result %s | %s", command, nm_dict)
@@ -927,14 +930,12 @@ def _read_header_v2(file: IO[bytes], sdds: SDDSFile, mode: str, endianness: str)
     version_line = file.readline(10).decode("ascii").rstrip()
     namelist_idx = 1
     if version_line[:4] != "SDDS" or len(version_line) != 5:
-        raise AttributeError(
-            f"Header parsing failed on line {namelist_idx}: {repr(version_line)} is not a valid version"
-        )
+        raise AttributeError(f"Header parsing failed on line {namelist_idx}: {version_line!r} is not a valid version")
 
     try:
         sdds_version = int(version_line[4])
-    except Exception:
-        raise AttributeError(f"Unrecognized SDDS version: {version_line[5]}")
+    except ValueError:
+        raise AttributeError(f"Unrecognized SDDS version: {version_line[4]!r}") from None
 
     if sdds_version > 5 or sdds_version < 1:
         raise ValueError(f"This package only supports SDDS version 5 or lower, file is version {sdds_version}")
@@ -1011,8 +1012,8 @@ def _read_header_v2(file: IO[bytes], sdds: SDDSFile, mode: str, endianness: str)
 
         try:
             tags, keys, values = tokenize_namelist(line)
-        except Exception as ex:
-            raise SDDSReadError(f'Failed to parse namelist from "{repr(line)}" ({ex=})')
+        except Exception as ex:  # hand-written tokenizer, any failure means a malformed namelist
+            raise SDDSReadError(f'Failed to parse namelist from "{line!r}" ({ex=})') from ex
 
         assert len(tags) == 2, f"Invalid tags {tags}"
         assert tags[1] == "&end", f"Invalid tags {tags}"
@@ -1222,7 +1223,6 @@ def _read_pages_binary(
 
     if sdds.data.column_major_order != 0:
         logger.debug("Data is in column-major order - no special handling required")
-        pass
     elif columns_all_numeric and sdds._meta_fixed_rowcount:
         # Numeric types but fixed rows - have to parse row by row
         logger.debug("All columns numeric and data is row order -> reading whole rows")
@@ -1482,7 +1482,7 @@ def _read_pages_binary(
                         page_size_actual = row
                         fixed_rowcount_eof = True
                         if len(byte_array) > 0:
-                            logger.debug(f"Have leftover bytes {repr(byte_array)} in fixed rowcount mode, ignoring")
+                            logger.debug(f"Have leftover bytes {byte_array!r} in fixed rowcount mode, ignoring")
                         break
                     else:
                         raise ValueError(f"Unexpected EOF at row {row}")
@@ -1684,7 +1684,7 @@ def _read_pages_binary(
                 for j in range(len(el.data)):
                     # If struct parser was used, data is already native, otherwise need to flip
                     el.data[j] = el.data[j].astype(columns_store_type[i], copy=False)
-        logging.info(f"Data converted to native {sys.byteorder}-endian format, disable for max performance")
+        logger.info(f"Data converted to native {sys.byteorder}-endian format, disable for max performance")
     sdds.n_pages = page_stored_idx
 
 
@@ -1758,7 +1758,7 @@ def _read_pages_ascii_mixed_lines(
                     if TRACE:
                         logger.debug(
                             f">>PARS | p {file.tell()} | {par_idx=} | {parameters_type[par_idx]} "
-                            f"| {repr(b_array)} | {value} | {parameters[par_idx].type}"
+                            f"| {b_array!r} | {value} | {parameters[par_idx].type}"
                         )
                 else:
                     # Primitive types
@@ -1766,7 +1766,7 @@ def _read_pages_ascii_mixed_lines(
                     if TRACE:
                         logger.debug(
                             f">>PARV | p {file.tell()} | {par_idx=} | {parameters_type[par_idx]} "
-                            f"| {repr(b_array)} | {value} | {parameters[par_idx].type}"
+                            f"| {b_array!r} | {value} | {parameters[par_idx].type}"
                         )
                 parameters[par_idx].data.append(value)
             par_idx += 1
@@ -1801,7 +1801,7 @@ def _read_pages_ascii_mixed_lines(
                         raise Exception(f">>ARRV | {file.tell()} | unexpected EOF at page {page_idx}")
                     values = split_sdds(b_array, posix=True)
                     logger.debug(
-                        f">>ARRV | {file.tell()} | {array_idx=} | {mapped_t} | {repr(b_array)} | {values} | {n_elements=} | {n_lines_read=}"
+                        f">>ARRV | {file.tell()} | {array_idx=} | {mapped_t} | {b_array!r} | {values} | {n_elements=} | {n_lines_read=}"
                     )
                     n_elements_read += len(values)
                     line_values.append(values)
@@ -1824,7 +1824,7 @@ def _read_pages_ascii_mixed_lines(
                     values = np.fromstring(b_array, dtype=mapped_t, sep=" ", count=-1)
                     if TRACE:
                         logger.debug(
-                            f">>ARRV | {file.tell()} | {array_idx=} | {mapped_t} | {repr(b_array)} | {values} | {n_elements=} | {n_lines_read=}"
+                            f">>ARRV | {file.tell()} | {array_idx=} | {mapped_t} | {b_array!r} | {values} | {n_elements=} | {n_lines_read=}"
                         )
                     n_elements_read += len(values)
                     line_values.append(values)
@@ -1868,29 +1868,29 @@ def _read_pages_ascii_mixed_lines(
             # Because read_table will consume too much if allowed to touch file, have to copy out a single page
             # TODO: see if maybe wrapping file will have higher perf
             lines = [file.readline().decode("ascii") for i in range(page_size)]
-            buf = io.StringIO("\n".join((l for l in lines if not l.startswith("!"))))
+            buf = io.StringIO("\n".join(l for l in lines if not l.startswith("!")))
             # buf = io.StringIO('\n'.join(lines))
             # lines = [file.readline() for i in range(page_size)]
             # buf = io.BytesIO(b''.join(lines))
-            opts = dict(
-                sep=r"\s+",
-                comment="!",
-                header=None,
-                escapechar="\\",
-                nrows=page_size,
-                skip_blank_lines=True,
-                skipinitialspace=True,
-                doublequote=False,
-                dtype=pd_column_dict,
-                engine="c",
-                float_precision="round_trip",  # the default C float parser is off by 1 ulp for some values
-                low_memory=False,
-                na_filter=False,
-                na_values=None,
-                quotechar='"',
-                quoting=csv.QUOTE_NONNUMERIC,
-                keep_default_na=False,
-            )
+            opts = {
+                "sep": r"\s+",
+                "comment": "!",
+                "header": None,
+                "escapechar": "\\",
+                "nrows": page_size,
+                "skip_blank_lines": True,
+                "skipinitialspace": True,
+                "doublequote": False,
+                "dtype": pd_column_dict,
+                "engine": "c",
+                "float_precision": "round_trip",  # the default C float parser is off by 1 ulp for some values
+                "low_memory": False,
+                "na_filter": False,
+                "na_values": None,
+                "quotechar": '"',
+                "quoting": csv.QUOTE_NONNUMERIC,
+                "keep_default_na": False,
+            }
             # iowrap = io.TextIOWrapper(file, encoding='ascii')
             # df = pd.read_table(iowrap, **opts)
             # iowrap.detach()
@@ -1922,11 +1922,10 @@ def _read_pages_ascii_mixed_lines(
                         raise ValueError(f"Unexpected empty string at position {file.tell()}")
 
                     col_idx_active = 0
-                    col_idx = 0
                     values = _split_ascii_row(line)
                     if TRACE:
                         logger.debug(f">COL ROW {row} | {len(values)}: {values=}")
-                    for c in sdds.columns:
+                    for col_idx, c in enumerate(sdds.columns):
                         if columns_mask[col_idx]:
                             conv = columns_conv[col_idx]
                             if conv is None:
@@ -1937,7 +1936,6 @@ def _read_pages_ascii_mixed_lines(
                             if TRACE:
                                 logger.debug(f">>CR {row=} | {c.name}:{value}")
                             col_idx_active += 1
-                        col_idx += 1
 
             # Assign data to the columns
             if not page_skip:
@@ -1974,11 +1972,10 @@ def _read_pages_ascii_mixed_lines(
                     if row_cnt > 1e7:
                         raise SDDSReadError(f"Read more than {row_cnt} rows - something is wrong")
                     col_idx_active = 0
-                    col_idx = 0
                     values = _split_ascii_row(line.strip())
                     if TRACE:
                         logger.debug(f">C ({file.tell()}) | {len(values)}: {values=}")
-                    for c in sdds.columns:
+                    for col_idx, c in enumerate(sdds.columns):
                         if columns_mask[col_idx]:
                             conv = columns_conv[col_idx]
                             if conv is None:
@@ -1989,7 +1986,6 @@ def _read_pages_ascii_mixed_lines(
                             if TRACE:
                                 logger.debug(f">>C ({file.tell()}) | {c.name}:{value}")
                             col_idx_active += 1
-                        col_idx += 1
                     row_cnt += 1
 
             # Assign data to the columns
@@ -2135,7 +2131,7 @@ def _read_pages_ascii_mixed_lines(
                     else:
                         raise SDDSReadError(f"Unexpected \\r without \\n at {file.tell()}")
                 else:
-                    logger.debug(f"Found character {repr(next_char)} at {file.tell()}, continuing to next page")
+                    logger.debug(f"Found character {next_char!r} at {file.tell()}, continuing to next page")
                     break
             else:
                 break
@@ -2259,14 +2255,14 @@ def _read_pages_ascii_numeric_lines(
                     value = _decode_ascii_text_parameter(b_array, parameters[par_idx].type)
                     if TRACE:
                         logger.debug(
-                            f">>PARS | pos {file.tell()} | {par_idx=} | {parameter_types[par_idx]} | {repr(b_array)} | {value}"
+                            f">>PARS | pos {file.tell()} | {par_idx=} | {parameter_types[par_idx]} | {b_array!r} | {value}"
                         )
                 else:
                     # Primitive types
                     value = np.fromstring(b_array, dtype=parameter_types[par_idx], sep=" ", count=1)[0]
                     if TRACE:
                         logger.debug(
-                            f">>PARV | pos {file.tell()} | {par_idx=} | {parameter_types[par_idx]} | {repr(b_array)} | {value}"
+                            f">>PARV | pos {file.tell()} | {par_idx=} | {parameter_types[par_idx]} | {b_array!r} | {value}"
                         )
                 parameter_data.append(value)
                 par_idx += 1
@@ -2305,7 +2301,7 @@ def _read_pages_ascii_numeric_lines(
                         raise Exception(f">>ARRV | {file.tell()} | unexpected EOF at page {page_idx}")
                     values = split_sdds(b_array, posix=True)
                     logger.debug(
-                        f">>ARRV | {file.tell()} | {array_idx=} | {mapped_t} | {repr(b_array)} | {values} | {n_elements=} | {n_lines_read=}"
+                        f">>ARRV | {file.tell()} | {array_idx=} | {mapped_t} | {b_array!r} | {values} | {n_elements=} | {n_lines_read=}"
                     )
                     n_elements_read += len(values)
                     line_values.append(values)
@@ -2328,7 +2324,7 @@ def _read_pages_ascii_numeric_lines(
                     values = np.fromstring(b_array, dtype=mapped_t, sep=" ", count=-1)
                     if TRACE:
                         logger.debug(
-                            f">>ARRV | {file.tell()} | {array_idx=} | {mapped_t} | {repr(b_array)} | {values} | {n_elements=} | {n_lines_read=}"
+                            f">>ARRV | {file.tell()} | {array_idx=} | {mapped_t} | {b_array!r} | {values} | {n_elements=} | {n_lines_read=}"
                         )
                     n_elements_read += len(values)
                     line_values.append(values)
@@ -2439,23 +2435,23 @@ def _read_pages_ascii_numeric_lines(
                         _parse_small_page(lines, page_idx)
                 else:
                     buf = io.StringIO("\n".join(lines))
-                    opts = dict(
-                        sep=r"\s+",
-                        comment="!",
-                        header=None,
-                        escapechar="\\",
-                        nrows=page_size,
-                        skip_blank_lines=True,
-                        skipinitialspace=True,
-                        doublequote=False,
-                        dtype=pd_column_dict,
-                        engine="c",
-                        float_precision="round_trip",  # the default C float parser is off by 1 ulp for some values
-                        low_memory=False,
-                        na_filter=False,
-                        na_values=None,
-                        keep_default_na=False,
-                    )
+                    opts = {
+                        "sep": r"\s+",
+                        "comment": "!",
+                        "header": None,
+                        "escapechar": "\\",
+                        "nrows": page_size,
+                        "skip_blank_lines": True,
+                        "skipinitialspace": True,
+                        "doublequote": False,
+                        "dtype": pd_column_dict,
+                        "engine": "c",
+                        "float_precision": "round_trip",  # the default C float parser is off by 1 ulp for some values
+                        "low_memory": False,
+                        "na_filter": False,
+                        "na_values": None,
+                        "keep_default_na": False,
+                    }
                     df = pd.read_table(buf, encoding="ascii", **opts)
                     # Assign data to the columns (pandas parsed every column, so index by file column)
                     if not page_skip:
@@ -2486,7 +2482,7 @@ def _read_pages_ascii_numeric_lines(
                         line_cnt += 1
                         yield l
 
-                buf = io.StringIO("\n".join((line for line in gen())))
+                buf = io.StringIO("\n".join(line for line in gen()))
                 logger.debug(f">>C {file.tell()} | Feeding buffer {cnt=} {line_cnt=} to parse_table")
                 if line_cnt == 0:
                     # Page ended immediately - pandas cannot parse an empty buffer
@@ -2494,23 +2490,23 @@ def _read_pages_ascii_numeric_lines(
                     if not page_skip:
                         _append_empty_columns(page_idx)
                 else:
-                    opts = dict(
-                        sep=r"\s+",
-                        comment="!",
-                        header=None,
-                        escapechar="\\",
-                        nrows=line_cnt,
-                        skip_blank_lines=True,
-                        skipinitialspace=True,
-                        doublequote=False,
-                        dtype=pd_column_dict,
-                        engine="c",
-                        float_precision="round_trip",  # the default C float parser is off by 1 ulp for some values
-                        low_memory=False,
-                        na_filter=False,
-                        na_values=None,
-                        keep_default_na=False,
-                    )
+                    opts = {
+                        "sep": r"\s+",
+                        "comment": "!",
+                        "header": None,
+                        "escapechar": "\\",
+                        "nrows": line_cnt,
+                        "skip_blank_lines": True,
+                        "skipinitialspace": True,
+                        "doublequote": False,
+                        "dtype": pd_column_dict,
+                        "engine": "c",
+                        "float_precision": "round_trip",  # the default C float parser is off by 1 ulp for some values
+                        "low_memory": False,
+                        "na_filter": False,
+                        "na_values": None,
+                        "keep_default_na": False,
+                    }
                     df = pd.read_table(buf, encoding="ascii", **opts)
                     # Assign data to the columns
                     if not page_skip:
