@@ -516,3 +516,26 @@ def test_read_no_row_counts_mixed_no_columns_selected():
     sdds = pysdds.read(io.BytesIO(src), cols=[], pages=[1])
     assert sdds.n_pages == 1
     assert sdds.par("p").data == [2]
+
+
+@pytest.mark.parametrize("with_string_column", [False, True])
+def test_read_ascii_lenient_numeric_cells_and_octal_escapes(with_string_column):
+    """int cells like 3.0 stay readable, longdouble keeps its precision, octal escapes are exactly 3 digits"""
+    extra_col = b"&column name=s, type=string, &end\n" if with_string_column else b""
+    extra_val = b' "\\0011"' if with_string_column else b""
+    src = (
+        b"SDDS1\n"
+        b"&parameter name=ps, type=string, &end\n"
+        b"&column name=i, type=long, &end\n"
+        b"&column name=g, type=longdouble, &end\n" + extra_col + b"&data mode=ascii, &end\n"
+        b'"\\1012"\n'
+        b"1\n"
+        b"3.0 1.000000000000000001e+00" + extra_val + b"\n"
+    )
+    sdds = pysdds.read(io.BytesIO(src), allow_longdouble=True)
+    assert sdds.par("ps").data == ["A2"]
+    assert sdds.col("i").data[0].tolist() == [3]
+    assert sdds.col("g").data[0][0] == np.longdouble("1.000000000000000001")
+    assert sdds.col("g").data[0][0] != np.longdouble(1.0)
+    if with_string_column:
+        assert sdds.col("s").data[0][0] == "\x011"

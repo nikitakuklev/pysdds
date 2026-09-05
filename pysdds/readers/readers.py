@@ -86,6 +86,23 @@ _ASCII_NUMERIC_PARSE_METHOD = "read_table"  # 'fromtxt'
 _ASCII_SMALL_PAGE_ROWS = 1000
 
 
+def _int_lenient(s: str) -> int:
+    try:
+        return int(s)
+    except ValueError:
+        # e.g. "3.0" in an integer column - the previous prefix-scanning parser accepted this too
+        return int(float(s))
+
+
+def _ascii_cell_converter(numpy_type):
+    """Python-level converter for one ASCII numeric cell of the given numpy dtype string"""
+    dt = np.dtype(numpy_type)
+    if dt.kind == "f":
+        # float() would silently round longdouble to binary64
+        return np.longdouble if dt.itemsize > 8 else float
+    return _int_lenient
+
+
 def _split_ascii_row(line: str) -> List[str]:
     """Tokenize one ASCII data row. Rows without quotes or escapes (the vast majority) split on whitespace
     exactly like the lexer would, at a fraction of the cost."""
@@ -1703,9 +1720,7 @@ def _read_pages_ascii_mixed_lines(
     assert object in columns_type
     # Per-cell converters: Python float/int assign straight into the preallocated arrays, a few times cheaper
     # than np.fromstring per value and without creating a numpy scalar each time
-    columns_conv = [
-        None if t is object else (float if np.issubdtype(np.dtype(t), np.floating) else int) for t in columns_type
-    ]
+    columns_conv = [None if t is object else _ascii_cell_converter(t) for t in columns_type]
     struct_type = None
     if n_columns > 0:
         logger.debug(f"Column types: {columns_type}")
@@ -1868,6 +1883,7 @@ def _read_pages_ascii_mixed_lines(
                 doublequote=False,
                 dtype=pd_column_dict,
                 engine="c",
+                float_precision="round_trip",  # the default C float parser is off by 1 ulp for some values
                 low_memory=False,
                 na_filter=False,
                 na_values=None,
@@ -2166,7 +2182,7 @@ def _read_pages_ascii_numeric_lines(
         columns_type = []
         # columns_store_type = []
 
-    columns_conv = [float if np.issubdtype(np.dtype(t), np.floating) else int for t in columns_type]
+    columns_conv = [_ascii_cell_converter(t) for t in columns_type]
 
     def _parse_small_page(lines, pg_idx):
         # Plain split-and-convert into preallocated arrays; only for small pages where pandas setup dominates
@@ -2434,6 +2450,7 @@ def _read_pages_ascii_numeric_lines(
                         doublequote=False,
                         dtype=pd_column_dict,
                         engine="c",
+                        float_precision="round_trip",  # the default C float parser is off by 1 ulp for some values
                         low_memory=False,
                         na_filter=False,
                         na_values=None,
@@ -2488,6 +2505,7 @@ def _read_pages_ascii_numeric_lines(
                         doublequote=False,
                         dtype=pd_column_dict,
                         engine="c",
+                        float_precision="round_trip",  # the default C float parser is off by 1 ulp for some values
                         low_memory=False,
                         na_filter=False,
                         na_values=None,
