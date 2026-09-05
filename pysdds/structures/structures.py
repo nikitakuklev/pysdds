@@ -1146,16 +1146,21 @@ class SDDSFile:
             for i, (k, v) in enumerate(parameter_dict.items()):
                 assert isinstance(v, list), f"Data of parameter [{k}] is not a list"
                 assert len(v) == n_pages, f"Length {len(v)} of parameter {k} different from page count {n_pages}"
-                namelist = {"name": k, "type": constants._PYTHON_TYPE_INV[type(v[0])]}
-                par = Parameter(namelist, sdds)
-                sdds.parameters.append(par)
                 if isinstance(v[0], str):
-                    par.data = list(np.array(v, dtype=object))
+                    sdds_type = "string"
+                    data = list(np.array(v, dtype=object))
                 else:
-                    arr = np.array(v)
+                    # Infer from the numpy dtype so both Python and numpy scalars are accepted
+                    arr = np.asarray(v)
                     if arr.dtype == np.dtype(np.int64):
                         arr = arr.astype(np.int32)
-                    par.data = list(arr)
+                    if arr.dtype not in constants._NUMPY_DTYPES_INV or arr.dtype == object:
+                        raise ValueError(f"Parameter [{k}] values of dtype {arr.dtype} are not supported")
+                    sdds_type = constants._NUMPY_DTYPES_INV[arr.dtype]
+                    data = list(arr)
+                par = Parameter({"name": k, "type": sdds_type}, sdds)
+                sdds.parameters.append(par)
+                par.data = data
 
         # fill other pages
         for page_idx in range(1, len(df_list)):
@@ -1179,6 +1184,7 @@ class SDDSFile:
         sdds.data = Data({"mode": mode})
         sdds.n_columns = len(sdds.columns)
         sdds.n_parameters = len(sdds.parameters)
+        sdds.endianness = endianness
         sdds.set_mode(mode)
         sdds.n_pages = n_pages
         return sdds

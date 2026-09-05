@@ -41,3 +41,23 @@ def test_character_fixed_value_parameter():
     assert sdds.par("c").fixed_value == "a"
     assert sdds.par("c").data == ["a", "a"]
     assert sdds.par("c").compare(sdds.copy().par("c"), eps=1e-9)
+
+
+def test_from_df_numpy_scalar_parameters_and_endianness():
+    import numpy as np
+    import pandas as pd
+
+    df = pd.DataFrame({"x": [1.0, 2.0]})
+    params = {"f": [np.float64(1.5)], "i": [np.int32(3)], "n": [4], "s": ["abc"]}
+    sdds = pysdds.SDDSFile.from_df([df], parameter_dict=params, mode="binary", endianness="big")
+    assert [p.type for p in sdds.parameters] == ["double", "long", "long", "string"]
+    assert sdds.endianness == "big"
+
+    buf = io.BytesIO()
+    pysdds.write(sdds, buf)
+    assert b"!# big-endian" in buf.getvalue()
+    sdds2 = pysdds.read(io.BytesIO(buf.getvalue()))
+    assert sdds2.par("f").data == [1.5]
+    assert sdds2.par("i").data == [3]
+    assert sdds2.par("n").data == [4]
+    assert sdds2.par("s").data == ["abc"]
