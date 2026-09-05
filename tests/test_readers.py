@@ -441,3 +441,11 @@ def test_read_ascii_numeric_no_row_counts_crlf():
     assert sdds.n_pages == 2
     assert [v.tolist() for v in sdds.col("x").data] == [[1.0, 2.0], [3.0]]
     assert sdds.par("p").data == [1, 2]
+
+
+def test_read_header_whitespace_around_equals():
+    src = b'SDDS1\n&column name = x, type =double, description= "a b", &end\n&data mode = ascii, &end\n1\n1.0\n'
+    sdds = pysdds.read(io.BytesIO(src))
+    assert sdds.column_names == ["x"]
+    assert sdds.col("x").nm == {"name": "x", "type": "double", "description": "a b"}
+    assert sdds.col("x").data[0].tolist() == [1.0]

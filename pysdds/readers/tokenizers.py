@@ -65,8 +65,11 @@ def tokenize_namelist(line):
                 # print('k', j)
                 if line[j] == "=":
                     kv_key_section = False
-                    keys.append(line[i:j])
+                    # Tolerate whitespace around '=' (e.g. "name = x")
+                    keys.append(line[i:j].rstrip())
                     j += 1
+                    while j < len(line) and line[j] in delimiters:
+                        j += 1
                     i = j
                 else:
                     j += 1
