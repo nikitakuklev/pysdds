@@ -431,25 +431,14 @@ class IncrementalWriter:
         n_rows = len(data_arrays[0])
         logger.debug(f"Writing {n_rows} rows to page {self.current_page}")
 
-        # Numeric columns are converted to the declared byte order once and sliced as bytes per row
-        page_data = []
-        for i, el in enumerate(self.sdds.columns):
-            t = el.type
-            arr = data_arrays[i]
-            if t == "string":
-                page_data.append((arr, None))
-            elif t == "character":
-                page_data.append((arr.astype("S1").tobytes(), 1))
-            else:
-                page_data.append((arr.astype(self.column_types[i], copy=False).tobytes(), self.column_lengths[i]))
-
-        file = self.file
-        for row in range(n_rows):
-            for buf, size in page_data:
-                if size is None:
-                    self._write_str_binary(buf[row])
-                else:
-                    file.write(buf[row * size : (row + 1) * size])
+        _write_rows_row_major(
+            self.file,
+            data_arrays,
+            [el.type for el in self.sdds.columns],
+            self.column_types,
+            n_rows,
+            self._write_str_binary,
+        )
 
     def close(self):
         if self.write_stage not in [WriterState.READY_FOR_NEXT_PAGE, WriterState.WRITING_PAGE]:
@@ -462,6 +451,39 @@ class IncrementalWriter:
         logger.debug("Closing write stream")
         _close_write_streams(self.file, self._raw_file, self.filepath)
         self.write_stage = WriterState.CLOSED
+
+
+def _write_rows_row_major(file, arrays, sdds_types, numpy_dtypes, n_rows, write_str):
+    """Write column arrays interleaved row by row.
+
+    Without string columns the page is packed into one structured array (fields in declared byte order,
+    characters as S1) and written in a single call - one page-sized copy, same as the per-column buffers
+    it replaces, but no Python loop. With string columns, lengths vary per cell, so rows are written one by one.
+    """
+    if "string" not in sdds_types:
+        dt = np.dtype([(f"f{i}", "S1" if t == "character" else numpy_dtypes[i]) for i, t in enumerate(sdds_types)])
+        rec = np.empty(n_rows, dtype=dt)
+        for i, (arr, t) in enumerate(zip(arrays, sdds_types)):
+            rec[f"f{i}"] = arr.astype("S1") if t == "character" else arr
+        file.write(rec)
+        return
+
+    # Numeric columns are converted to the declared byte order once and sliced as bytes per row
+    # (a numpy scalar would be written in native order)
+    page_data = []
+    for arr, t, dtype in zip(arrays, sdds_types, numpy_dtypes):
+        if t == "string":
+            page_data.append((arr, None))
+        elif t == "character":
+            page_data.append((arr.astype("S1").tobytes(), 1))
+        else:
+            page_data.append((arr.astype(dtype, copy=False).tobytes(), dtype.itemsize))
+    for row in range(n_rows):
+        for buf, size in page_data:
+            if size is None:
+                write_str(buf[row])
+            else:
+                file.write(buf[row * size : (row + 1) * size])
 
 
 def _close_write_streams(file, raw_file, target):
@@ -943,22 +965,12 @@ def _dump_data_binary(sdds: SDDSFile, file: IO[bytes], endianness):
                     # astype (not view) to ensure byte order conversion for non-native endianness
                     file.write(col_data.astype(column_types[i]))
         else:
-            # Row-major: interleave columns row by row. Numeric columns are converted to the declared byte
-            # order once and then sliced as bytes per row (a numpy scalar would be written in native order).
-            page_data = []
-            for i, el in enumerate(sdds.columns):
-                t = el.type
-                if t == "string":
-                    page_data.append((el.data[page_idx], None))
-                elif t == "character":
-                    page_data.append((el.data[page_idx].astype("S1").tobytes(), 1))
-                else:
-                    page_data.append(
-                        (el.data[page_idx].astype(column_types[i], copy=False).tobytes(), column_lengths[i])
-                    )
-            for row in range(page_size):
-                for buf, size in page_data:
-                    if size is None:
-                        _write_str(buf[row])
-                    else:
-                        file.write(buf[row * size : (row + 1) * size])
+            # Row-major: interleave columns row by row
+            _write_rows_row_major(
+                file,
+                [el.data[page_idx] for el in sdds.columns],
+                [el.type for el in sdds.columns],
+                column_types,
+                page_size,
+                _write_str,
+            )
