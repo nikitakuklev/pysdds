@@ -34,10 +34,15 @@ jobs:
       matrix:
         python-version: ["3.8", "3.9", "3.10", "3.12", "3.14"]
         pandas-version: ["<3", ">=3"]
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest]
         exclude:
           - python-version: "3.14"
             pandas-version: "<3"
+          # apple silicon runners have no 3.8/3.9 builds
+          - os: macos-latest
+            python-version: "3.8"
+          - os: macos-latest
+            python-version: "3.9"
           - python-version: "3.10"
             pandas-version: ">=3"
           - python-version: "3.8"
