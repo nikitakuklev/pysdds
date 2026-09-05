@@ -463,6 +463,7 @@ def test_from_df_multipage_int_columns(mode):
     sdds2 = pysdds.read(io.BytesIO(buf.getvalue()))
     assert [v.tolist() for v in sdds2.col("i").data] == [[1, 2], [3]]
     assert sdds2.col("i").data[1].dtype == np.int64
+    assert sdds2 == sdds2.copy()
 
 
 def test_sddsfile_write_respects_overwrite(tmp_path):

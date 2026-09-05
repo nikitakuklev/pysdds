@@ -778,7 +778,7 @@ class SDDSFile:
         Two files are considered same if all data matches exactly
         See compare() for comparison with tolerance
         """
-        self.compare(other, eps=None)
+        return self.compare(other, eps=None)
 
     def copy(self, data=True, deep=True):
         """
