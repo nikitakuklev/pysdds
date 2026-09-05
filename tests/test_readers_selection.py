@@ -13,7 +13,7 @@ import pysdds
 from pysdds.structures import Array
 
 N_PAGES = 3
-ROWS = [5, 0, 7]  # middle page is empty
+ROWS = [5, 0, 1200]  # middle page is empty; last page is above the small-page threshold of the numeric parser
 
 
 def _cell(p, k, r):
