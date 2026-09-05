@@ -108,39 +108,49 @@ def test_col_empty_shortcut(file_root):
 
 
 @pytest.mark.parametrize("file_root", file_twi)
-def test_col_empty_perf(file_root):
-    root = logging.getLogger()
-    for handler in root.handlers:
-        root.removeHandler(handler)
-    logging.basicConfig(
-        level=logging.DEBUG,
-        # format='%(asctime)s %(processName)-10s %(name)s %(levelname)-8s %(message)s', #[%(name)s]
-        format="[%(levelname)-5.5s][%(asctime)s.%(msecs)03d %(filename)10s %(lineno)4s] %(message)s",
-        datefmt="%H:%M:%S",
-        force=True,
-    )
-
-    def best_of(n_repeats, **kwargs):
-        # Minimum over repeats is robust to scheduler noise and GC pauses; the reads are ~1 ms each so a
-        # single ten-iteration total is easily swayed by state left over from earlier tests in the session
-        best = float("inf")
-        for _ in range(n_repeats):
-            t0 = time.perf_counter()
-            for _ in range(5):
-                pysdds.read(file_root, **kwargs)
-            best = min(best, time.perf_counter() - t0)
-        return best
-
-    pysdds.read(file_root, cols=[], pages=[0])
-    pysdds.read(file_root, pages=[0])
-    t_empty = best_of(7, cols=[], pages=[0])
-    t_full = best_of(7, pages=[0])
-    logging.getLogger(__name__).info(f"Empty cols read time: {t_empty:.6f}s vs full read time: {t_full:.6f}s")
-    assert t_full > t_empty
+def test_col_empty_read(file_root):
+    """Reading with cols=[] still yields the header and page bookkeeping of a file with string columns"""
+    sdds = pysdds.read(file_root, cols=[], pages=[0])
+    assert sdds.n_pages == 1
+    assert sdds.n_columns == 18
+    assert all(not c._enabled for c in sdds.columns)
     sdds = pysdds.read(file_root, pages=[0])
     assert sdds.n_pages == 1
     assert sdds.n_columns == 18
     sdds.validate_data()
+
+
+def test_col_empty_perf():
+    """Skipping the columns of an all-numeric binary page must be much cheaper than parsing it.
+
+    Rows with string columns have to be walked to find the string lengths even when nothing is stored, so the
+    shortcut is only a clear win for numeric pages, where it is a seek. Timed from memory so disk caching and
+    platform IO speed play no role.
+    """
+    n_rows = 400_000  # ~25 MB per page so parsing dominates the fixed per-read cost
+    df = pd.DataFrame({f"c{i}": np.arange(n_rows, dtype=np.float64) * (i + 1) for i in range(8)})
+    sdds = pysdds.SDDSFile.from_df([df, df], mode="binary")
+    buf = io.BytesIO()
+    pysdds.write(sdds, buf)
+    src = buf.getvalue()
+
+    def best_of(n_repeats, **kwargs):
+        # Minimum over repeats is robust to scheduler noise and GC pauses
+        best = float("inf")
+        for _ in range(n_repeats):
+            t0 = time.perf_counter()
+            for _ in range(3):
+                pysdds.read(io.BytesIO(src), **kwargs)
+            best = min(best, time.perf_counter() - t0)
+        return best
+
+    t_empty = best_of(5, cols=[], pages=[0])
+    t_full = best_of(5, pages=[0])
+    logging.getLogger(__name__).info(f"Empty cols read time: {t_empty:.6f}s vs full read time: {t_full:.6f}s")
+    assert t_full > 2 * t_empty
+    sdds2 = pysdds.read(io.BytesIO(src), pages=[0])
+    assert sdds2.n_pages == 1
+    assert np.array_equal(sdds2.col("c3").data[0], df["c3"].values)
 
 
 def _make_multipage_sdds(mode, n_pages=5, mixed=False):
