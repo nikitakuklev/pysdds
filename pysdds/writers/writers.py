@@ -283,7 +283,7 @@ class IncrementalWriter:
                 file.write(d.to_bytes(4, self.endianness))
             t = el.type
             if t == "string":
-                for s in array_data[i]:
+                for s in array_data[i].ravel():
                     self._write_str_binary(s)
             elif t == "character":
                 file.write(array_data[i].astype("S1").view(self.NUMPY_DTYPE["character"]))
@@ -314,7 +314,7 @@ class IncrementalWriter:
                 file.write(d.to_bytes(4, self.endianness))
             t = el.type
             if t == "string":
-                for s in array_data[i]:
+                for s in array_data[i].ravel():
                     self._write_str_binary(s)
             elif t == "character":
                 file.write(array_data[i].astype("S1").view(self.NUMPY_DTYPE["character"]))
@@ -669,12 +669,14 @@ def _dump_data_ascii(sdds: SDDSFile, file: IO[bytes], best_settings):
             for i, el in enumerate(sdds.arrays):
                 data = el.data[page_idx]
                 append(" ".join([str(i) for i in data.shape]) + f" ! {len(data.shape)}-dimensional array {el.name}")
+                # Elements are written flat in C order regardless of dimensionality
+                flat = data.ravel()
                 if el.type == "string":
-                    sl = [encode_if_needed(v) for v in data]
+                    sl = [encode_if_needed(v) for v in flat]
                 elif el.type == "double":
-                    sl = [f"{v:.15e}" for v in data]
+                    sl = [f"{v:.15e}" for v in flat]
                 else:
-                    sl = [str(v) for v in data]
+                    sl = [str(v) for v in flat]
                 append(" ".join(sl))
 
             if len(sdds.columns) > 0:
@@ -859,7 +861,7 @@ def _dump_data_binary(sdds: SDDSFile, file: IO[bytes], endianness):
                 file.write(d.to_bytes(4, endianness))
             t = el.type
             if t == "string":
-                for s in el.data[page_idx]:
+                for s in el.data[page_idx].ravel():
                     _write_str(s)
             elif t == "character":
                 file.write(el.data[page_idx].astype("S1").view(NUMPY_DTYPE["character"]))

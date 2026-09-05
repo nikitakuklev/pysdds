@@ -1308,7 +1308,8 @@ def _read_pages_binary(
 
             if type_len is None:
                 # Strings need special treatment
-                data_array = np.empty(dimensions, dtype=object) if flag else None
+                # Filled with a flat C-order index, reshaped to the declared dimensions once complete
+                data_array = np.empty(n_elements, dtype=object) if flag else None
                 for j in range(n_elements):
                     byte_array = file.read(4)
                     assert len(byte_array) == 4
@@ -1326,7 +1327,7 @@ def _read_pages_binary(
                         if flag:
                             data_array[j] = string_bytes.decode("ascii")
                 if flag:
-                    arrays[i].data.append(data_array)
+                    arrays[i].data.append(data_array.reshape(dimensions))
             else:
                 # Should read the right number of bytes or EOF
                 data_bytes = file.read(type_len * n_elements)

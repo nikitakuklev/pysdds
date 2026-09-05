@@ -427,3 +427,26 @@ def test_binary_parameters_byte_order(endianness, column_major_order):
     assert sdds2.par("r").data[0] == 2.5
     assert np.array_equal(sdds2.col("x").data[0], [1.0, 2.0])
     assert np.array_equal(sdds2.col("i").data[0], [3, 4])
+
+
+@pytest.mark.parametrize("mode", ["ascii", "binary"])
+def test_write_multidimensional_arrays(mode):
+    """2-D numeric and string arrays must be written flat in C order and read back with the same shape"""
+    src = (
+        b"SDDS1\n"
+        b"&array name=a, type=double, dimensions=2, &end\n"
+        b"&array name=s, type=string, dimensions=2, &end\n"
+        b"&data mode=ascii, &end\n"
+        b"2 3\n"
+        b"1 2 3 4 5 6\n"
+        b"2 2\n"
+        b'a "b c" d ""\n'
+    )
+    sdds = pysdds.read(io.BytesIO(src))
+    sdds.set_mode(mode)
+    buf = io.BytesIO()
+    pysdds.write(sdds, buf, use_best_settings=False)
+
+    sdds2 = pysdds.read(io.BytesIO(buf.getvalue()))
+    assert np.array_equal(sdds2.arrays[0].data[0], np.arange(1, 7, dtype=float).reshape(2, 3))
+    assert sdds2.arrays[1].data[0].tolist() == [["a", "b c"], ["d", ""]]
