@@ -61,3 +61,22 @@ def test_from_df_numpy_scalar_parameters_and_endianness():
     assert sdds2.par("i").data == [3]
     assert sdds2.par("n").data == [4]
     assert sdds2.par("s").data == ["abc"]
+
+
+def test_write_from_scratch_without_data_namelist():
+    """Objects built with add_column/add_parameter and no set_mode() call must still write a readable file"""
+    import numpy as np
+
+    for mode in ("binary", "ascii"):
+        sdds = pysdds.SDDSFile()  # data namelist is None here
+        sdds.mode = mode
+        sdds.add_column("x", "double", data=[np.array([1.0, 2.0])])
+        sdds.add_parameter("p", "double", data=[1.5])
+        sdds.n_pages = 1
+        buf = io.BytesIO()
+        pysdds.write(sdds, buf)
+        assert sdds.data is None  # caller's object untouched
+        sdds2 = pysdds.read(io.BytesIO(buf.getvalue()))
+        assert sdds2.mode == mode
+        assert sdds2.par("p").data == [1.5]
+        assert np.array_equal(sdds2.col("x").data[0], [1.0, 2.0])

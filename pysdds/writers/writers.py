@@ -13,7 +13,7 @@ from typing import IO, List, Optional, Union
 import numpy as np
 import pandas as pd
 
-from pysdds.structures import SDDSFile
+from pysdds.structures import Data, SDDSFile
 from pysdds.util.constants import (
     _NUMPY_DTYPE_BE,
     _NUMPY_DTYPE_LE,
@@ -76,6 +76,7 @@ def write(
     if compression not in [None, "auto", "xz", "gz", "bz2"]:
         raise ValueError(f"SDDS compression ({compression}) is not recognized")
 
+    sdds = _ensure_data_namelist(sdds)
     sdds.validate_data()
 
     endianness = sdds.endianness
@@ -120,6 +121,16 @@ def write(
     # logger.debug(f'Columns numeric: {is_columns_numeric}')
 
 
+def _ensure_data_namelist(sdds: SDDSFile) -> SDDSFile:
+    """Return an SDDSFile whose &data namelist exists and carries the object's mode (shallow copy if changed)"""
+    if sdds.data is not None and "mode" in sdds.data.nm:
+        return sdds
+    sdds = copy.copy(sdds)
+    sdds.data = Data() if sdds.data is None else copy.deepcopy(sdds.data)
+    sdds.set_mode(sdds.mode)
+    return sdds
+
+
 class WriterState(Enum):
     UNINITIALIZED = 0
     READY_FOR_NEXT_PAGE = 1
@@ -151,6 +162,8 @@ class IncrementalWriter:
 
         if compression not in [None, "auto", "xz", "gz", "bz2"]:
             raise ValueError(f"SDDS compression ({compression}) is not recognized")
+
+        sdds = _ensure_data_namelist(sdds)
 
         if sdds.data.lines_per_row != 1:
             raise NotImplementedError("lines_per_row != 1 is not yet supported")

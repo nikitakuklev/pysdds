@@ -581,6 +581,8 @@ class Data:
 
     def to_sdds(self):
         nm = self.nm.copy()
+        # mode is mandatory in the namelist; fall back to the default so the header is always readable
+        nm.setdefault("mode", self.mode)
         if self.mode == "ascii":
             nm.pop("endian", None)
         return f"&data {_namelist_to_str(nm, omit_defaults={'lines_per_row': 1})}, &end"
