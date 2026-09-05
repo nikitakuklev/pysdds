@@ -424,3 +424,20 @@ def test_read_ascii_numeric_comment_inside_column_data():
     sdds = pysdds.read(io.BytesIO(src))
     assert sdds.n_pages == 2
     assert [v.tolist() for v in sdds.col("x").data] == [[1.0, 2.0], [3.0, 4.0]]
+
+
+def test_read_ascii_numeric_no_row_counts_crlf():
+    """Empty-line page terminator must be recognised with Windows line endings in the numeric parser"""
+    src = (
+        b"SDDS1\r\n"
+        b"&parameter name=p, type=long, &end\r\n"
+        b"&column name=x, type=double, &end\r\n"
+        b"&data mode=ascii, no_row_counts=1, &end\r\n"
+        b"1\r\n1.0\r\n2.0\r\n"
+        b"\r\n"
+        b"2\r\n3.0\r\n"
+    )
+    sdds = pysdds.read(io.BytesIO(src))
+    assert sdds.n_pages == 2
+    assert [v.tolist() for v in sdds.col("x").data] == [[1.0, 2.0], [3.0]]
+    assert sdds.par("p").data == [1, 2]

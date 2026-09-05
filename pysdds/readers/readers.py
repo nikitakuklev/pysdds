@@ -2335,7 +2335,7 @@ def _read_pages_ascii_numeric_lines(
 
                 def gen():
                     l = __get_next_line(file, accept_meta_commands=False, strip=False, replace_tabs=True)
-                    if l == "\n" or l is None:
+                    if l is None or l == "\n" or l == "\r\n":
                         return
                     yield l
 
@@ -2423,7 +2423,7 @@ def _read_pages_ascii_numeric_lines(
                             strip=False,
                             replace_tabs=True,
                         )
-                        if l == "\n" or l is None:
+                        if l is None or l == "\n" or l == "\r\n":
                             return
                         l.strip()
                         cnt += len(l)
