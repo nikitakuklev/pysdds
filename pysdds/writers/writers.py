@@ -94,10 +94,11 @@ def write(
     t_start = time.perf_counter()
 
     if isinstance(filepath, Path):
-        file = _open_write_file(filepath, compression=compression, overwrite_ok=overwrite)
+        file, raw_file = _open_write_file(filepath, compression=compression, overwrite_ok=overwrite)
     else:
-        # IO is already a stream
+        # IO is already a stream - only a compression wrapper (if any) is ours to close
         file = _open_write_stream(filepath, compression=compression)
+        raw_file = None
 
     if use_best_settings:
         sdds = copy.copy(sdds)
@@ -107,14 +108,17 @@ def write(
         sdds.data.nm["column_major_order"] = 1 if mode == "binary" else 0
         sdds.data.__use_best_settings = True
 
-    _dump_header(sdds, file)
-    # logger.info(f'Header write OK')
+    try:
+        _dump_header(sdds, file)
+        # logger.info(f'Header write OK')
 
-    if sdds.n_pages > 0:
-        if mode == "ascii":
-            _dump_data_ascii(sdds, file, best_settings=use_best_settings)
-        else:
-            _dump_data_binary(sdds, file, endianness)
+        if sdds.n_pages > 0:
+            if mode == "ascii":
+                _dump_data_ascii(sdds, file, best_settings=use_best_settings)
+            else:
+                _dump_data_binary(sdds, file, endianness)
+    finally:
+        _close_write_streams(file, raw_file, filepath)
 
     logger.debug(f"Written in {(time.perf_counter() - t_start) * 1e3:.3f} ms")
     # is_columns_numeric = not any(el.type == 'string' for el in sdds.columns)
@@ -123,7 +127,7 @@ def write(
 
 def _ensure_data_namelist(sdds: SDDSFile) -> SDDSFile:
     """Return an SDDSFile whose &data namelist exists and carries the object's mode (shallow copy if changed)"""
-    if sdds.data is not None and "mode" in sdds.data.nm:
+    if sdds.data is not None and sdds.data.nm.get("mode") == sdds.mode:
         return sdds
     sdds = copy.copy(sdds)
     sdds.data = Data() if sdds.data is None else copy.deepcopy(sdds.data)
@@ -262,10 +266,13 @@ class IncrementalWriter:
         t_start = time.perf_counter()
 
         if isinstance(self.filepath, Path):
-            file = _open_write_file(self.filepath, compression=self.compression, overwrite_ok=self.overwrite)
+            file, self._raw_file = _open_write_file(
+                self.filepath, compression=self.compression, overwrite_ok=self.overwrite
+            )
         else:
             # IO is already a stream
             file = _open_write_stream(self.filepath, compression=self.compression)
+            self._raw_file = None
         self.file = file
         _dump_header(self.sdds, file, ignore_fixed_rowcount=False)
         self.write_stage = WriterState.READY_FOR_NEXT_PAGE
@@ -303,7 +310,8 @@ class IncrementalWriter:
             elif t == "character":
                 file.write(array_data[i].astype("S1").view(self.NUMPY_DTYPE["character"]))
             else:
-                file.write(array_data[i].view(self.NUMPY_DTYPE[t]))
+                # astype (not view) so the bytes match the declared endianness
+                file.write(array_data[i].astype(self.NUMPY_DTYPE[t]))
 
     def _new_page_binary_fixed_rowcount(
         self, parameter_data: List[Union[str, int, float]], array_data: List[np.ndarray]
@@ -334,7 +342,8 @@ class IncrementalWriter:
             elif t == "character":
                 file.write(array_data[i].astype("S1").view(self.NUMPY_DTYPE["character"]))
             else:
-                file.write(array_data[i].view(self.NUMPY_DTYPE[t]))
+                # astype (not view) so the bytes match the declared endianness
+                file.write(array_data[i].astype(self.NUMPY_DTYPE[t]))
 
     def _end_page_binary(self):
         if self.write_method == "fixed_rowcount":
@@ -451,11 +460,23 @@ class IncrementalWriter:
             self.end_page()
 
         logger.debug("Closing write stream")
-        self.file.close()
+        _close_write_streams(self.file, self._raw_file, self.filepath)
         self.write_stage = WriterState.CLOSED
 
 
+def _close_write_streams(file, raw_file, target):
+    """Close what the writer opened: the compression wrapper (flushes its trailer), then our own file handle.
+    A stream supplied by the caller is left open."""
+    if file is not target:
+        file.close()
+    if raw_file is not None and raw_file is not file:
+        raw_file.close()
+
+
 def _open_write_stream(stream: BytesIO, compression: str = None):
+    if compression == "auto":
+        logger.debug("Compression 'auto' on a stream target - writing uncompressed")
+        compression = None
     if compression is not None and compression not in ["xz", "gz", "bz2"]:
         raise ValueError(f"Compression format ({compression}) is not recognized")
     buffered_stream = stream
@@ -502,6 +523,11 @@ def _open_write_file(filepath: Path, compression: str = None, overwrite_ok: bool
     # if not filepath.is_file():
     #    raise IOError(f'File ({filepath}) does not exist or cannot be read')
 
+    if compression == "auto":
+        # Same extension rules as the reader
+        extension = filepath.suffix.strip(".")
+        compression = {"xz": "xz", "7z": "xz", "lzma": "xz", "gz": "gz", "bz2": "bz2"}.get(extension)
+        logger.debug(f"Auto compression resolved as ({compression}) from file extension")
     if compression is not None and compression not in ["xz", "gz", "bz2"]:
         raise ValueError(f"Compression format ({compression}) is not recognized")
 
@@ -519,16 +545,13 @@ def _open_write_file(filepath: Path, compression: str = None, overwrite_ok: bool
             import bz2
 
             stream = bz2.open(buffered_stream, "wb")
-        elif compression == "zip":
-            import zipfile
-
-            stream = zipfile.ZipFile(buffered_stream, "w")
         else:
             stream = buffered_stream
         if TRACE:
             logger.debug(f"File stream: {buffered_stream}")
             logger.debug(f"Final stream: {stream}")
-        return stream
+        # Compression wrappers do not close the underlying file, so hand both back
+        return stream, buffered_stream
     except IOError as ex:
         logger.exception(f"File {str(filepath)} IO failed")
         raise ex

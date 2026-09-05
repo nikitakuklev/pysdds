@@ -493,23 +493,29 @@ class _KeepOpenBytesIO(io.BytesIO):
         pass
 
 
+@pytest.mark.parametrize("endianness", ["little", "big"])
 @pytest.mark.parametrize("n_rows_declared", [3, 10])
-def test_streaming_writer_fixed_rowcount_round_trip(n_rows_declared):
-    """Fixed-rowcount pages: exact row count and early EOF, with a character column"""
+def test_streaming_writer_fixed_rowcount_round_trip(n_rows_declared, endianness):
+    """Fixed-rowcount pages: exact row count and early EOF, character column, numeric array in both byte orders"""
     sdds = pysdds.SDDSFile(add_data_nm=True)
     sdds.set_mode("binary")
+    sdds.set_endianness(endianness)
+    sdds.arrays.append(pysdds.structures.Array({"name": "a", "type": "double"}, sdds))
+    sdds.n_arrays = 1
     sdds.add_column("x", "double")
     sdds.add_column("c", "character")
     buf = _KeepOpenBytesIO()
     w = sdds.get_streaming_writer(buf)
     w.binary_fixed_rowcount = n_rows_declared
     w.begin()
-    w.new_page([], [])
+    w.new_page([], [np.array([1.5, 2.5])])
     w.write_rows([np.array([1.0, 2.0, 3.0]), np.array(["a", " ", "c"], dtype=object)])
     w.close()
 
     sdds2 = pysdds.read(io.BytesIO(buf.getvalue()))
     assert sdds2.n_pages == 1
+    assert sdds2.endianness == endianness
+    assert np.array_equal(sdds2.arrays[0].data[0], [1.5, 2.5])
     assert np.array_equal(sdds2.col("x").data[0], [1.0, 2.0, 3.0])
     assert list(sdds2.col("c").data[0]) == ["a", " ", "c"]
 
@@ -565,3 +571,29 @@ def test_ascii_character_values_escaped():
     assert list(sdds2.arrays[0].data[0]) == chars
     assert list(sdds2.col("c").data[0]) == chars
     assert np.array_equal(sdds2.col("x").data[0], np.arange(len(chars), dtype=float))
+
+
+def test_write_closes_files_and_auto_compression(tmp_path):
+    """write() must close what it opened (compressed trailers flushed) and infer compression from the extension"""
+    import gzip
+
+    sdds = pysdds.SDDSFile.from_df([pd.DataFrame({"x": [1.0, 2.0]})])
+    target = tmp_path / "out.sdds.gz"
+    pysdds.write(sdds, target, compression="auto")
+    with gzip.open(target, "rb") as f:
+        assert f.read().startswith(b"SDDS")
+    assert np.array_equal(pysdds.read(target).col("x").data[0], [1.0, 2.0])
+
+    # Caller-owned stream: the gzip wrapper is closed (trailer written), the stream itself stays open
+    buf = io.BytesIO()
+    pysdds.write(sdds, buf, compression="gz")
+    assert not buf.closed
+    assert gzip.decompress(buf.getvalue()).startswith(b"SDDS")
+
+    # Header mode must follow the object's mode even if the data namelist disagrees
+    sdds.set_mode("ascii")
+    sdds.data.nm["mode"] = "binary"
+    buf = io.BytesIO()
+    pysdds.write(sdds, buf)
+    assert b"&data mode=ascii" in buf.getvalue()
+    assert np.array_equal(pysdds.read(io.BytesIO(buf.getvalue())).col("x").data[0], [1.0, 2.0])
