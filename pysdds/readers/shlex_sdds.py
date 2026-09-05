@@ -211,6 +211,13 @@ class shlex_sdds:
                     token += nextchar
             elif state in self.escape:
                 if not nextchar:  # end of file
+                    if escaped_octal_mode:
+                        # Octal escape terminated by end of input, e.g. a trailing "\040"
+                        token += chr(int(octal_buffer, 8))
+                        escaped_octal_mode = False
+                        octal_buffer = ""
+                        state = escapedstate
+                        continue
                     if self.debug >= 2:
                         print("shlex: I see EOF in escape state")
                     # XXX what error should be raised here?

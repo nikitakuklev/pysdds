@@ -313,6 +313,21 @@ def test_read_zero_row_page(mode, column_major_order, no_row_counts, mixed):
     assert np.array_equal(sdds2.col("x").data[2], [3.0])
 
 
+def test_read_ascii_trailing_character_column_octal():
+    """Character column written as an octal escape in the last position of a row"""
+    src = (
+        b"SDDS1\n"
+        b"&column name=x, type=double, &end\n"
+        b"&column name=c, type=character, &end\n"
+        b"&data mode=ascii, &end\n"
+        b"2\n"
+        b"1.5 \\040\n"
+        b"2.5 b\n"
+    )
+    sdds = pysdds.read(io.BytesIO(src))
+    assert list(sdds.col("c").data[0]) == [" ", "b"]
+
+
 def test_read_all_sdds_types_header_only():
     """Verify header parsing of all SDDS types works on every platform
     (no longdouble data is actually parsed, just the header)."""
