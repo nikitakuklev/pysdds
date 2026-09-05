@@ -400,6 +400,10 @@ def read(
         if header_only:
             return sdds
 
+        if sdds.data is None:
+            # Header-only file (e.g. description and fixed-value parameters) - nothing else to parse
+            return sdds
+
         # Handle the longdouble mess conservatively
         if (
             any(el.type == "longdouble" for el in sdds.parameters)
@@ -871,9 +875,9 @@ def _read_header_fullstream(file: IO[bytes], sdds: SDDSFile, mode: str, endianne
         else:
             raise ValueError(f"Unrecognized namelist command {command} on line {line_num}")
 
-    if sdds.columns or sdds.parameters or sdds.arrays:
+    if sdds.columns or sdds.arrays or any(p.fixed_value is None for p in sdds.parameters):
         if sdds.data is None:
-            raise AttributeError("SDDS file contains columns, arrays, or parameters - &data namelist is required")
+            raise SDDSReadError("SDDS file contains columns, arrays, or parameters - &data namelist is required")
 
     sdds.n_parameters = len(sdds.parameters)
     sdds.n_arrays = len(sdds.arrays)
@@ -919,6 +923,9 @@ def _read_header_v2(file: IO[bytes], sdds: SDDSFile, mode: str, endianness: str)
             cut_midline_comments=False,
         )  # file.readline().decode('ascii')
         line_cnt = 0
+        if line is None:
+            # EOF - header ended without a &data namelist
+            return None
         if accept_meta_commands and line.startswith("!#"):
             return buffer.strip()
         else:
@@ -941,6 +948,9 @@ def _read_header_v2(file: IO[bytes], sdds: SDDSFile, mode: str, endianness: str)
     meta_endianness_set = False
     while True:
         line = __find_next_namelist(file, accept_meta_commands=True)
+        if line is None:
+            # No &data namelist - legal only if the file carries no per-page data (checked below)
+            break
         # line = file.readline().decode('ascii').strip('\n')
         # len_line = len(line)
         namelist_idx += 1
@@ -1056,9 +1066,9 @@ def _read_header_v2(file: IO[bytes], sdds: SDDSFile, mode: str, endianness: str)
         else:
             raise ValueError(f"Unrecognized namelist command {command} on line {namelist_idx}")
 
-    if sdds.columns or sdds.parameters or sdds.arrays:
+    if sdds.columns or sdds.arrays or any(p.fixed_value is None for p in sdds.parameters):
         if sdds.data is None:
-            raise AttributeError("SDDS file contains columns, arrays, or parameters - &data namelist is required")
+            raise SDDSReadError("SDDS file contains columns, arrays, or parameters - &data namelist is required")
 
     sdds.n_parameters = len(sdds.parameters)
     sdds.n_arrays = len(sdds.arrays)

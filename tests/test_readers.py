@@ -449,3 +449,15 @@ def test_read_header_whitespace_around_equals():
     assert sdds.column_names == ["x"]
     assert sdds.col("x").nm == {"name": "x", "type": "double", "description": "a b"}
     assert sdds.col("x").data[0].tolist() == [1.0]
+
+
+def test_read_header_without_data_namelist():
+    """&data is optional when the file has only a description and fixed-value parameters"""
+    src = b'SDDS1\n&description text="header only", &end\n&parameter name=p, type=double, fixed_value=1.5, &end\n'
+    sdds = pysdds.read(io.BytesIO(src))
+    assert sdds.data is None
+    assert sdds.n_pages == 0
+    assert sdds.par("p").fixed_value == 1.5
+
+    with pytest.raises(pysdds.util.errors.SDDSReadError):
+        pysdds.read(io.BytesIO(src + b"&column name=x, type=double, &end\n"))
