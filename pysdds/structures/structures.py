@@ -1154,9 +1154,8 @@ class SDDSFile:
                     data = list(np.array(v, dtype=object))
                 else:
                     # Infer from the numpy dtype so both Python and numpy scalars are accepted
+                    # int64 stays long64 (consistent with columns) rather than being truncated to 32 bits
                     arr = np.asarray(v)
-                    if arr.dtype == np.dtype(np.int64):
-                        arr = arr.astype(np.int32)
                     if arr.dtype not in constants._NUMPY_DTYPES_INV or arr.dtype == object:
                         raise ValueError(f"Parameter [{k}] values of dtype {arr.dtype} are not supported")
                     sdds_type = constants._NUMPY_DTYPES_INV[arr.dtype]
