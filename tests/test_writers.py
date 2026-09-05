@@ -531,3 +531,32 @@ def test_streaming_writer_with_fixed_value_parameter():
     assert sdds2.par("p").data == [2.5]
     assert sdds2.par("s").data == ["abc"]
     assert np.array_equal(sdds2.col("x").data[0], [1.0, 2.0])
+
+
+def test_ascii_character_values_escaped():
+    """Characters that are special to the ASCII tokenizer must be escaped in parameters, arrays and columns"""
+    chars = [" ", '"', "\\", "!", "\t", "a"]
+    src = (
+        b"SDDS1\n"
+        b"&parameter name=p, type=character, &end\n"
+        b"&array name=a, type=character, &end\n"
+        b"&column name=c, type=character, &end\n"
+        b"&column name=x, type=double, &end\n"
+        b"&data mode=ascii, &end\n"
+    )
+    sdds = pysdds.read(io.BytesIO(src), header_only=True)
+    sdds.data = pysdds.structures.Data({"mode": "ascii"})
+    sdds.par("p").data = ['"']
+    sdds.arrays[0].data = [np.array(chars, dtype=object)]
+    sdds.col("c").data = [np.array(chars, dtype=object)]
+    sdds.col("x").data = [np.arange(len(chars), dtype=float)]
+    sdds.n_pages = 1
+    sdds.set_mode("ascii")
+    buf = io.BytesIO()
+    pysdds.write(sdds, buf)
+
+    sdds2 = pysdds.read(io.BytesIO(buf.getvalue()))
+    assert sdds2.par("p").data == ['"']
+    assert list(sdds2.arrays[0].data[0]) == chars
+    assert list(sdds2.col("c").data[0]) == chars
+    assert np.array_equal(sdds2.col("x").data[0], np.arange(len(chars), dtype=float))

@@ -607,9 +607,13 @@ def _dump_data_ascii(sdds: SDDSFile, file: IO[bytes], best_settings):
 
     def encode_char_if_needed(s):
         assert len(s) == 1
-        if 32 <= ord(s) < 127:
+        if s in ("\\", '"', "!"):
+            # Would otherwise be read as escape, quote, or comment
+            return "\\" + s
+        elif 32 < ord(s) < 127:
             return s
         else:
+            # Space, control characters, and DEL as octal so the token stays intact
             return f"\\{ord(s):03o}"
 
     # if _ASCII_TEXT_WRITE_METHOD == 'sequential':
@@ -692,6 +696,8 @@ def _dump_data_ascii(sdds: SDDSFile, file: IO[bytes], best_settings):
                 flat = data.ravel()
                 if el.type == "string":
                     sl = [encode_if_needed(v) for v in flat]
+                elif el.type == "character":
+                    sl = [encode_char_if_needed(v) for v in flat]
                 elif el.type == "double":
                     sl = [f"{v:.15e}" for v in flat]
                 else:
@@ -708,6 +714,8 @@ def _dump_data_ascii(sdds: SDDSFile, file: IO[bytes], best_settings):
                         v = c.data[page_idx][i]
                         if c.type == "string":
                             sl.append(encode_if_needed(v))
+                        elif c.type == "character":
+                            sl.append(encode_char_if_needed(v))
                         elif c.type == "double":
                             sl.append(f"{v:.15e}")
                         else:
