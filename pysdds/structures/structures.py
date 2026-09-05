@@ -803,11 +803,14 @@ class SDDSFile:
 
         if not data:
             for p in sdds2.parameters:
-                p.data = []
+                # Fixed-value parameters have no stored data (setter would refuse)
+                if p.fixed_value is None:
+                    p.data = []
             for a in sdds2.arrays:
                 a.data = []
             for c in sdds2.columns:
                 c.data = []
+                c._page_numbers = []
             sdds2.n_pages = 0
 
         return sdds2
