@@ -461,7 +461,8 @@ def read(
         if DEBUG2:
             logger.debug(f"Page mask: {pages_mask} (actual page count TBD)")
 
-        is_columns_numeric = not any(el.type == "string" for el in sdds.columns)
+        # Character columns need the token-based parser too - they map to object dtype, not a numeric one
+        is_columns_numeric = not any(el.type in ("string", "character") for el in sdds.columns)
         if DEBUG2:
             logger.debug(f"Columns numeric: {is_columns_numeric}")
 

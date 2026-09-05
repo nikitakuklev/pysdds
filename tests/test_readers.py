@@ -259,6 +259,27 @@ def test_read_all_sdds_types():
     assert list(sdds.columns[9].data[1]) == ["six", "seven", "eight"]
 
 
+def test_read_ascii_character_column_without_string_columns():
+    """Character columns are not numeric and must go through the token parser even when no string column exists"""
+    src = (
+        b"SDDS1\n"
+        b"&column name=c, type=character, &end\n"
+        b"&column name=x, type=double, &end\n"
+        b"&column name=n, type=long, &end\n"
+        b"&data mode=ascii, &end\n"
+        b"3\n"
+        b"a 1.5 1\n"
+        b"\\040 2.5 2\n"
+        b'\\" 3.5 3\n'
+    )
+    sdds = pysdds.read(io.BytesIO(src))
+    sdds.validate_data()
+    assert sdds.n_pages == 1
+    assert list(sdds.col("c").data[0]) == ["a", " ", '"']
+    assert np.array_equal(sdds.col("x").data[0], np.array([1.5, 2.5, 3.5]))
+    assert np.array_equal(sdds.col("n").data[0], np.array([1, 2, 3], dtype=np.int32))
+
+
 def test_read_all_sdds_types_header_only():
     """Verify header parsing of all SDDS types works on every platform
     (no longdouble data is actually parsed, just the header)."""
