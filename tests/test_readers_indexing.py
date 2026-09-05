@@ -120,16 +120,24 @@ def test_col_empty_perf(file_root):
         force=True,
     )
 
-    sdds = pysdds.read(file_root, cols=[], pages=[0])
-    t1 = time.perf_counter()
-    for i in range(10):
-        sdds = pysdds.read(file_root, cols=[], pages=[0])
-    t2 = time.perf_counter()
-    for i in range(10):
-        sdds = pysdds.read(file_root, pages=[0])
-    t3 = time.perf_counter()
-    logging.info(f"Empty cols read time: {t2 - t1:.6f}s vs full read time: {t3 - t2:.6f}s")
-    assert t3 - t2 > t2 - t1
+    def best_of(n_repeats, **kwargs):
+        # Minimum over repeats is robust to scheduler noise and GC pauses; the reads are ~1 ms each so a
+        # single ten-iteration total is easily swayed by state left over from earlier tests in the session
+        best = float("inf")
+        for _ in range(n_repeats):
+            t0 = time.perf_counter()
+            for _ in range(5):
+                pysdds.read(file_root, **kwargs)
+            best = min(best, time.perf_counter() - t0)
+        return best
+
+    pysdds.read(file_root, cols=[], pages=[0])
+    pysdds.read(file_root, pages=[0])
+    t_empty = best_of(7, cols=[], pages=[0])
+    t_full = best_of(7, pages=[0])
+    logging.info(f"Empty cols read time: {t_empty:.6f}s vs full read time: {t_full:.6f}s")
+    assert t_full > t_empty
+    sdds = pysdds.read(file_root, pages=[0])
     assert sdds.n_pages == 1
     assert sdds.n_columns == 18
     sdds.validate_data()
