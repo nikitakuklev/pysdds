@@ -1034,7 +1034,8 @@ class SDDSFile:
         if description is not None:
             nm["description"] = description
         if fixed_value is not None:
-            nm["fixed_value"] = fixed_value
+            # Namelist values are strings, exactly as the header parser would produce them
+            nm["fixed_value"] = fixed_value if isinstance(fixed_value, str) else str(fixed_value)
         par = Parameter(nm, self)
         if data is not None:
             par.data = data
