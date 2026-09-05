@@ -134,8 +134,9 @@ class shlex_sdds:
         token = ""
         state = " "
         octal_pushback = deque()
+        punctuation_chars = self._punctuation_chars  # hoisted: this check runs once per character
         while True:
-            if self.punctuation_chars and self._pushback_chars:
+            if punctuation_chars and self._pushback_chars:
                 nextchar = self._pushback_chars.pop()
             else:
                 if octal_pushback:

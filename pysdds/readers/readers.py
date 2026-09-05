@@ -82,6 +82,14 @@ _ASCII_TEXT_PARSE_METHOD = "shlex"
 _ASCII_NUMERIC_PARSE_METHOD = "read_table"  # 'fromtxt'
 
 
+def _split_ascii_row(line: str) -> List[str]:
+    """Tokenize one ASCII data row. Rows without quotes or escapes (the vast majority) split on whitespace
+    exactly like the lexer would, at a fraction of the cost."""
+    if '"' in line or "\\" in line:
+        return split_sdds(line, posix=True)
+    return line.split()
+
+
 def _decode_ascii_text_parameter(line: str, sdds_type: str) -> str:
     """Decode a string or character parameter from its ASCII data line"""
     value = line.strip()
@@ -1689,6 +1697,11 @@ def _read_pages_ascii_mixed_lines(
         i: columns_store_type[i] if columns_store_type[i] is not object else str for i in range(len(columns_type))
     }
     assert object in columns_type
+    # Per-cell converters: Python float/int assign straight into the preallocated arrays, a few times cheaper
+    # than np.fromstring per value and without creating a numpy scalar each time
+    columns_conv = [
+        None if t is object else (float if np.issubdtype(np.dtype(t), np.floating) else int) for t in columns_type
+    ]
     struct_type = None
     if n_columns > 0:
         logger.debug(f"Column types: {columns_type}")
@@ -1890,16 +1903,16 @@ def _read_pages_ascii_mixed_lines(
 
                     col_idx_active = 0
                     col_idx = 0
-                    values = split_sdds(line, posix=True)
+                    values = _split_ascii_row(line)
                     if TRACE:
                         logger.debug(f">COL ROW {row} | {len(values)}: {values=}")
                     for c in sdds.columns:
                         if columns_mask[col_idx]:
-                            t = columns_type[col_idx]
-                            if t is object:
+                            conv = columns_conv[col_idx]
+                            if conv is None:
                                 value = values[col_idx]
                             else:
-                                value = np.fromstring(values[col_idx], dtype=t, count=1, sep=" ")[0]
+                                value = conv(values[col_idx])
                             columns_data[col_idx_active][row] = value
                             if TRACE:
                                 logger.debug(f">>CR {row=} | {c.name}:{value}")
@@ -1942,16 +1955,16 @@ def _read_pages_ascii_mixed_lines(
                         raise SDDSReadError(f"Read more than {row_cnt} rows - something is wrong")
                     col_idx_active = 0
                     col_idx = 0
-                    values = split_sdds(line.strip(), posix=True)
+                    values = _split_ascii_row(line.strip())
                     if TRACE:
                         logger.debug(f">C ({file.tell()}) | {len(values)}: {values=}")
                     for c in sdds.columns:
                         if columns_mask[col_idx]:
-                            t = columns_type[col_idx]
-                            if t is object:
+                            conv = columns_conv[col_idx]
+                            if conv is None:
                                 value = values[col_idx]
                             else:
-                                value = np.fromstring(values[col_idx], dtype=t, count=1, sep=" ")[0]
+                                value = conv(values[col_idx])
                             columns_list_data[col_idx_active].append(value)
                             if TRACE:
                                 logger.debug(f">>C ({file.tell()}) | {c.name}:{value}")
