@@ -1222,6 +1222,31 @@ def _read_pages_binary(
         # Most general row-order parser
         logger.debug("Not all columns numeric, data is row order -> using slow sequential parser")
 
+    # Row plan for the general parser: each run of consecutive non-string columns, together with the 4-byte
+    # length prefix of the string column that follows it, is read and unpacked in one go. This cuts the
+    # per-row Python work from one read+unpack per cell to one per segment. Entries are
+    # (Struct, byte size, [(tuple position, destination index, is_character)...], has_string, string destination)
+    row_plan = []
+    if not columns_all_numeric and sdds.data.column_major_order == 0:
+        prefix = "<" if endianness == "little" else ">"
+        dest = []  # destination (active) index per column, None if masked out
+        for i in range(n_columns):
+            dest.append(sum(columns_mask[:i]) if columns_mask[i] else None)
+        fmt = ""
+        seg_numeric = []
+        for i in range(n_columns):
+            if columns_len[i] is None:
+                st = struct.Struct(prefix + fmt + "i")
+                row_plan.append((st, st.size, seg_numeric, True, dest[i]))
+                fmt, seg_numeric = "", []
+            else:
+                if dest[i] is not None:
+                    seg_numeric.append((len(fmt.replace("16s", "x")), dest[i], columns_len[i] == 1))
+                fmt += columns_type_struct[i].lstrip("<>")
+        if fmt:
+            st = struct.Struct(prefix + fmt)
+            row_plan.append((st, st.size, seg_numeric, False, None))
+
     page_idx = 0
     page_stored_idx = 0
     page_last_active_idx = max(i for i, v in enumerate(pages_mask) if v) if pages_mask is not None else None
@@ -1542,66 +1567,41 @@ def _read_pages_binary(
                 if columns_mask[i]:
                     columns_data.append(np.empty(page_size, dtype=columns_store_type[i]))
             page_size_actual = page_size  # reduced if a fixed-rowcount file ends early
+            store = not page_skip
             for row in range(page_size):
-                idx_active = 0
                 if TRACE:
                     logger.debug(f">COL ROW {row} | {file.tell()=}")
-                for i in range(n_columns):
-                    type_len = columns_len[i]
-                    flag = columns_mask[i]
-                    if type_len is None:
-                        # string column
-                        byte_array = file.read(4)
-                        if len(byte_array) < 4:
-                            if sdds._meta_fixed_rowcount:
-                                logger.info(f"Encountered fixed rowcount file end at row {row} of {page_size}")
-                                page_size_actual = row
-                                fixed_rowcount_eof = True
-                                if len(byte_array) > 0:
-                                    raise ValueError(f"Weird leftover {byte_array}")
-                                break
-                            else:
-                                raise ValueError(f"Unexpected EOF at row {row}, column {i}")
-                        string_len_actual = int.from_bytes(byte_array, endianness, signed=True)
+                for seg_struct, seg_size, seg_numeric, has_string, str_dest in row_plan:
+                    byte_array = file.read(seg_size)
+                    if len(byte_array) < seg_size:
+                        if sdds._meta_fixed_rowcount:
+                            logger.info(f"Encountered fixed rowcount file end at row {row} of {page_size}")
+                            page_size_actual = row
+                            fixed_rowcount_eof = True
+                            if len(byte_array) > 0:
+                                raise ValueError(f"Weird leftover {byte_array}")
+                            break
+                        else:
+                            raise ValueError(f"Unexpected EOF at row {row}")
+                    values = seg_struct.unpack(byte_array)
+                    if store:
+                        for pos, d, is_char in seg_numeric:
+                            # struct 'c' yields a 1-byte bytes object; store a plain str like the other paths
+                            columns_data[d][row] = values[pos].decode("ascii") if is_char else values[pos]
+                    if has_string:
+                        string_len_actual = values[-1]
                         if string_len_actual < 0:
                             raise ValueError(
                                 f"Column string length ({string_len_actual}) is negative - file is likely corrupt"
                             )
                         assert string_len_actual <= 1000000  # sanity check
                         if string_len_actual == 0:
-                            # empty string
-                            if flag and not page_skip:
-                                columns_data[idx_active][row] = ""
-                                # l.debug(f'>>COL S {i} {file.tell()} | {columns_type[i]} | {columns_size[i]} | {s} | {columns_data[i][row]} | {b_array}')
-                                idx_active += 1
+                            if store and str_dest is not None:
+                                columns_data[str_dest][row] = ""
                         else:
                             byte_array = file.read(string_len_actual)
-                            if flag and not page_skip:
-                                columns_data[idx_active][row] = byte_array.decode("ascii")
-                                # l.debug(f'>>COL S {i} {file.tell()} | {columns_type[i]} | {columns_size[i]} | {s} | {columns_data[i][row]} | {b_array}')
-                                idx_active += 1
-                    else:
-                        # primitive type column
-                        byte_array = file.read(type_len)
-                        if len(byte_array) < type_len:
-                            if sdds._meta_fixed_rowcount:
-                                logger.info(f"Encountered fixed rowcount file end at row {row} of {page_size}")
-                                page_size_actual = row
-                                fixed_rowcount_eof = True
-                                if len(byte_array) > 0:
-                                    raise ValueError(f"Weird leftover {byte_array}")
-                                break
-                            else:
-                                raise ValueError(f"Unexpected EOF at row {row}, column {i}")
-                        if flag and not page_skip:
-                            value = columns_structs[i].unpack(byte_array)[0]
-                            # value = np.frombuffer(byte_array, dtype=mapped_t, count=1)[0]
-                            if type_len == 1:
-                                # struct 'c' yields a 1-byte bytes object; store a plain str like the other paths
-                                value = value.decode("ascii")
-                            columns_data[idx_active][row] = value
-                            # l.debug(f'>>COL {i} {file.tell()} | {columns_type[i]} | {columns_size[i]} | {s} | {columns_data[i][row]} | {b_array}')
-                            idx_active += 1
+                            if store and str_dest is not None:
+                                columns_data[str_dest][row] = byte_array.decode("ascii")
                 if TRACE:
                     logger.debug(f">COL END {row} | {file.tell()=}")
                 if fixed_rowcount_eof:
