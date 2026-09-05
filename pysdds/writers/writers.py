@@ -849,7 +849,9 @@ def _dump_data_binary(sdds: SDDSFile, file: IO[bytes], endianness):
             elif type_len == 1:
                 file.write(ord(el.data[page_idx]).to_bytes(1, endianness))
             else:
-                file.write(el.data[page_idx])
+                # Convert explicitly - a bare numpy scalar would be written in native byte order,
+                # and plain Python numbers have no buffer at all
+                file.write(np.array(el.data[page_idx], dtype=p_types[i]).tobytes())
 
         for i, el in enumerate(sdds.arrays):
             # file.write(el.data[page_idx].shape.view(NUMPY_DTYPE['character'])])

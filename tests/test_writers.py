@@ -406,3 +406,24 @@ def test_source_to_binary_logical_match_colmajor(source, ref_file):
     sdds2 = pysdds.read(io.BufferedReader(buf))
 
     ref_sdds.compare(sdds2, ignore_data_mode=True)
+
+
+@pytest.mark.parametrize("column_major_order", [0, 1])
+@pytest.mark.parametrize("endianness", ["little", "big"])
+def test_binary_parameters_byte_order(endianness, column_major_order):
+    """Parameters must be written in the declared endianness; plain Python floats must be accepted"""
+    df = pd.DataFrame({"x": [1.0, 2.0], "i": np.array([3, 4], dtype=np.int32)})
+    sdds = pysdds.SDDSFile.from_df([df], parameter_dict={"p": [1.5], "q": [7]}, mode="binary")
+    sdds.add_parameter("r", "double", data=[2.5])
+    sdds.set_endianness(endianness)
+    sdds.data.nm["column_major_order"] = column_major_order
+    buf = io.BytesIO()
+    pysdds.write(sdds, buf, use_best_settings=False)
+
+    sdds2 = pysdds.read(io.BytesIO(buf.getvalue()))
+    assert sdds2.endianness == endianness
+    assert sdds2.par("p").data[0] == 1.5
+    assert sdds2.par("q").data[0] == 7
+    assert sdds2.par("r").data[0] == 2.5
+    assert np.array_equal(sdds2.col("x").data[0], [1.0, 2.0])
+    assert np.array_equal(sdds2.col("i").data[0], [3, 4])
