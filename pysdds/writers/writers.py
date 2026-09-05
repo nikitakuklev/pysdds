@@ -409,7 +409,12 @@ class IncrementalWriter:
             assert all(isinstance(x, (str, float, int)) for x in data_arrays), (
                 f"Invalid data types in {data_arrays} for single rowrite"
             )
-            data_arrays_np = [np.array([x], dtype=self.column_types[i]) for i, x in enumerate(data_arrays)]
+            # Text cells (string/character) become object arrays like the array-input path expects;
+            # the character dtype in column_types is the on-disk int8 and cannot hold a str
+            data_arrays_np = [
+                np.array([x], dtype=object if isinstance(x, str) else self.column_types[i])
+                for i, x in enumerate(data_arrays)
+            ]
             logger.debug(f"Single row {data_arrays} converted to  {data_arrays_np}")
         else:
             data_arrays_np = data_arrays

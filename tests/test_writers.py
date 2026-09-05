@@ -509,7 +509,8 @@ def test_streaming_writer_fixed_rowcount_round_trip(n_rows_declared, endianness)
     w.binary_fixed_rowcount = n_rows_declared
     w.begin()
     w.new_page([], [np.array([1.5, 2.5])])
-    w.write_rows([np.array([1.0, 2.0, 3.0]), np.array(["a", " ", "c"], dtype=object)])
+    w.write_rows([np.array([1.0, 2.0]), np.array(["a", " "], dtype=object)])
+    w.write_rows([3.0, "c"])  # single row given as scalars
     w.close()
 
     sdds2 = pysdds.read(io.BytesIO(buf.getvalue()))
