@@ -507,3 +507,27 @@ def test_streaming_writer_fixed_rowcount_round_trip(n_rows_declared):
     assert sdds2.n_pages == 1
     assert np.array_equal(sdds2.col("x").data[0], [1.0, 2.0, 3.0])
     assert list(sdds2.col("c").data[0]) == ["a", " ", "c"]
+
+
+def test_streaming_writer_with_fixed_value_parameter():
+    """Fixed-value parameters are not written per page and must not shift the other parameters"""
+    sdds = pysdds.SDDSFile(add_data_nm=True)
+    sdds.set_mode("binary")
+    sdds.add_parameter("f", "double", fixed_value=1.0)
+    sdds.add_parameter("p", "double")
+    sdds.add_parameter("s", "string")
+    sdds.add_column("x", "double")
+    buf = _KeepOpenBytesIO()
+    w = sdds.get_streaming_writer(buf)
+    w.begin()
+    with pytest.raises(pysdds.util.errors.SDDSWriteException):
+        w.new_page([1.0, 2.5, "abc"], [])
+    w.new_page([2.5, "abc"], [])
+    w.write_rows([np.array([1.0, 2.0])])
+    w.close()
+
+    sdds2 = pysdds.read(io.BytesIO(buf.getvalue()))
+    assert sdds2.par("f").data == [1.0]
+    assert sdds2.par("p").data == [2.5]
+    assert sdds2.par("s").data == ["abc"]
+    assert np.array_equal(sdds2.col("x").data[0], [1.0, 2.0])

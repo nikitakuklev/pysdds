@@ -225,6 +225,8 @@ class IncrementalWriter:
         logger.debug(f"Parameters: {len(parameters)} of {len(sdds.parameters)}")
         logger.debug(f"Parameter types: {p_types}")
         logger.debug(f"Parameter lengths: {p_lengths}")
+        # Only parameters without fixed_value are written per page; types/lengths are indexed accordingly
+        self.parameters = parameters
         self.p_types = p_types
         self.p_lengths = p_lengths
 
@@ -280,7 +282,7 @@ class IncrementalWriter:
         page_size = self.binary_fixed_rowcount
         _write_row_count(file, page_size, self.endianness)
 
-        for i, el in enumerate(self.sdds.parameters):
+        for i, el in enumerate(self.parameters):
             type_len = self.p_lengths[i]
             if type_len is None:
                 self._write_str_binary(parameter_data[i])
@@ -311,7 +313,7 @@ class IncrementalWriter:
         _write_row_count(file, page_size, self.endianness)
         logger.debug(f"Starting page {self.current_page} with {page_size} rows in FIXED COUNT MODE")
 
-        for i, el in enumerate(self.sdds.parameters):
+        for i, el in enumerate(self.parameters):
             type_len = self.p_lengths[i]
             if type_len is None:
                 self._write_str_binary(parameter_data[i])
@@ -365,7 +367,11 @@ class IncrementalWriter:
 
         parameter_data = parameter_data or []
         array_data = array_data or []
-        assert len(parameter_data) == len(self.sdds.parameters)
+        if len(parameter_data) != len(self.parameters):
+            raise SDDSWriteException(
+                f"Expected {len(self.parameters)} parameter values (fixed-value parameters excluded), "
+                f"got {len(parameter_data)}"
+            )
         assert len(array_data) == len(self.sdds.arrays)
 
         if self.mode == "ascii":
