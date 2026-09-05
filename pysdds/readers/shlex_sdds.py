@@ -233,6 +233,12 @@ class shlex_sdds:
                         octal_pushback.append(nextchar)
                     else:
                         octal_buffer += nextchar
+                        if len(octal_buffer) == 3:
+                            # SDDS octal escapes are exactly three digits; a following digit is literal text
+                            escaped_octal_mode = False
+                            token += chr(int(octal_buffer, 8))
+                            state = escapedstate
+                            octal_buffer = ""
                 elif nextchar in self.octal_numbers:
                     escaped_octal_mode = True
                     octal_buffer += nextchar
