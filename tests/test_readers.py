@@ -476,3 +476,22 @@ def test_read_header_without_data_namelist():
 
     with pytest.raises(pysdds.util.errors.SDDSReadError):
         pysdds.read(io.BytesIO(src + b"&column name=x, type=double, &end\n"))
+
+
+@pytest.mark.parametrize("page_size", [3, 1500])
+def test_read_ascii_numeric_column_selection(page_size):
+    """Selecting a non-leading column must return that column's values on both numeric ASCII parse paths"""
+    n = page_size
+    body = "".join(f"{i}.0 {10 * i}.0 {i}\n" for i in range(n)).encode()
+    src = (
+        b"SDDS1\n"
+        b"&column name=x, type=double, &end\n"
+        b"&column name=y, type=double, &end\n"
+        b"&column name=k, type=long, &end\n"
+        b"&data mode=ascii, &end\n" + f"{n}\n".encode() + body
+    )
+    sdds = pysdds.read(io.BytesIO(src), cols=["y", "k"])
+    assert not sdds.col("x")._enabled
+    assert np.array_equal(sdds.col("y").data[0], 10.0 * np.arange(n))
+    assert np.array_equal(sdds.col("k").data[0], np.arange(n, dtype=np.int32))
+    assert sdds.col("k").data[0].dtype == np.int32

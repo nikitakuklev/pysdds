@@ -80,6 +80,10 @@ _HEADER_PARSE_METHOD = "v2"
 # _ASCII_TEXT_PARSE_METHOD = 'read_table'
 _ASCII_TEXT_PARSE_METHOD = "shlex"
 _ASCII_NUMERIC_PARSE_METHOD = "read_table"  # 'fromtxt'
+# Pages with at most this many rows are parsed in plain Python: pandas.read_table has ~0.2-0.35 ms of fixed
+# setup per call, which dominates for files made of many small pages. Measured crossover is ~800-1000 rows
+# for 2-6 numeric columns (10-row pages: 185 us with pandas vs 7 us in Python).
+_ASCII_SMALL_PAGE_ROWS = 1000
 
 
 def _split_ascii_row(line: str) -> List[str]:
@@ -2163,6 +2167,25 @@ def _read_pages_ascii_numeric_lines(
         columns_type = []
         # columns_store_type = []
 
+    columns_conv = [float if np.issubdtype(np.dtype(t), np.floating) else int for t in columns_type]
+
+    def _parse_small_page(lines, pg_idx):
+        # Plain split-and-convert into preallocated arrays; only for small pages where pandas setup dominates
+        active = [
+            (i, np.empty(len(lines), dtype=columns_type[i]), columns_conv[i])
+            for i in range(n_columns)
+            if columns_mask[i]
+        ]
+        for r, l in enumerate(lines):
+            if "!" in l:
+                l = l[: l.index("!")]
+            v = l.split()
+            for i, arr, conv in active:
+                arr[r] = conv(v[i])
+        for i, arr, _ in active:
+            columns[i].data.append(arr)
+            columns[i]._page_numbers.append(pg_idx)
+
     def _append_empty_columns(pg_idx):
         # Zero-row page - store empty arrays of the right dtype for every active column
         for ci, col in enumerate(columns):
@@ -2396,40 +2419,34 @@ def _read_pages_ascii_numeric_lines(
                     if "!" in l and l.lstrip().startswith("!"):
                         continue
                     lines.append(l)
-                buf = io.StringIO("\n".join(lines))
-                # buf = io.StringIO('\n'.join(lines))
-                # lines = [file.readline() for i in range(page_size)]
-                # buf = io.BytesIO(b''.join(lines))
-                opts = dict(
-                    sep=r"\s+",
-                    comment="!",
-                    header=None,
-                    escapechar="\\",
-                    nrows=page_size,
-                    skip_blank_lines=True,
-                    skipinitialspace=True,
-                    doublequote=False,
-                    dtype=pd_column_dict,
-                    engine="c",
-                    low_memory=False,
-                    na_filter=False,
-                    na_values=None,
-                    keep_default_na=False,
-                )
-                # iowrap = io.TextIOWrapper(file, encoding='ascii')
-                # df = pd.read_table(iowrap, **opts)
-                # iowrap.detach()
-                df = pd.read_table(buf, encoding="ascii", **opts)
-                # df = pd.read_table(file, encoding='ascii', **opts)
-                # print(df.dtypes)
-                # Assign data to the columns
-                if not page_skip:
-                    col_idx_active = 0
-                    for i, c in enumerate(sdds.columns):
-                        if columns_mask[i]:
-                            c.data.append(df.loc[:, col_idx_active].values)
-                            c._page_numbers.append(page_idx)
-                            col_idx_active += 1
+                if page_size <= _ASCII_SMALL_PAGE_ROWS:
+                    if not page_skip:
+                        _parse_small_page(lines, page_idx)
+                else:
+                    buf = io.StringIO("\n".join(lines))
+                    opts = dict(
+                        sep=r"\s+",
+                        comment="!",
+                        header=None,
+                        escapechar="\\",
+                        nrows=page_size,
+                        skip_blank_lines=True,
+                        skipinitialspace=True,
+                        doublequote=False,
+                        dtype=pd_column_dict,
+                        engine="c",
+                        low_memory=False,
+                        na_filter=False,
+                        na_values=None,
+                        keep_default_na=False,
+                    )
+                    df = pd.read_table(buf, encoding="ascii", **opts)
+                    # Assign data to the columns (pandas parsed every column, so index by file column)
+                    if not page_skip:
+                        for i, c in enumerate(sdds.columns):
+                            if columns_mask[i]:
+                                c.data.append(df.iloc[:, i].values)
+                                c._page_numbers.append(page_idx)
             elif _ASCII_NUMERIC_PARSE_METHOD == "read_table" and page_size is None:
                 # no_row_count mode
                 # TODO: exponential growth buffer
