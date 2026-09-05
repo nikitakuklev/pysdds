@@ -1404,9 +1404,11 @@ def _read_pages_binary(
         elif columns_all_numeric and sdds._meta_fixed_rowcount:
             for i in range(n_columns):
                 if columns_mask[i]:
-                    columns_data.append(np.empty(page_size, dtype=columns_store_type[i]))
+                    # struct yields 1-byte bytes for characters; collect as S1 and decode once at the end
+                    dt = "S1" if columns_len[i] == 1 else columns_store_type[i]
+                    columns_data.append(np.empty(page_size, dtype=dt))
             st = struct.Struct(combined_struct)
-            page_size_actual = None
+            page_size_actual = page_size  # reduced if a fixed-rowcount file ends early
             for row in range(page_size):
                 byte_array = file.read(combined_size)
                 if len(byte_array) < combined_size:
@@ -1458,7 +1460,8 @@ def _read_pages_binary(
         ):
             for i in range(n_columns):
                 if columns_mask[i]:
-                    columns_data.append(np.empty(page_size, dtype=columns_store_type[i]))
+                    dt = "S1" if columns_len[i] == 1 else columns_store_type[i]
+                    columns_data.append(np.empty(page_size, dtype=dt))
             st = struct.Struct(combined_struct)
             byte_array = file.read(combined_size * page_size)
             if len(byte_array) < combined_size * page_size:
@@ -1519,7 +1522,7 @@ def _read_pages_binary(
             for i in range(n_columns):
                 if columns_mask[i]:
                     columns_data.append(np.empty(page_size, dtype=columns_store_type[i]))
-            page_size_actual = None
+            page_size_actual = page_size  # reduced if a fixed-rowcount file ends early
             for row in range(page_size):
                 idx_active = 0
                 if TRACE:

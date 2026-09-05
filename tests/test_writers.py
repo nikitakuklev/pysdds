@@ -480,3 +480,29 @@ def test_sddsfile_write_respects_overwrite(tmp_path):
     buf = io.BytesIO()
     sdds.write(buf)
     assert buf.getvalue().startswith(b"SDDS")
+
+
+class _KeepOpenBytesIO(io.BytesIO):
+    def close(self):
+        pass
+
+
+@pytest.mark.parametrize("n_rows_declared", [3, 10])
+def test_streaming_writer_fixed_rowcount_round_trip(n_rows_declared):
+    """Fixed-rowcount pages: exact row count and early EOF, with a character column"""
+    sdds = pysdds.SDDSFile(add_data_nm=True)
+    sdds.set_mode("binary")
+    sdds.add_column("x", "double")
+    sdds.add_column("c", "character")
+    buf = _KeepOpenBytesIO()
+    w = sdds.get_streaming_writer(buf)
+    w.binary_fixed_rowcount = n_rows_declared
+    w.begin()
+    w.new_page([], [])
+    w.write_rows([np.array([1.0, 2.0, 3.0]), np.array(["a", " ", "c"], dtype=object)])
+    w.close()
+
+    sdds2 = pysdds.read(io.BytesIO(buf.getvalue()))
+    assert sdds2.n_pages == 1
+    assert np.array_equal(sdds2.col("x").data[0], [1.0, 2.0, 3.0])
+    assert list(sdds2.col("c").data[0]) == ["a", " ", "c"]
