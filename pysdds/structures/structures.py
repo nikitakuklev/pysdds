@@ -1083,6 +1083,7 @@ class SDDSFile:
         col = Column(nm, self)
         if data is not None:
             col.data = data
+            col._page_numbers = list(range(len(data)))
         self.columns.append(col)
         self.n_columns += 1
         return col
@@ -1144,6 +1145,7 @@ class SDDSFile:
             col = Column(namelist, sdds)
             sdds.columns.append(col)
             col.data.append(val)
+            col._page_numbers.append(0)
 
         if parameter_dict is not None:
             for i, (k, v) in enumerate(parameter_dict.items()):
@@ -1182,6 +1184,7 @@ class SDDSFile:
                         f"({sdds.columns[i].data[0].dtype})"
                     )
                 sdds.columns[i].data.append(val)
+                sdds.columns[i]._page_numbers.append(page_idx)
 
         sdds.data = Data({"mode": mode})
         sdds.n_columns = len(sdds.columns)
