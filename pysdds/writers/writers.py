@@ -15,10 +15,12 @@ import pandas as pd
 
 from pysdds.structures import Data, SDDSFile
 from pysdds.util.constants import (
+    _LONGDOUBLE_NATIVE,
     _NUMPY_DTYPE_BE,
     _NUMPY_DTYPE_LE,
     _NUMPY_DTYPE_SIZES,
 )
+from pysdds.util.conversions import encode_longdouble_fields
 from pysdds.util.errors import SDDSWriteException
 
 # The proper way to implement conditional logging is to check current level,
@@ -300,8 +302,7 @@ class IncrementalWriter:
             elif type_len == 1:
                 file.write(ord(parameter_data[i]).to_bytes(1, self.endianness))
             else:
-                arr = np.array([parameter_data[i]], dtype=self.p_types[i])
-                file.write(arr)
+                file.write(_numeric_to_bytes(parameter_data[i], el.type, self.p_types[i], self.endianness))
 
         for i, el in enumerate(self.sdds.arrays):
             # file.write(el.data[page_idx].shape.view(NUMPY_DTYPE['character'])])
@@ -314,8 +315,7 @@ class IncrementalWriter:
             elif t == "character":
                 file.write(array_data[i].astype("S1").view(self.NUMPY_DTYPE["character"]))
             else:
-                # astype (not view) so the bytes match the declared endianness
-                file.write(array_data[i].astype(self.NUMPY_DTYPE[t]))
+                file.write(_numeric_to_bytes(array_data[i], t, self.NUMPY_DTYPE[t], self.endianness))
 
     def _new_page_binary_fixed_rowcount(
         self, parameter_data: List[Union[str, int, float]], array_data: List[np.ndarray]
@@ -332,8 +332,7 @@ class IncrementalWriter:
             elif type_len == 1:
                 file.write(ord(parameter_data[i]).to_bytes(1, self.endianness))
             else:
-                arr = np.array([parameter_data[i]], dtype=self.p_types[i])
-                file.write(arr)
+                file.write(_numeric_to_bytes(parameter_data[i], el.type, self.p_types[i], self.endianness))
 
         for i, el in enumerate(self.sdds.arrays):
             # file.write(el.data[page_idx].shape.view(NUMPY_DTYPE['character'])])
@@ -346,8 +345,7 @@ class IncrementalWriter:
             elif t == "character":
                 file.write(array_data[i].astype("S1").view(self.NUMPY_DTYPE["character"]))
             else:
-                # astype (not view) so the bytes match the declared endianness
-                file.write(array_data[i].astype(self.NUMPY_DTYPE[t]))
+                file.write(_numeric_to_bytes(array_data[i], t, self.NUMPY_DTYPE[t], self.endianness))
 
     def _end_page_binary(self):
         if self.write_method == "fixed_rowcount":
@@ -416,7 +414,12 @@ class IncrementalWriter:
             # Text cells (string/character) become object arrays like the array-input path expects;
             # the character dtype in column_types is the on-disk int8 and cannot hold a str
             data_arrays_np = [
-                np.array([x], dtype=object if isinstance(x, str) else self.column_types[i])
+                np.array(
+                    [x],
+                    dtype=object
+                    if isinstance(x, str)
+                    else _row_cell_dtype(self.sdds.columns[i].type, self.column_types[i]),
+                )
                 for i, x in enumerate(data_arrays)
             ]
             logger.debug(f"Single row {data_arrays} converted to  {data_arrays_np}")
@@ -447,6 +450,7 @@ class IncrementalWriter:
             self.column_types,
             n_rows,
             self._write_str_binary,
+            self.endianness,
         )
 
     def close(self):
@@ -467,7 +471,19 @@ class IncrementalWriter:
 _ROW_MAJOR_CHUNK_BYTES = 4 << 20
 
 
-def _write_rows_row_major(file, arrays, sdds_types, numpy_dtypes, n_rows, write_str):
+def _row_cell_dtype(sdds_type: str, on_disk_dtype: np.dtype) -> np.dtype:
+    """dtype to hold a single numeric cell in memory: the on-disk one, except longdouble where that is raw bytes"""
+    return np.dtype(np.longdouble) if sdds_type == "longdouble" else on_disk_dtype
+
+
+def _numeric_to_bytes(values, sdds_type: str, dtype: np.dtype, endianness: str) -> bytes:
+    """Numeric values as bytes in the declared byte order (a bare numpy scalar would be written in native order)"""
+    if sdds_type == "longdouble" and not _LONGDOUBLE_NATIVE:
+        return encode_longdouble_fields(values, endianness)
+    return np.asarray(values).astype(dtype, copy=False).tobytes()
+
+
+def _write_rows_row_major(file, arrays, sdds_types, numpy_dtypes, n_rows, write_str, endianness):
     """Write column arrays interleaved row by row, in bounded-size chunks.
 
     Without string columns each chunk is packed into a structured array (fields in declared byte order,
@@ -487,7 +503,13 @@ def _write_rows_row_major(file, arrays, sdds_types, numpy_dtypes, n_rows, write_
             stop = min(start + chunk_rows, n_rows)
             m = stop - start
             for i, (arr, t) in enumerate(zip(arrays, sdds_types)):
-                rec[f"f{i}"][:m] = arr[start:stop].astype("S1") if t == "character" else arr[start:stop]
+                if t == "character":
+                    rec[f"f{i}"][:m] = arr[start:stop].astype("S1")
+                elif t == "longdouble" and not _LONGDOUBLE_NATIVE:
+                    packed = encode_longdouble_fields(arr[start:stop], endianness)
+                    rec[f"f{i}"][:m] = np.frombuffer(packed, dtype=numpy_dtypes[i])
+                else:
+                    rec[f"f{i}"][:m] = arr[start:stop]
             file.write(rec[:m])
         return
 
@@ -502,7 +524,7 @@ def _write_rows_row_major(file, arrays, sdds_types, numpy_dtypes, n_rows, write_
             elif t == "character":
                 chunk_data.append((arr[start:stop].astype("S1").tobytes(), 1))
             else:
-                chunk_data.append((arr[start:stop].astype(dtype, copy=False).tobytes(), dtype.itemsize))
+                chunk_data.append((_numeric_to_bytes(arr[start:stop], t, dtype, endianness), dtype.itemsize))
         for row in range(stop - start):
             for buf, size in chunk_data:
                 if size is None:
@@ -958,9 +980,7 @@ def _dump_data_binary(sdds: SDDSFile, file: IO[bytes], endianness):
             elif type_len == 1:
                 file.write(ord(el.data[page_idx]).to_bytes(1, endianness))
             else:
-                # Convert explicitly - a bare numpy scalar would be written in native byte order,
-                # and plain Python numbers have no buffer at all
-                file.write(np.array(el.data[page_idx], dtype=p_types[i]).tobytes())
+                file.write(_numeric_to_bytes(el.data[page_idx], el.type, p_types[i], endianness))
 
         for i, el in enumerate(sdds.arrays):
             # file.write(el.data[page_idx].shape.view(NUMPY_DTYPE['character'])])
@@ -973,8 +993,7 @@ def _dump_data_binary(sdds: SDDSFile, file: IO[bytes], endianness):
             elif t == "character":
                 file.write(el.data[page_idx].astype("S1").view(NUMPY_DTYPE["character"]))
             else:
-                # astype (not view) to ensure byte order conversion for non-native endianness
-                file.write(el.data[page_idx].astype(NUMPY_DTYPE[t]))
+                file.write(_numeric_to_bytes(el.data[page_idx], t, NUMPY_DTYPE[t], endianness))
 
         if sdds.data.column_major_order:
             # Column-major: write each column as a contiguous block
@@ -987,8 +1006,7 @@ def _dump_data_binary(sdds: SDDSFile, file: IO[bytes], endianness):
                 elif t == "character":
                     file.write(col_data.astype("S1").view(dtype=NUMPY_DTYPE["character"]))
                 else:
-                    # astype (not view) to ensure byte order conversion for non-native endianness
-                    file.write(col_data.astype(column_types[i]))
+                    file.write(_numeric_to_bytes(col_data, t, column_types[i], endianness))
         else:
             # Row-major: interleave columns row by row
             _write_rows_row_major(
@@ -998,4 +1016,5 @@ def _dump_data_binary(sdds: SDDSFile, file: IO[bytes], endianness):
                 column_types,
                 page_size,
                 _write_str,
+                endianness,
             )

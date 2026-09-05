@@ -189,10 +189,6 @@ def test_masked_string_array_does_not_corrupt_columns():
         )
 
 
-@pytest.mark.skipif(
-    np.dtype(np.longdouble) == np.dtype(np.float64),
-    reason="longdouble == float64 on this platform (e.g. Windows), cannot parse 80-bit floats",
-)
 def test_read_all_sdds_types():
     """Read the reference example.sdds that exercises every SDDS data type:
     short, ushort, long, ulong, long64, ulong64, float, double, longdouble,
@@ -536,7 +532,12 @@ def test_read_ascii_lenient_numeric_cells_and_octal_escapes(with_string_column):
     sdds = pysdds.read(io.BytesIO(src), allow_longdouble=True)
     assert sdds.par("ps").data == ["A2"]
     assert sdds.col("i").data[0].tolist() == [3]
-    assert sdds.col("g").data[0][0] == np.longdouble("1.000000000000000001")
-    assert sdds.col("g").data[0][0] != np.longdouble(1.0)
+    g = sdds.col("g").data[0][0]
+    assert g == np.longdouble("1.000000000000000001")
+    if np.dtype(np.longdouble).itemsize > 8:
+        assert g != np.longdouble(1.0)
+    else:
+        # No 80-bit type on this platform (e.g. Windows): the value is read as the nearest double
+        assert g == 1.0
     if with_string_column:
         assert sdds.col("s").data[0][0] == "\x011"

@@ -14,6 +14,7 @@ import pandas as pd
 
 from pysdds.structures import Array, Associate, Column, Data, Description, Parameter, SDDSFile
 from pysdds.util.constants import (
+    _LONGDOUBLE_NATIVE,
     _NUMPY_DTYPE_BE,
     _NUMPY_DTYPE_FINAL,
     _NUMPY_DTYPE_LE,
@@ -23,6 +24,7 @@ from pysdds.util.constants import (
     _STRUCT_STRINGS_LE,
 )
 
+from ..util.conversions import LONGDOUBLE_FIELD_BYTES, decode_longdouble_fields
 from ..util.errors import SDDSReadError
 from .shlex_sdds import split_sdds
 from .tokenizers import tokenize_namelist
@@ -101,6 +103,15 @@ def _ascii_cell_converter(numpy_type):
         # float() would silently round longdouble to binary64
         return np.longdouble if dt.itemsize > 8 else float
     return _int_lenient
+
+
+def _longdouble_from_bytes(buffer, endianness: str) -> np.ndarray:
+    """Packed 16-byte longdouble fields -> np.longdouble array, or float64 where numpy has no 80-bit type"""
+    if _LONGDOUBLE_NATIVE:
+        return np.frombuffer(
+            buffer, dtype=_NUMPY_DTYPE_BE["longdouble"] if endianness == "big" else _NUMPY_DTYPE_LE["longdouble"]
+        )
+    return decode_longdouble_fields(buffer, endianness)
 
 
 def _split_ascii_row(line: str) -> List[str]:
@@ -444,19 +455,13 @@ def read(
                     "Encountered longdouble data type, which is strongly discouraged. Override with "
                     '"allow_longdouble" to attempt parsing.'
                 )
+            elif _LONGDOUBLE_NATIVE:
+                logger.debug("longdouble values will be read as np.longdouble (80-bit, padded to 16 bytes)")
             else:
-                ldinfo = np.finfo(np.longdouble)
-                import ctypes
-
-                ldlen = ctypes.sizeof(ctypes.c_longdouble)
-                if ldinfo.dtype == np.dtype(np.float64):
-                    assert ldlen == 8
-                    raise Exception("longdouble is float64 on this platform, parsing not possible")
-                elif ldinfo.dtype == np.dtype(np.float128):
-                    assert ldlen == 16
-                    logger.warning("longdouble values will be treated as np.float128 (80-bit, padded to 128bit)")
-                else:
-                    raise Exception(f"Unexpected longdouble length ({ldinfo=})({ldlen=}), aborting")
+                logger.warning(
+                    f"np.longdouble is {np.dtype(np.longdouble).itemsize} bytes on this platform - "
+                    "longdouble values will be converted to float64 (53-bit precision)"
+                )
         if sdds._meta_fixed_rowcount:
             if sdds.mode != "binary":
                 raise ValueError(f'Meta-command "!# fixed-rowcount" requires binary mode, not {sdds.mode}')
@@ -1211,9 +1216,10 @@ def _read_pages_binary(
         columns_structs.append(struct.Struct(STRUCT_DTYPE_STRINGS[t]) if t != "string" else None)
     columns_all_numeric = object not in columns_type and n_columns > 0
     if columns_all_numeric:
-        combined_struct = columns_type_struct[0]
-        for v in columns_type_struct[1:]:
-            combined_struct += v[1]
+        # One explicit byte-order prefix, then the bare codes (longdouble is "16s", which has no prefix of its own)
+        combined_struct = ("<" if endianness == "little" else ">") + "".join(
+            v.lstrip("<>") for v in columns_type_struct
+        )
         combined_size = sum(columns_len)
     if n_columns > 0:
         logger.debug("Columns to parse: %d", n_columns)
@@ -1267,6 +1273,24 @@ def _read_pages_binary(
         if fmt:
             st = struct.Struct(prefix + fmt)
             row_plan.append((st, st.size, seg_numeric, False, None))
+
+    # Cell dtypes for the struct-based parsers: struct yields 1-byte bytes for characters and 16 raw bytes for
+    # longdouble, so those are collected as S1/V16 and converted once per page in _finish_column
+    columns_cell_dtype = []
+    for i, c in enumerate(columns):
+        if columns_len[i] == 1:
+            columns_cell_dtype.append(np.dtype("S1"))
+        elif c.type == "longdouble":
+            columns_cell_dtype.append(np.dtype(f"V{LONGDOUBLE_FIELD_BYTES}"))
+        else:
+            columns_cell_dtype.append(columns_store_type[i])
+
+    def _finish_column(i: int, arr: np.ndarray) -> np.ndarray:
+        if columns_len[i] == 1:
+            return np.char.decode(arr.view("S1"), "ascii").astype(object)
+        if columns[i].type == "longdouble":
+            return _longdouble_from_bytes(np.ascontiguousarray(arr).tobytes(), endianness)
+        return arr
 
     page_idx = 0
     page_stored_idx = 0
@@ -1335,7 +1359,10 @@ def _read_pages_binary(
                 # All primitive types
                 byte_array = file.read(type_len)
                 assert len(byte_array) == type_len, f"Invalid {len(byte_array)=} for type {parameter_types[i]}"
-                val = np.frombuffer(byte_array, dtype=parameter_types[i], count=1)[0]
+                if el.type == "longdouble":
+                    val = _longdouble_from_bytes(byte_array, endianness)[0]
+                else:
+                    val = np.frombuffer(byte_array, dtype=parameter_types[i], count=1)[0]
 
             if TRACE:
                 logger.debug(
@@ -1399,7 +1426,10 @@ def _read_pages_binary(
                     raise ValueError(f">>Array {a.name} read failed because of EOF")
                 if flag:
                     # Arrays are initialized in C order by default, matching SDDS
-                    values = np.frombuffer(data_bytes, dtype=mapped_t)
+                    if a.type == "longdouble":
+                        values = _longdouble_from_bytes(data_bytes, endianness)
+                    else:
+                        values = np.frombuffer(data_bytes, dtype=mapped_t)
                     if type_len == 1:
                         # Character arrays are stored as str objects, like character columns and parameters
                         values = np.char.decode(values.view("S1"), "ascii").astype(object)
@@ -1451,7 +1481,10 @@ def _read_pages_binary(
                     # primitive type -> read in full column
                     byte_array = file.read(type_len * page_size)
                     if flag:
-                        column_array = np.frombuffer(byte_array, dtype=columns_type[i], count=page_size)
+                        if columns[i].type == "longdouble":
+                            column_array = _longdouble_from_bytes(byte_array, endianness)
+                        else:
+                            column_array = np.frombuffer(byte_array, dtype=columns_type[i], count=page_size)
                         if type_len == 1:
                             # Decode uint8 to <U1 to object
                             column_array = np.char.decode(column_array.view("S1"), "ascii").astype(object)
@@ -1470,8 +1503,7 @@ def _read_pages_binary(
             for i in range(n_columns):
                 if columns_mask[i]:
                     # struct yields 1-byte bytes for characters; collect as S1 and decode once at the end
-                    dt = "S1" if columns_len[i] == 1 else columns_store_type[i]
-                    columns_data.append(np.empty(page_size, dtype=dt))
+                    columns_data.append(np.empty(page_size, dtype=columns_cell_dtype[i]))
             st = struct.Struct(combined_struct)
             page_size_actual = page_size  # reduced if a fixed-rowcount file ends early
             for row in range(page_size):
@@ -1504,16 +1536,9 @@ def _read_pages_binary(
                         if sdds._meta_fixed_rowcount and page_size_actual < page_size:
                             # Hopefully no copy?
                             arr = columns_data[idx_active][:page_size_actual]
-                            if columns_len[i] == 1:
-                                c.data.append(np.char.decode(arr.view("S1"), "ascii").astype(object))
-                            else:
-                                c.data.append(arr)
                         else:
                             arr = columns_data[idx_active]
-                            if columns_len[i] == 1:
-                                c.data.append(np.char.decode(arr.view("S1"), "ascii").astype(object))
-                            else:
-                                c.data.append(arr)
+                        c.data.append(_finish_column(i, arr))
                         c._page_numbers.append(page_idx)
                         idx_active += 1
                 page_stored_idx += 1
@@ -1525,8 +1550,7 @@ def _read_pages_binary(
         ):
             for i in range(n_columns):
                 if columns_mask[i]:
-                    dt = "S1" if columns_len[i] == 1 else columns_store_type[i]
-                    columns_data.append(np.empty(page_size, dtype=dt))
+                    columns_data.append(np.empty(page_size, dtype=columns_cell_dtype[i]))
             st = struct.Struct(combined_struct)
             byte_array = file.read(combined_size * page_size)
             if len(byte_array) < combined_size * page_size:
@@ -1542,11 +1566,7 @@ def _read_pages_binary(
                 idx_active = 0
                 for i, c in enumerate(sdds.columns):
                     if columns_mask[i]:
-                        arr = columns_data[idx_active]
-                        if columns_len[i] == 1:
-                            c.data.append(np.char.decode(arr.view("S1"), "ascii").astype(object))
-                        else:
-                            c.data.append(arr)
+                        c.data.append(_finish_column(i, columns_data[idx_active]))
                         c._page_numbers.append(page_idx)
                         idx_active += 1
                 page_stored_idx += 1
@@ -1573,10 +1593,8 @@ def _read_pages_binary(
                 idx_active = 0
                 for i, c in enumerate(columns):
                     if columns_mask[i]:
-                        # arr = array[f'f{i}'].copy()
-                        if columns_len[i] == 1:
-                            # c.data.append(np.char.decode(arr.view('S1'), 'ascii'))
-                            c.data.append(np.char.decode(array[str(i)].view("S1"), "ascii").astype(object))
+                        if columns_len[i] == 1 or c.type == "longdouble":
+                            c.data.append(_finish_column(i, array[str(i)]))
                         else:
                             # For now, make a copy to be safe
                             c.data.append(array[str(i)].copy())
@@ -1586,7 +1604,9 @@ def _read_pages_binary(
         else:
             for i in range(n_columns):
                 if columns_mask[i]:
-                    columns_data.append(np.empty(page_size, dtype=columns_store_type[i]))
+                    # character cells are decoded to str on assignment, so they take the store (object) dtype
+                    dt = columns_store_type[i] if columns_len[i] == 1 else columns_cell_dtype[i]
+                    columns_data.append(np.empty(page_size, dtype=dt))
             page_size_actual = page_size  # reduced if a fixed-rowcount file ends early
             store = not page_skip
             for row in range(page_size):
@@ -1634,9 +1654,12 @@ def _read_pages_binary(
                 for i, c in enumerate(sdds.columns):
                     if columns_mask[i]:
                         if sdds._meta_fixed_rowcount and page_size_actual < page_size:
-                            c.data.append(columns_data[idx_active][:page_size_actual])
+                            arr = columns_data[idx_active][:page_size_actual]
                         else:
-                            c.data.append(columns_data[idx_active])
+                            arr = columns_data[idx_active]
+                        if c.type == "longdouble":
+                            arr = _finish_column(i, arr)
+                        c.data.append(arr)
                         c._page_numbers.append(page_idx)
                         idx_active += 1
                 page_stored_idx += 1
@@ -1721,6 +1744,9 @@ def _read_pages_ascii_mixed_lines(
     # Per-cell converters: Python float/int assign straight into the preallocated arrays, a few times cheaper
     # than np.fromstring per value and without creating a numpy scalar each time
     columns_conv = [None if t is object else _ascii_cell_converter(t) for t in columns_type]
+    # pandas would parse longdouble cells as binary64 (and QUOTE_NONNUMERIC converts them before any dtype
+    # applies), so pages with such columns always take the per-cell parser
+    columns_have_longdouble = any(c.type == "longdouble" for c in columns)
     struct_type = None
     if n_columns > 0:
         logger.debug(f"Column types: {columns_type}")
@@ -1864,7 +1890,7 @@ def _read_pages_ascii_mixed_lines(
 
         # line = file.readline().decode('ascii')
         # list instead of generator to hopefully preallocate space
-        if _ASCII_TEXT_PARSE_METHOD == "read_table":
+        if _ASCII_TEXT_PARSE_METHOD == "read_table" and not columns_have_longdouble:
             # Because read_table will consume too much if allowed to touch file, have to copy out a single page
             # TODO: see if maybe wrapping file will have higher perf
             lines = [file.readline().decode("ascii") for i in range(page_size)]
@@ -1907,7 +1933,7 @@ def _read_pages_ascii_mixed_lines(
                         col_idx_active += 1
                 page_stored_idx += 1
             page_idx += 1
-        elif _ASCII_TEXT_PARSE_METHOD == "shlex" and page_size is not None:
+        elif page_size is not None:
             columns_data = []
             if not page_skip:
                 for i, c in enumerate(sdds.columns):
@@ -2420,7 +2446,10 @@ def _read_pages_ascii_numeric_lines(
                 if not page_skip:
                     _append_empty_columns(page_idx)
             elif _ASCII_NUMERIC_PARSE_METHOD == "read_table" and page_size is not None:
-                pd_column_dict = {i: columns_type[i] for i in range(len(columns_type))}
+                # pandas parses floats as binary64, so longdouble columns are read as text and converted after
+                pd_column_dict = {
+                    i: (str if columns[i].type == "longdouble" else columns_type[i]) for i in range(len(columns_type))
+                }
                 # Collect exactly page_size data lines - comment lines do not count towards the row total
                 lines = []
                 while len(lines) < page_size:
@@ -2457,12 +2486,18 @@ def _read_pages_ascii_numeric_lines(
                     if not page_skip:
                         for i, c in enumerate(sdds.columns):
                             if columns_mask[i]:
-                                c.data.append(df.iloc[:, i].values)
+                                values = df.iloc[:, i].values
+                                if c.type == "longdouble":
+                                    values = values.astype(_NUMPY_DTYPE_FINAL["longdouble"])
+                                c.data.append(values)
                                 c._page_numbers.append(page_idx)
             elif _ASCII_NUMERIC_PARSE_METHOD == "read_table" and page_size is None:
                 # no_row_count mode
                 # TODO: exponential growth buffer
-                pd_column_dict = {i: columns_type[i] for i in range(len(columns_type))}
+                # pandas parses floats as binary64, so longdouble columns are read as text and converted after
+                pd_column_dict = {
+                    i: (str if columns[i].type == "longdouble" else columns_type[i]) for i in range(len(columns_type))
+                }
                 cnt = 0
                 line_cnt = 0
 
@@ -2512,7 +2547,10 @@ def _read_pages_ascii_numeric_lines(
                     if not page_skip:
                         for i, c in enumerate(sdds.columns):
                             if columns_mask[i]:
-                                c.data.append(df.iloc[:, i].values)
+                                values = df.iloc[:, i].values
+                                if c.type == "longdouble":
+                                    values = values.astype(_NUMPY_DTYPE_FINAL["longdouble"])
+                                c.data.append(values)
                                 c._page_numbers.append(page_idx)
         page_idx += 1
         if not page_skip:

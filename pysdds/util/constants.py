@@ -1,13 +1,19 @@
-import os
-
 import numpy as np
 import pandas as pd
+
+from .conversions import LONGDOUBLE_FIELD_BYTES, longdouble_is_native
 
 # SDDS specification has short, long, float, double, character, or string
 # SDDS 2 adds ulong, ushort
 # SDDS 4/5 adds long64, ulong64
 # Unclear which version adds longdouble - handling this type is very problematic because it changes size based on
 # the OS and 32/64 version to ensure byte alignment. Namely, Windows has np.longdouble==np.double, x86 unix = np.float96, x64 unix = np.float128, PowerPC handling is compiler-dependent
+# Files always carry 16-byte fields (what the C library writes on x86-64). Where np.longdouble is that same type the
+# fields are viewed directly; elsewhere they are decoded to/encoded from float64 by pysdds.util.conversions
+_LONGDOUBLE_NATIVE = longdouble_is_native()
+_LONGDOUBLE_FIELD_LE = np.dtype("<g", align=True) if _LONGDOUBLE_NATIVE else np.dtype(f"V{LONGDOUBLE_FIELD_BYTES}")
+_LONGDOUBLE_FIELD_BE = np.dtype(">g") if _LONGDOUBLE_NATIVE else np.dtype(f"V{LONGDOUBLE_FIELD_BYTES}")
+
 _NUMPY_DTYPES = {
     "short": "i2",
     "ushort": "u2",
@@ -17,6 +23,7 @@ _NUMPY_DTYPES = {
     "ulong64": "u8",
     "float": "f4",
     "double": "f8",
+    "longdouble": "g",  # 80-bit where available, otherwise the same as f8
     "character": object,
     "string": object,
 }
@@ -40,11 +47,10 @@ try:
 except TypeError:
     pass
 
-# Only add them is likely available, since otherwise np.dtype(np.longdouble) == np.dtype(np.float64)
-# which confuses dict type lookups
-if os.name == "posix":
-    _NUMPY_DTYPES.update({"longdouble": "g"})
-    _NUMPY_DTYPES_INV.update({np.dtype(np.longdouble): "longdouble"})
+# Only when it is a distinct type, since otherwise np.dtype(np.longdouble) == np.dtype(np.float64)
+# and the reverse lookup would turn every double into a longdouble
+if _LONGDOUBLE_NATIVE:
+    _NUMPY_DTYPES_INV[np.dtype(np.longdouble)] = "longdouble"
 
 # On all 'reasonable' architectures, things will be little endian, but plenty of old files floating around
 _NUMPY_DTYPE_LE = {
@@ -56,7 +62,7 @@ _NUMPY_DTYPE_LE = {
     "ulong64": np.dtype("<u8"),
     "float": np.dtype("<f4"),
     "double": np.dtype("<f8"),
-    "longdouble": np.dtype("<g", align=True),
+    "longdouble": _LONGDOUBLE_FIELD_LE,
     "character": np.dtype("<i1"),
     "string": object,
 }
@@ -70,7 +76,7 @@ _NUMPY_DTYPE_BE = {
     "ulong64": np.dtype(">u8"),
     "float": np.dtype(">f4"),
     "double": np.dtype(">f8"),
-    "longdouble": np.dtype(">g"),
+    "longdouble": _LONGDOUBLE_FIELD_BE,
     "character": np.dtype("<i1"),
     "string": object,
 }
@@ -104,6 +110,8 @@ _PYTHON_TYPE_FINAL = {
 }
 _PYTHON_TYPE_NO_NUMPY = {"long": int, "double": float}
 _PYTHON_TYPE_INV = {int: "long", float: "double", str: "string"}
+if _LONGDOUBLE_NATIVE:
+    _PYTHON_TYPE_INV[np.longdouble] = "longdouble"
 _STRUCT_STRINGS_LE = {
     "short": "<h",
     "ushort": "<H",
