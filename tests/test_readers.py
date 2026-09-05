@@ -405,3 +405,22 @@ def test_read_all_sdds_types_header_only():
         assert a.dimensions == 1
     for a in sdds.arrays[4:]:
         assert a.dimensions == 2
+
+
+def test_read_ascii_numeric_comment_inside_column_data():
+    """Comment lines between rows must not count towards the declared row total"""
+    src = (
+        b"SDDS1\n"
+        b"&column name=x, type=double, &end\n"
+        b"&data mode=ascii, &end\n"
+        b"2\n"
+        b"1.0\n"
+        b"! comment between rows\n"
+        b"2.0 ! trailing comment\n"
+        b"2\n"
+        b"3.0\n"
+        b"4.0\n"
+    )
+    sdds = pysdds.read(io.BytesIO(src))
+    assert sdds.n_pages == 2
+    assert [v.tolist() for v in sdds.col("x").data] == [[1.0, 2.0], [3.0, 4.0]]

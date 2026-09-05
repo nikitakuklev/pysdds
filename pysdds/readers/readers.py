@@ -2364,8 +2364,16 @@ def _read_pages_ascii_numeric_lines(
                     _append_empty_columns(page_idx)
             elif _ASCII_NUMERIC_PARSE_METHOD == "read_table" and page_size is not None:
                 pd_column_dict = {i: columns_type[i] for i in range(len(columns_type))}
-                lines = [file.readline().decode("ascii") for i in range(page_size)]
-                buf = io.StringIO("\n".join((l for l in lines if not l.startswith("!"))))
+                # Collect exactly page_size data lines - comment lines do not count towards the row total
+                lines = []
+                while len(lines) < page_size:
+                    l = file.readline().decode("ascii")
+                    if not l:
+                        raise SDDSReadError(f"Unexpected EOF in page {page_idx} after {len(lines)} of {page_size} rows")
+                    if "!" in l and l.lstrip().startswith("!"):
+                        continue
+                    lines.append(l)
+                buf = io.StringIO("\n".join(lines))
                 # buf = io.StringIO('\n'.join(lines))
                 # lines = [file.readline() for i in range(page_size)]
                 # buf = io.BytesIO(b''.join(lines))
