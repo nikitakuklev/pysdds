@@ -495,3 +495,24 @@ def test_read_ascii_numeric_column_selection(page_size):
     assert np.array_equal(sdds.col("y").data[0], 10.0 * np.arange(n))
     assert np.array_equal(sdds.col("k").data[0], np.arange(n, dtype=np.int32))
     assert sdds.col("k").data[0].dtype == np.int32
+
+
+def test_read_no_row_counts_mixed_no_columns_selected():
+    """cols=[] must still count pages and read parameters in the no_row_counts token parser"""
+    src = (
+        b"SDDS1\n"
+        b"&parameter name=p, type=long, &end\n"
+        b"&column name=x, type=double, &end\n"
+        b"&column name=s, type=string, &end\n"
+        b"&data mode=ascii, no_row_counts=1, &end\n"
+        b"1\n1.0 a\n2.0 b\n\n"
+        b"2\n3.0 c\n\n"
+        b"3\n"
+    )
+    sdds = pysdds.read(io.BytesIO(src), cols=[])
+    assert sdds.n_pages == 3
+    assert sdds.par("p").data == [1, 2, 3]
+    assert not sdds.col("x")._enabled and sdds.col("x").data == []
+    sdds = pysdds.read(io.BytesIO(src), cols=[], pages=[1])
+    assert sdds.n_pages == 1
+    assert sdds.par("p").data == [2]

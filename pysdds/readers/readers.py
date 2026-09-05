@@ -1978,10 +1978,9 @@ def _read_pages_ascii_mixed_lines(
 
             # Assign data to the columns
             if not page_skip:
-                if not any(columns_mask):
-                    break
+                # With no columns selected there is nothing to store, but the page still counts
                 column_lengths = [len(x) for x in columns_list_data]
-                assert len(set(column_lengths)) == 1, f"Column mismatch {column_lengths}"
+                assert len(set(column_lengths)) <= 1, f"Column mismatch {column_lengths}"
                 col_idx_active = 0
                 for i, c in enumerate(sdds.columns):
                     if columns_mask[i]:
