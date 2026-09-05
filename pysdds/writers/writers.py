@@ -733,7 +733,7 @@ def _dump_data_ascii(sdds: SDDSFile, file: IO[bytes], best_settings):
                     if p.type == "string":
                         append(encode_if_needed(v))
                     elif p.type == "double":
-                        append(f"{v:.15e}")
+                        append(f"{v:.16e}")
                     elif p.type == "character":
                         append(encode_char_if_needed(v))
                     else:
@@ -749,7 +749,7 @@ def _dump_data_ascii(sdds: SDDSFile, file: IO[bytes], best_settings):
                 elif el.type == "character":
                     sl = [encode_char_if_needed(v) for v in flat]
                 elif el.type == "double":
-                    sl = [f"{v:.15e}" for v in flat]
+                    sl = [f"{v:.16e}" for v in flat]
                 else:
                     sl = [str(v) for v in flat]
                 append(" ".join(sl))
@@ -759,7 +759,7 @@ def _dump_data_ascii(sdds: SDDSFile, file: IO[bytes], best_settings):
                 if sdds.data.no_row_counts == 0:
                     append(str(page_size))
                 # Resolve the formatter once per column instead of dispatching on c.type for every cell
-                fmt_double = "{:.15e}".format
+                fmt_double = "{:.16e}".format
                 columns_fmt = []
                 for c in sdds.columns:
                     t = c.type
@@ -825,7 +825,7 @@ def _dump_data_ascii(sdds: SDDSFile, file: IO[bytes], best_settings):
                 #     if c.type == 'string':
                 #         df.loc[:, col] = df.loc[:, col].apply(lambda x: '"{}"'.format(x))
                 #     elif c.type == 'double':
-                #         df.loc[:, col] = df.loc[:, col].apply(lambda x: '{:.15e}'.format(x))
+                #         df.loc[:, col] = df.loc[:, col].apply(lambda x: '{:.16e}'.format(x))
                 # opts2 = dict(
                 #     header=False,
                 #     index=False,
