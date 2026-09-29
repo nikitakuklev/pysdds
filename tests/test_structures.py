@@ -80,3 +80,67 @@ def test_write_from_scratch_without_data_namelist():
         assert sdds2.mode == mode
         assert sdds2.par("p").data == [1.5]
         assert np.array_equal(sdds2.col("x").data[0], [1.0, 2.0])
+
+
+# Integer parameter lists may contain ordinary Python ints, whose width is checked against the header type.
+_INTEGER_PARAMETER_DTYPES = {
+    "short": "i2",
+    "ushort": "u2",
+    "long": "i4",
+    "ulong": "u4",
+    "long64": "i8",
+    "ulong64": "u8",
+}
+
+
+def test_python_integer_parameter_roundtrips():
+    import numpy as np
+
+    for mode in ("ascii", "binary"):
+        for endian in ("little", "big"):
+            for sdds_type, dtype in _INTEGER_PARAMETER_DTYPES.items():
+                limits = np.iinfo(dtype)
+                values = [int(limits.min), 7, int(limits.max)]
+                source = pysdds.SDDSFile()
+                source.n_pages = len(values)
+                source.add_parameter("p", sdds_type, data=values)
+                source.add_parameter("q", "double", data=[1.5] * len(values))
+                source.set_mode(mode)
+                source.set_endianness(endian)
+                source.validate_data()
+                output = io.BytesIO()
+                pysdds.write(source, output)
+                result = pysdds.read(io.BytesIO(output.getvalue()))
+                assert result.par("p").data == values, (mode, endian, sdds_type)
+                assert all(isinstance(v, np.dtype(dtype).type) for v in result.par("p").data)
+                assert result.par("q").data == [1.5] * len(values)
+                assert all(type(v) is int for v in source.par("p").data)
+
+
+def test_python_integer_parameters_reject_overflow_before_writing():
+    import numpy as np
+    import pytest
+
+    for sdds_type, dtype in _INTEGER_PARAMETER_DTYPES.items():
+        limits = np.iinfo(dtype)
+        for value in (int(limits.min) - 1, int(limits.max) + 1):
+            for mode in ("ascii", "binary"):
+                source = pysdds.SDDSFile()
+                source.n_pages = 1
+                source.add_parameter("p", sdds_type, data=[value])
+                source.set_mode(mode)
+                output = io.BytesIO()
+                with pytest.raises(ValueError, match=f"outside the range of {sdds_type}"):
+                    pysdds.write(source, output)
+                assert output.getvalue() == b""
+
+
+def test_integer_parameter_validation_does_not_coerce_other_types():
+    import pytest
+
+    for value in (True, False, 1.5, "7"):
+        source = pysdds.SDDSFile()
+        source.n_pages = 1
+        source.add_parameter("p", "long", data=[value])
+        with pytest.raises(Exception, match="Parameter type"):
+            source.validate_data()

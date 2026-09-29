@@ -1281,7 +1281,13 @@ class SDDSFile:
             assert len(data) == n_pages, f"Expected {n_pages} points but have {len(data)} for {el}"
             assert isinstance(data, list)
             for v in data:
-                if type(v) != _PYTHON_TYPE_FINAL[el.type]:
+                if type(v) is int and np.issubdtype(_NUMPY_DTYPE_FINAL[el.type], np.integer):
+                    # Python ints have no fixed width. Validate before the writer casts to the declared
+                    # SDDS dtype, so an accepted value cannot silently wrap or change sign.
+                    limits = np.iinfo(_NUMPY_DTYPE_FINAL[el.type])
+                    if not limits.min <= v <= limits.max:
+                        raise ValueError(f"Parameter {el.name} value {v} is outside the range of {el.type}")
+                elif type(v) != _PYTHON_TYPE_FINAL[el.type]:
                     raise Exception(f"Parameter type ({type(v)}) ({v}) does not match {_PYTHON_TYPE_FINAL[el.type]}")
 
         for el in self.arrays:

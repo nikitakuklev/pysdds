@@ -765,7 +765,7 @@ def _dump_data_ascii(sdds: SDDSFile, file: IO[bytes], best_settings):
         }
 
         for page_idx in range(sdds.n_pages):
-            if page_idx > 0 and sdds.data.no_row_counts == 1:
+            if page_idx > 0 and sdds.data.no_row_counts == 1 and sdds.columns:
                 # Must indicate new page if row count is missing
                 append("")
             append(f"! page number {page_idx}")
@@ -783,7 +783,7 @@ def _dump_data_ascii(sdds: SDDSFile, file: IO[bytes], best_settings):
 
             for i, el in enumerate(sdds.arrays):
                 data = el.data[page_idx]
-                append(" ".join([str(i) for i in data.shape]) + f" ! {len(data.shape)}-dimensional array {el.name}")
+                append(" ".join([str(i) for i in data.shape]) + f" ! {len(data.shape)}-dimensional array {el.name}:")
                 # Elements are written flat in C order regardless of dimensionality
                 flat = data.ravel()
                 if el.type == "string":
@@ -794,7 +794,8 @@ def _dump_data_ascii(sdds: SDDSFile, file: IO[bytes], best_settings):
                     sl = [f"{v:.16e}" for v in flat]
                 else:
                     sl = [str(v) for v in flat]
-                append(" ".join(sl))
+                if flat.size:
+                    append(" ".join(sl))
 
             if len(sdds.columns) > 0:
                 page_size = len(sdds.columns[0].data[page_idx])
@@ -848,7 +849,7 @@ def _dump_data_ascii(sdds: SDDSFile, file: IO[bytes], best_settings):
 
             for i, el in enumerate(sdds.arrays):
                 data = el.data[page_idx]
-                append(" ".join([str(i) for i in data.shape]) + f" ! {len(data.shape)}-dimensional array {el.name}")
+                append(" ".join([str(i) for i in data.shape]) + f" ! {len(data.shape)}-dimensional array {el.name}:")
                 array_df = pd.DataFrame({"data": data}).T
                 array_df.to_csv(file, **opts, sep=" ", quoting=csv.QUOTE_MINIMAL)
 
