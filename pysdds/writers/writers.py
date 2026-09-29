@@ -373,13 +373,6 @@ class IncrementalWriter:
         if self.write_stage not in [WriterState.READY_FOR_NEXT_PAGE, WriterState.WRITING_PAGE]:
             raise SDDSWriteException(f"Cannot write new page in current state {self.write_stage}")
 
-        if self.write_stage == WriterState.WRITING_PAGE:
-            if self.write_method == "fixed_rowcount":
-                raise SDDSWriteException("Cannot write more than one page when using fixed_rowcount mode")
-            else:
-                logger.debug(f"Ending page {self.current_page} implicitly due to new page request")
-                self.end_page()
-
         parameter_data = parameter_data or []
         array_data = array_data or []
         if len(parameter_data) != len(self.parameters):
@@ -388,6 +381,15 @@ class IncrementalWriter:
                 f"got {len(parameter_data)}"
             )
         assert len(array_data) == len(self.sdds.arrays)
+        # Validate every scalar before writing a row count, parameter prefix, or changing page state.
+        parameter_data = [p._validated_value(v) for p, v in zip(self.parameters, parameter_data)]
+
+        if self.write_stage == WriterState.WRITING_PAGE:
+            if self.write_method == "fixed_rowcount":
+                raise SDDSWriteException("Cannot write more than one page when using fixed_rowcount mode")
+            else:
+                logger.debug(f"Ending page {self.current_page} implicitly due to new page request")
+                self.end_page()
 
         if self.mode == "ascii":
             raise NotImplementedError("Incremental writing is not supported in ASCII mode")
@@ -771,7 +773,7 @@ def _dump_data_ascii(sdds: SDDSFile, file: IO[bytes], best_settings):
             append(f"! page number {page_idx}")
             for j, p in enumerate(sdds.parameters):
                 if p.fixed_value is None:
-                    v = p.data[page_idx]
+                    v = p._validated_value(p.data[page_idx])
                     if p.type == "string":
                         append(encode_if_needed(v))
                     elif p.type == "double":
@@ -981,7 +983,7 @@ def _dump_data_binary(sdds: SDDSFile, file: IO[bytes], endianness):
             elif type_len == 1:
                 file.write(ord(el.data[page_idx]).to_bytes(1, endianness))
             else:
-                file.write(_numeric_to_bytes(el.data[page_idx], el.type, p_types[i], endianness))
+                file.write(_numeric_to_bytes(el._validated_value(el.data[page_idx]), el.type, p_types[i], endianness))
 
         for i, el in enumerate(sdds.arrays):
             # file.write(el.data[page_idx].shape.view(NUMPY_DTYPE['character'])])

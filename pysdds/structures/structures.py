@@ -194,6 +194,49 @@ class Parameter:
     def to_sdds(self):
         return f"&parameter {_namelist_to_str(self.nm)},  &end"
 
+    def _validated_value(self, value):
+        """Return a scalar in the declared type without changing caller data.
+
+        Unsupported scalar types raise TypeError; range/character errors raise ValueError.
+        Floating-point precision rounding is allowed, but finite overflow is not.
+        """
+        is_integer = type(value) is int or isinstance(value, np.integer)
+        is_floating = type(value) is float or isinstance(value, np.floating)
+        if self.type in ("string", "character"):
+            if type(value) is not str:
+                raise TypeError(f"Parameter type ({type(value)}) does not match {self.type} for {self.name}")
+            if self.type == "character":
+                if len(value) != 1:
+                    raise ValueError(f"Parameter {self.name} requires exactly one character")
+                if ord(value) > 255:
+                    raise ValueError(f"Parameter {self.name} character is outside the single-byte range")
+            else:
+                value.encode("ascii")
+            return value
+
+        dtype = constants._NUMPY_DTYPE_FINAL[self.type]
+        if dtype.kind in "iu":
+            if not is_integer:
+                raise TypeError(f"Parameter type ({type(value)}) does not match {self.type} for {self.name}")
+            limits = np.iinfo(dtype)
+            if not limits.min <= int(value) <= limits.max:
+                raise ValueError(f"Parameter {self.name} value is outside the range of {self.type}")
+        else:
+            if not (is_integer or is_floating):
+                raise TypeError(f"Parameter type ({type(value)}) does not match {self.type} for {self.name}")
+            limit = np.finfo(dtype).max
+            if is_integer:
+                # Compare in the integer domain: a float cast could overflow or round across the bound.
+                if not -int(limit) <= int(value) <= int(limit):
+                    raise ValueError(f"Parameter {self.name} value is outside the range of {self.type}")
+            elif np.isfinite(value) and abs(np.longdouble(value)) > np.longdouble(limit):
+                raise ValueError(f"Parameter {self.name} value is outside the range of {self.type}")
+            if is_integer and int(value).bit_length() > 1024:
+                # Only extended longdouble can reach here. Hex avoids both binary64 conversion and
+                # Python's decimal digit limit for large integers within longdouble's finite range.
+                return dtype.type(hex(int(value)))
+        return dtype.type(value)
+
     def compare(
         self,
         other,
@@ -1270,7 +1313,7 @@ class SDDSFile:
     def validate_data(self):
         """Validate current data for self-consistency"""
         n_pages = self.n_pages
-        from ..util.constants import _NUMPY_DTYPE_FINAL, _PYTHON_TYPE_FINAL
+        from ..util.constants import _NUMPY_DTYPE_FINAL
 
         assert self.n_parameters == len(self.parameters)
         assert self.n_arrays == len(self.arrays)
@@ -1281,14 +1324,7 @@ class SDDSFile:
             assert len(data) == n_pages, f"Expected {n_pages} points but have {len(data)} for {el}"
             assert isinstance(data, list)
             for v in data:
-                if type(v) is int and np.issubdtype(_NUMPY_DTYPE_FINAL[el.type], np.integer):
-                    # Python ints have no fixed width. Validate before the writer casts to the declared
-                    # SDDS dtype, so an accepted value cannot silently wrap or change sign.
-                    limits = np.iinfo(_NUMPY_DTYPE_FINAL[el.type])
-                    if not limits.min <= v <= limits.max:
-                        raise ValueError(f"Parameter {el.name} value {v} is outside the range of {el.type}")
-                elif type(v) != _PYTHON_TYPE_FINAL[el.type]:
-                    raise Exception(f"Parameter type ({type(v)}) ({v}) does not match {_PYTHON_TYPE_FINAL[el.type]}")
+                el._validated_value(v)
 
         for el in self.arrays:
             data = el.data
